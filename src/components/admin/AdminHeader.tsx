@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { Bell, Search, User } from 'lucide-react';
 
 interface AdminHeaderProps {
@@ -22,6 +23,7 @@ export function AdminHeader({ title, subtitle }: AdminHeaderProps) {
             className="w-64 pl-9 bg-background"
           />
         </div>
+        <ThemeToggle />
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
