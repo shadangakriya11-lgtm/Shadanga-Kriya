@@ -41,7 +41,7 @@ export default function Index() {
             A protocol-driven audio therapy ecosystem where learners focus on recovery, and administrators maintain complete operational control.
           </p>
           <div className="flex items-center justify-center gap-4">
-            <Button variant="premium" size="xl" onClick={() => navigate('/login')}>
+            <Button variant="premium" size="xl" onClick={() => navigate('/splash')}>
               <Smartphone className="h-5 w-5 mr-2" />
               Learner App
             </Button>
@@ -64,7 +64,7 @@ export default function Index() {
             <p className="text-muted-foreground mb-4">
               Distraction-free audio therapy with strict playback rules, offline support, and pre-session protocols.
             </p>
-            <Button variant="ghost" className="p-0 h-auto text-primary" onClick={() => navigate('/login')}>
+            <Button variant="ghost" className="p-0 h-auto text-primary" onClick={() => navigate('/splash')}>
               Access App <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
