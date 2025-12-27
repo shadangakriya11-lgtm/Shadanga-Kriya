@@ -69,7 +69,7 @@ export default function CourseDetail() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="flex items-center gap-4 px-4 py-4 max-w-3xl mx-auto">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
