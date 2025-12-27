@@ -85,8 +85,8 @@ export default function Index() {
           </div>
 
           <div className="bg-card rounded-2xl border border-border/50 p-8 shadow-soft animate-fade-in" style={{ animationDelay: '300ms' }}>
-            <div className="h-14 w-14 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
-              <Users className="h-7 w-7 text-primary" />
+            <div className="h-14 w-14 rounded-xl bg-secondary/30 flex items-center justify-center mb-6">
+              <Users className="h-7 w-7 text-secondary-foreground" />
             </div>
             <h3 className="font-serif text-xl font-semibold text-foreground mb-3">
               Facilitator Panel
@@ -94,8 +94,8 @@ export default function Index() {
             <p className="text-muted-foreground mb-4">
               Tablet-friendly interface for sub-admins to mark attendance, supervise sessions, and view reports.
             </p>
-            <Button variant="ghost" className="p-0 h-auto text-primary" disabled>
-              Coming Soon <ArrowRight className="h-4 w-4 ml-1" />
+            <Button variant="ghost" className="p-0 h-auto text-primary" onClick={() => navigate('/facilitator')}>
+              Open Panel <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
         </section>

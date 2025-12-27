@@ -20,6 +20,10 @@ import AdminPayments from "./pages/AdminPayments";
 import AdminSubAdmins from "./pages/AdminSubAdmins";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminSettings from "./pages/AdminSettings";
+import FacilitatorDashboard from "./pages/FacilitatorDashboard";
+import FacilitatorAttendance from "./pages/FacilitatorAttendance";
+import FacilitatorSessions from "./pages/FacilitatorSessions";
+import FacilitatorReports from "./pages/FacilitatorReports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -53,6 +57,12 @@ const App = () => (
             <Route path="/admin/subadmins" element={<AdminSubAdmins />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/admin/settings" element={<AdminSettings />} />
+            
+            {/* Facilitator Routes */}
+            <Route path="/facilitator" element={<FacilitatorDashboard />} />
+            <Route path="/facilitator/attendance" element={<FacilitatorAttendance />} />
+            <Route path="/facilitator/sessions" element={<FacilitatorSessions />} />
+            <Route path="/facilitator/reports" element={<FacilitatorReports />} />
             
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
