@@ -8,6 +8,7 @@ interface LessonCardProps {
   lesson: Lesson;
   onClick?: () => void;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 const statusConfig = {
@@ -17,7 +18,7 @@ const statusConfig = {
   skipped: { variant: 'pending' as const, label: 'Skipped', canPlay: false },
 };
 
-export function LessonCard({ lesson, onClick, className }: LessonCardProps) {
+export function LessonCard({ lesson, onClick, className, style }: LessonCardProps) {
   const status = statusConfig[lesson.status];
 
   return (
@@ -28,6 +29,7 @@ export function LessonCard({ lesson, onClick, className }: LessonCardProps) {
         lesson.status === 'locked' && "opacity-60",
         className
       )}
+      style={style}
       onClick={status.canPlay ? onClick : undefined}
     >
       {/* Order Number / Status Icon */}
