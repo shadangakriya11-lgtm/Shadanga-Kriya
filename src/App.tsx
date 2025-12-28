@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Index from "./pages/Index";
+import Auth from "./pages/Auth";
 import Splash from "./pages/Splash";
 import LearnerLogin from "./pages/LearnerLogin";
 import LearnerHome from "./pages/LearnerHome";
@@ -38,6 +39,9 @@ const App = () => (
           <Routes>
             {/* Landing */}
             <Route path="/" element={<Index />} />
+            
+            {/* Auth */}
+            <Route path="/auth" element={<Auth />} />
             
             {/* Learner Routes */}
             <Route path="/splash" element={<Splash />} />
