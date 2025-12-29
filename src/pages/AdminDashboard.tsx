@@ -96,12 +96,12 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="Dashboard" subtitle="Overview of your therapy platform" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {/* Stats Grid */}
-          <section className="grid grid-cols-4 gap-4 mb-8">
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6 lg:mb-8">
             <StatCard
               icon={Users}
               title="Total Users"
@@ -137,15 +137,15 @@ export default function AdminDashboard() {
           </section>
 
           {/* Secondary Stats */}
-          <section className="grid grid-cols-2 gap-4 mb-8">
-            <div className="bg-card rounded-xl border border-border/50 p-6 shadow-soft animate-fade-in" style={{ animationDelay: '400ms' }}>
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 mb-6 lg:mb-8">
+            <div className="bg-card rounded-xl border border-border/50 p-4 lg:p-6 shadow-soft animate-fade-in" style={{ animationDelay: '400ms' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif text-lg font-semibold text-foreground">Completion Rate</h3>
+                <h3 className="font-serif text-base lg:text-lg font-semibold text-foreground">Completion Rate</h3>
                 <TrendingUp className="h-5 w-5 text-success" />
               </div>
-              <div className="flex items-end gap-4">
-                <span className="font-serif text-5xl font-bold text-foreground">{dashboardStats.completionRate}%</span>
-                <span className="text-sm text-success mb-2">+5% from last month</span>
+              <div className="flex items-end gap-2 lg:gap-4">
+                <span className="font-serif text-3xl lg:text-5xl font-bold text-foreground">{dashboardStats.completionRate}%</span>
+                <span className="text-xs lg:text-sm text-success mb-1 lg:mb-2">+5% from last month</span>
               </div>
               <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
                 <div
@@ -155,14 +155,14 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-card rounded-xl border border-border/50 p-6 shadow-soft animate-fade-in" style={{ animationDelay: '500ms' }}>
+            <div className="bg-card rounded-xl border border-border/50 p-4 lg:p-6 shadow-soft animate-fade-in" style={{ animationDelay: '500ms' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif text-lg font-semibold text-foreground">Active Alerts</h3>
+                <h3 className="font-serif text-base lg:text-lg font-semibold text-foreground">Active Alerts</h3>
                 <AlertTriangle className="h-5 w-5 text-warning" />
               </div>
-              <div className="flex items-end gap-4">
-                <span className="font-serif text-5xl font-bold text-foreground">{dashboardStats.alerts}</span>
-                <span className="text-sm text-muted-foreground mb-2">interruptions today</span>
+              <div className="flex items-end gap-2 lg:gap-4">
+                <span className="font-serif text-3xl lg:text-5xl font-bold text-foreground">{dashboardStats.alerts}</span>
+                <span className="text-xs lg:text-sm text-muted-foreground mb-1 lg:mb-2">interruptions today</span>
               </div>
               <Button variant="warning" size="sm" className="mt-4">
                 Review Alerts
@@ -171,21 +171,25 @@ export default function AdminDashboard() {
           </section>
 
           {/* Tables */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6">
             <section className="animate-fade-in" style={{ animationDelay: '600ms' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif text-lg font-semibold text-foreground">Recent Users</h3>
+                <h3 className="font-serif text-base lg:text-lg font-semibold text-foreground">Recent Users</h3>
                 <Button variant="ghost" size="sm">View All</Button>
               </div>
-              <DataTable columns={userColumns} data={mockUsers} />
+              <div className="overflow-x-auto">
+                <DataTable columns={userColumns} data={mockUsers} />
+              </div>
             </section>
 
             <section className="animate-fade-in" style={{ animationDelay: '700ms' }}>
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-serif text-lg font-semibold text-foreground">Courses</h3>
+                <h3 className="font-serif text-base lg:text-lg font-semibold text-foreground">Courses</h3>
                 <Button variant="ghost" size="sm">View All</Button>
               </div>
-              <DataTable columns={courseColumns} data={mockCourses} />
+              <div className="overflow-x-auto">
+                <DataTable columns={courseColumns} data={mockCourses} />
+              </div>
             </section>
           </div>
         </main>

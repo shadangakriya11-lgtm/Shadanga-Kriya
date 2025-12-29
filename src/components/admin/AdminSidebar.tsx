@@ -11,8 +11,14 @@ import {
   Settings,
   LogOut,
   Shield,
+  Menu,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
@@ -29,11 +35,11 @@ const bottomItems = [
   { icon: Settings, label: 'Settings', href: '/admin/settings' },
 ];
 
-export function AdminSidebar() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar flex flex-col border-r border-sidebar-border">
+    <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="h-16 flex items-center gap-3 px-6 border-b border-sidebar-border">
         <div className="h-9 w-9 rounded-lg bg-sidebar-primary/20 flex items-center justify-center">
@@ -55,6 +61,7 @@ export function AdminSidebar() {
             <NavLink
               key={item.href}
               to={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
@@ -71,6 +78,9 @@ export function AdminSidebar() {
 
       {/* Bottom Section */}
       <div className="px-3 py-4 border-t border-sidebar-border space-y-1">
+        <div className="flex justify-start px-3 py-2">
+          <ThemeToggle />
+        </div>
         {bottomItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;
@@ -79,6 +89,7 @@ export function AdminSidebar() {
             <NavLink
               key={item.href}
               to={item.href}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
@@ -96,6 +107,38 @@ export function AdminSidebar() {
           <span>Sign Out</span>
         </button>
       </div>
-    </aside>
+    </div>
+  );
+}
+
+export function AdminSidebar() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar flex-col border-r border-sidebar-border hidden lg:flex">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Sidebar Trigger - rendered in AdminHeader */}
+    </>
+  );
+}
+
+export function AdminMobileSidebar() {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>
+        <Button variant="ghost" size="icon" className="lg:hidden">
+          <Menu className="h-5 w-5" />
+        </Button>
+      </SheetTrigger>
+      <SheetContent side="left" className="p-0 w-64 bg-sidebar">
+        <SidebarContent onNavigate={() => setIsOpen(false)} />
+      </SheetContent>
+    </Sheet>
   );
 }

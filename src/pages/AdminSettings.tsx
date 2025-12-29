@@ -14,10 +14,10 @@ export default function AdminSettings() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="Settings" subtitle="Configure platform settings" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           <Tabs defaultValue="organization" className="space-y-6">
             <TabsList>
               <TabsTrigger value="organization" className="gap-2">

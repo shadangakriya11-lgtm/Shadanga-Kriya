@@ -186,36 +186,34 @@ export default function AdminSubAdmins() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="Sub-Admin Management" subtitle="Manage sub-administrators and permissions" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {/* Actions Bar */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search sub-admins..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-80 pl-9"
-                />
-              </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search sub-admins..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full sm:w-64 lg:w-80 pl-9"
+              />
             </div>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button variant="premium">
+                <Button variant="premium" className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Sub-Admin
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="font-serif">Create New Sub-Admin</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Full Name</Label>
                       <Input placeholder="Enter full name" />
@@ -231,7 +229,7 @@ export default function AdminSubAdmins() {
                   </div>
                   <div className="space-y-2">
                     <Label>Permissions</Label>
-                    <div className="grid grid-cols-2 gap-3 p-4 border border-border rounded-lg">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 border border-border rounded-lg">
                       {allPermissions.map((perm) => (
                         <div key={perm.id} className="flex items-start gap-3">
                           <Checkbox
@@ -249,9 +247,9 @@ export default function AdminSubAdmins() {
                       ))}
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                    <Button variant="premium" onClick={() => setIsCreateOpen(false)}>Create Sub-Admin</Button>
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                    <Button variant="outline" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Cancel</Button>
+                    <Button variant="premium" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Create Sub-Admin</Button>
                   </div>
                 </div>
               </DialogContent>
@@ -259,33 +257,35 @@ export default function AdminSubAdmins() {
           </div>
 
           {/* Stats Summary */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Total Sub-Admins</p>
-              <p className="font-serif text-2xl font-bold text-foreground">{mockSubAdmins.length}</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Total Sub-Admins</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{mockSubAdmins.length}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Active</p>
-              <p className="font-serif text-2xl font-bold text-success">
+              <p className="text-xs lg:text-sm text-muted-foreground">Active</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">
                 {mockSubAdmins.filter(a => a.isActive).length}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Locations Covered</p>
-              <p className="font-serif text-2xl font-bold text-foreground">
+              <p className="text-xs lg:text-sm text-muted-foreground">Locations Covered</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">
                 {new Set(mockSubAdmins.flatMap(a => a.locations)).size}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Inactive</p>
-              <p className="font-serif text-2xl font-bold text-locked">
+              <p className="text-xs lg:text-sm text-muted-foreground">Inactive</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-locked">
                 {mockSubAdmins.filter(a => !a.isActive).length}
               </p>
             </div>
           </div>
 
           {/* Sub-Admins Table */}
-          <DataTable columns={subAdminColumns} data={filteredSubAdmins} />
+          <div className="overflow-x-auto">
+            <DataTable columns={subAdminColumns} data={filteredSubAdmins} />
+          </div>
         </main>
       </div>
     </div>

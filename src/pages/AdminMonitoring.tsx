@@ -196,68 +196,72 @@ export default function AdminMonitoring() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="Lesson Monitoring" subtitle="Track user progress and manage playback" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {/* Actions Bar */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by user or lesson..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-80 pl-9"
+                  className="w-full sm:w-64 lg:w-80 pl-9"
                 />
               </div>
-              <Button 
-                variant={statusFilter === 'all' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setStatusFilter('all')}
-              >
-                All
-              </Button>
-              <Button 
-                variant={statusFilter === 'in_progress' ? 'default' : 'outline'} 
-                size="sm"
-                onClick={() => setStatusFilter('in_progress')}
-              >
-                In Progress
-              </Button>
-              <Button 
-                variant={statusFilter === 'interrupted' ? 'warning' : 'outline'} 
-                size="sm"
-                onClick={() => setStatusFilter('interrupted')}
-              >
-                Interrupted
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  variant={statusFilter === 'all' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All
+                </Button>
+                <Button 
+                  variant={statusFilter === 'in_progress' ? 'default' : 'outline'} 
+                  size="sm"
+                  onClick={() => setStatusFilter('in_progress')}
+                >
+                  In Progress
+                </Button>
+                <Button 
+                  variant={statusFilter === 'interrupted' ? 'warning' : 'outline'} 
+                  size="sm"
+                  onClick={() => setStatusFilter('interrupted')}
+                >
+                  Interrupted
+                </Button>
+              </div>
             </div>
           </div>
 
           {/* Stats Summary */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Active Sessions</p>
-              <p className="font-serif text-2xl font-bold text-foreground">47</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Active Sessions</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">47</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Completed Today</p>
-              <p className="font-serif text-2xl font-bold text-success">156</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Completed Today</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">156</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Interrupted</p>
-              <p className="font-serif text-2xl font-bold text-destructive">12</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Interrupted</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-destructive">12</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Pause Requests</p>
-              <p className="font-serif text-2xl font-bold text-warning">8</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Pause Requests</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">8</p>
             </div>
           </div>
 
           {/* Progress Table */}
-          <DataTable columns={progressColumns} data={filteredProgress} />
+          <div className="overflow-x-auto">
+            <DataTable columns={progressColumns} data={filteredProgress} />
+          </div>
         </main>
       </div>
     </div>

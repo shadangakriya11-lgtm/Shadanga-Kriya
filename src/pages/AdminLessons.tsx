@@ -125,24 +125,24 @@ export default function AdminLessons() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="Lesson Management" subtitle="Upload and configure audio lessons" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {/* Actions Bar */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search lessons..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-80 pl-9"
+                  className="w-full sm:w-64 lg:w-80 pl-9"
                 />
               </div>
               <Select>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Filter by course" />
                 </SelectTrigger>
                 <SelectContent>
@@ -155,12 +155,12 @@ export default function AdminLessons() {
             </div>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button variant="premium">
+                <Button variant="premium" className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Lesson
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="font-serif">Add New Lesson</DialogTitle>
                 </DialogHeader>
@@ -182,7 +182,7 @@ export default function AdminLessons() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Duration (minutes)</Label>
                       <Input type="number" placeholder="15" />
@@ -194,7 +194,7 @@ export default function AdminLessons() {
                   </div>
                   <div className="space-y-2">
                     <Label>Audio File (Encrypted)</Label>
-                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
+                    <div className="border-2 border-dashed border-border rounded-lg p-6 lg:p-8 text-center">
                       <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                       <p className="text-sm text-muted-foreground">Drag & drop audio file or click to browse</p>
                       <p className="text-xs text-muted-foreground mt-1">MP3, WAV up to 100MB</p>
@@ -207,9 +207,9 @@ export default function AdminLessons() {
                     </div>
                     <Switch />
                   </div>
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                    <Button variant="premium" onClick={() => setIsCreateOpen(false)}>Create Lesson</Button>
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                    <Button variant="outline" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Cancel</Button>
+                    <Button variant="premium" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Create Lesson</Button>
                   </div>
                 </div>
               </DialogContent>
@@ -217,27 +217,29 @@ export default function AdminLessons() {
           </div>
 
           {/* Stats Summary */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Total Lessons</p>
-              <p className="font-serif text-2xl font-bold text-foreground">156</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Total Lessons</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">156</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">With Audio</p>
-              <p className="font-serif text-2xl font-bold text-success">142</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">With Audio</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">142</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Pending Upload</p>
-              <p className="font-serif text-2xl font-bold text-warning">14</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Pending Upload</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">14</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Total Duration</p>
-              <p className="font-serif text-2xl font-bold text-foreground">48h</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Total Duration</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">48h</p>
             </div>
           </div>
 
           {/* Lessons Table */}
-          <DataTable columns={lessonColumns} data={filteredLessons} />
+          <div className="overflow-x-auto">
+            <DataTable columns={lessonColumns} data={filteredLessons} />
+          </div>
         </main>
       </div>
     </div>

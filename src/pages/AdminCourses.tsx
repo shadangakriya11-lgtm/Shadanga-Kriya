@@ -119,35 +119,35 @@ export default function AdminCourses() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="Course Management" subtitle="Create and manage therapy courses" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {/* Actions Bar */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search courses..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-80 pl-9"
+                  className="w-full sm:w-64 lg:w-80 pl-9"
                 />
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
               </Button>
             </div>
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
               <DialogTrigger asChild>
-                <Button variant="premium">
+                <Button variant="premium" className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
                   Create Course
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="font-serif">Create New Course</DialogTitle>
                 </DialogHeader>
@@ -160,7 +160,7 @@ export default function AdminCourses() {
                     <Label>Description</Label>
                     <Textarea placeholder="Enter course description" rows={4} />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Type</Label>
                       <Select>
@@ -178,7 +178,7 @@ export default function AdminCourses() {
                       <Input type="number" placeholder="0" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Status</Label>
                       <Select>
@@ -197,9 +197,9 @@ export default function AdminCourses() {
                       <Input placeholder="e.g., 6 hours" />
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                    <Button variant="premium" onClick={() => setIsCreateOpen(false)}>Create Course</Button>
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                    <Button variant="outline" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Cancel</Button>
+                    <Button variant="premium" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Create Course</Button>
                   </div>
                 </div>
               </DialogContent>
@@ -207,27 +207,29 @@ export default function AdminCourses() {
           </div>
 
           {/* Stats Summary */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Total Courses</p>
-              <p className="font-serif text-2xl font-bold text-foreground">24</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Total Courses</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">24</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Active</p>
-              <p className="font-serif text-2xl font-bold text-success">18</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Active</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">18</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Self-Paced</p>
-              <p className="font-serif text-2xl font-bold text-foreground">15</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Self-Paced</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">15</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">On-Site</p>
-              <p className="font-serif text-2xl font-bold text-foreground">9</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">On-Site</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">9</p>
             </div>
           </div>
 
           {/* Courses Table */}
-          <DataTable columns={courseColumns} data={filteredCourses} />
+          <div className="overflow-x-auto">
+            <DataTable columns={courseColumns} data={filteredCourses} />
+          </div>
         </main>
       </div>
     </div>

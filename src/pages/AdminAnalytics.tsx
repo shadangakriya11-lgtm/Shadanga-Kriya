@@ -70,10 +70,10 @@ export default function AdminAnalytics() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="Analytics & Reports" subtitle="Insights into platform performance" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {/* Actions Bar */}
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
