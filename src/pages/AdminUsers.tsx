@@ -102,55 +102,57 @@ export default function AdminUsers() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="User Management" subtitle="Manage learners and their access" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {/* Actions Bar */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search users..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-80 pl-9"
+                  className="w-full sm:w-64 lg:w-80 pl-9"
                 />
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
               </Button>
             </div>
-            <Button variant="premium">
+            <Button variant="premium" className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               Add User
             </Button>
           </div>
 
           {/* Stats Summary */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Total Users</p>
-              <p className="font-serif text-2xl font-bold text-foreground">1,247</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Total Users</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">1,247</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Active</p>
-              <p className="font-serif text-2xl font-bold text-success">892</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Active</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">892</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Inactive</p>
-              <p className="font-serif text-2xl font-bold text-locked">355</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Inactive</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-locked">355</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Sub-Admins</p>
-              <p className="font-serif text-2xl font-bold text-foreground">12</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Sub-Admins</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">12</p>
             </div>
           </div>
 
           {/* Users Table */}
-          <DataTable columns={userColumns} data={filteredUsers} />
+          <div className="overflow-x-auto">
+            <DataTable columns={userColumns} data={filteredUsers} />
+          </div>
         </main>
       </div>
     </div>

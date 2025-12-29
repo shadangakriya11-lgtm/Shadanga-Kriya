@@ -199,40 +199,40 @@ export default function AdminPayments() {
     <div className="min-h-screen bg-background">
       <AdminSidebar />
       
-      <div className="ml-64">
+      <div className="lg:ml-64">
         <AdminHeader title="Payments & Transactions" subtitle="Manage payments and course activations" />
         
-        <main className="p-6">
+        <main className="p-4 lg:p-6">
           {/* Actions Bar */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search transactions..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-80 pl-9"
+                  className="w-full sm:w-64 lg:w-80 pl-9"
                 />
               </div>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
                 <Filter className="h-4 w-4 mr-2" />
                 Filters
               </Button>
             </div>
-            <div className="flex items-center gap-3">
-              <Button variant="outline">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <Button variant="outline" className="w-full sm:w-auto">
                 <Download className="h-4 w-4 mr-2" />
-                Export Report
+                Export
               </Button>
               <Dialog open={isActivateOpen} onOpenChange={setIsActivateOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="premium">
+                  <Button variant="premium" className="w-full sm:w-auto">
                     <CreditCard className="h-4 w-4 mr-2" />
                     Manual Activation
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="font-serif">Manual Course Activation</DialogTitle>
                   </DialogHeader>
@@ -267,9 +267,9 @@ export default function AdminPayments() {
                       <Label>Notes (optional)</Label>
                       <Input placeholder="e.g., Scholarship, Promotional access" />
                     </div>
-                    <div className="flex justify-end gap-3 pt-4">
-                      <Button variant="outline" onClick={() => setIsActivateOpen(false)}>Cancel</Button>
-                      <Button variant="premium" onClick={() => setIsActivateOpen(false)}>Activate Course</Button>
+                    <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                      <Button variant="outline" onClick={() => setIsActivateOpen(false)} className="w-full sm:w-auto">Cancel</Button>
+                      <Button variant="premium" onClick={() => setIsActivateOpen(false)} className="w-full sm:w-auto">Activate Course</Button>
                     </div>
                   </div>
                 </DialogContent>
@@ -278,31 +278,33 @@ export default function AdminPayments() {
           </div>
 
           {/* Stats Summary */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
-              <p className="font-serif text-2xl font-bold text-foreground">${totalRevenue.toLocaleString()}</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Total Revenue</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">${totalRevenue.toLocaleString()}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="font-serif text-2xl font-bold text-success">
+              <p className="text-xs lg:text-sm text-muted-foreground">Completed</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">
                 {mockTransactions.filter(tx => tx.status === 'completed').length}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">Pending</p>
-              <p className="font-serif text-2xl font-bold text-warning">
+              <p className="text-xs lg:text-sm text-muted-foreground">Pending</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">
                 {mockTransactions.filter(tx => tx.status === 'pending').length}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-sm text-muted-foreground">This Month</p>
-              <p className="font-serif text-2xl font-bold text-foreground">$12,450</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">This Month</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">$12,450</p>
             </div>
           </div>
 
           {/* Transactions Table */}
-          <DataTable columns={transactionColumns} data={filteredTransactions} />
+          <div className="overflow-x-auto">
+            <DataTable columns={transactionColumns} data={filteredTransactions} />
+          </div>
         </main>
       </div>
     </div>
