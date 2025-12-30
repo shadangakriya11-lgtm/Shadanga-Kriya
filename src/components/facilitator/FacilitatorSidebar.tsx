@@ -17,24 +17,24 @@ const navItems = [
   { icon: BarChart3, label: 'Reports', href: '/facilitator/reports' },
 ];
 
-export function FacilitatorSidebar() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-20 lg:w-64 bg-sidebar flex flex-col border-r border-sidebar-border transition-all duration-300">
+    <div className="flex flex-col h-full bg-sidebar">
       {/* Logo */}
-      <div className="h-16 flex items-center gap-3 px-4 lg:px-6 border-b border-sidebar-border">
+      <div className="h-16 flex items-center gap-3 px-6 border-b border-sidebar-border">
         <div className="h-9 w-9 rounded-lg bg-secondary/30 flex items-center justify-center flex-shrink-0">
           <Shield className="h-5 w-5 text-sidebar-primary" />
         </div>
-        <div className="hidden lg:block">
+        <div>
           <h1 className="font-serif font-semibold text-sidebar-foreground">TherapyOS</h1>
           <p className="text-xs text-sidebar-foreground/60">Facilitator</p>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-2 lg:px-3 py-4 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;
@@ -43,30 +43,46 @@ export function FacilitatorSidebar() {
             <NavLink
               key={item.href}
               to={item.href}
+              onClick={onNavigate}
               className={cn(
-                "flex items-center justify-center lg:justify-start gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
                   ? "bg-sidebar-accent text-sidebar-primary"
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
               )}
             >
               <Icon className="h-5 w-5 flex-shrink-0" />
-              <span className="hidden lg:inline">{item.label}</span>
+              <span>{item.label}</span>
             </NavLink>
           );
         })}
       </nav>
 
       {/* Bottom Section */}
-      <div className="px-2 lg:px-3 py-4 border-t border-sidebar-border space-y-1">
-        <div className="flex justify-center lg:justify-start px-3 py-2">
+      <div className="px-3 py-4 border-t border-sidebar-border space-y-1">
+        <div className="flex justify-start px-3 py-2">
           <ThemeToggle />
         </div>
-        <button className="flex items-center justify-center lg:justify-start gap-3 px-3 py-3 lg:py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-colors w-full">
+        <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-colors w-full">
           <LogOut className="h-5 w-5 flex-shrink-0" />
-          <span className="hidden lg:inline">Sign Out</span>
+          <span>Sign Out</span>
         </button>
       </div>
-    </aside>
+    </div>
   );
+}
+
+export function FacilitatorSidebar() {
+  return (
+    <>
+      {/* Desktop Sidebar */}
+      <aside className="fixed left-0 top-0 h-screen w-64 bg-sidebar flex-col border-r border-sidebar-border hidden lg:flex">
+        <SidebarContent />
+      </aside>
+    </>
+  );
+}
+
+export function FacilitatorMobileSidebar({ onNavigate }: { onNavigate?: () => void }) {
+  return <SidebarContent onNavigate={onNavigate} />;
 }
