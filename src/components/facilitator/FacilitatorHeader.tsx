@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Bell, Menu, User } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { FacilitatorSidebar } from './FacilitatorSidebar';
+import { FacilitatorMobileSidebar } from './FacilitatorSidebar';
 
 interface FacilitatorHeaderProps {
   title: string;
@@ -10,18 +11,20 @@ interface FacilitatorHeaderProps {
 }
 
 export function FacilitatorHeader({ title, subtitle }: FacilitatorHeaderProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6">
       <div className="flex items-center gap-4">
         {/* Mobile menu */}
-        <Sheet>
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="lg:hidden">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="p-0 w-64">
-            <FacilitatorSidebar />
+          <SheetContent side="left" className="p-0 w-64 bg-sidebar">
+            <FacilitatorMobileSidebar onNavigate={() => setIsOpen(false)} />
           </SheetContent>
         </Sheet>
         
