@@ -1,24 +1,65 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { mockCourses, mockLessons } from '@/data/mockData';
 import { LessonCard } from '@/components/learner/LessonCard';
 import { PreLessonProtocol } from '@/components/learner/PreLessonProtocol';
 import { AudioPlayer } from '@/components/learner/AudioPlayer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft, Clock, BookOpen, DollarSign } from 'lucide-react';
 import { Lesson } from '@/types';
+import { useCourse, useLessonsByCourse, useCourseProgress } from '@/hooks/useApi';
+import { useAuth } from '@/contexts/AuthContext';
 
 type ViewState = 'details' | 'protocol' | 'player';
 
 export default function CourseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
   const [view, setView] = useState<ViewState>('details');
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
 
-  const course = mockCourses.find((c) => c.id === id);
-  const lessons = mockLessons.filter((l) => l.courseId === id);
+  const { data: courseData, isLoading: courseLoading } = useCourse(id || '');
+  const { data: lessonsData, isLoading: lessonsLoading } = useLessonsByCourse(id || '');
+  const { data: progressData } = useCourseProgress(id || '');
+
+  const course = courseData?.course;
+  const lessons: Lesson[] = (lessonsData?.lessons || []).map((l: any, index: number) => ({
+    id: l.id,
+    courseId: l.course_id,
+    title: l.title,
+    description: l.description,
+    duration: l.duration || '10 min',
+    audioUrl: l.audio_url,
+    order: l.order_index || index + 1,
+    status: progressData?.lessons?.[l.id]?.completed ? 'completed' : 
+            (index === 0 || progressData?.lessons?.[lessonsData?.lessons[index - 1]?.id]?.completed) ? 'active' : 'locked',
+    progress: progressData?.lessons?.[l.id]?.progress || 0,
+  }));
+
+  const isLoading = courseLoading || lessonsLoading;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
+          <div className="flex items-center gap-4 px-4 py-4 max-w-3xl mx-auto">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <Skeleton className="h-6 w-48" />
+          </div>
+        </header>
+        <main className="px-4 py-6 max-w-3xl mx-auto space-y-4">
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </main>
+      </div>
+    );
+  }
 
   if (!course) {
     return (
@@ -64,6 +105,11 @@ export default function CourseDetail() {
     );
   }
 
+  const progress = progressData?.progress || 0;
+  const completedLessons = progressData?.completedLessons || 0;
+  const totalLessons = lessons.length;
+  const isEnrolled = !!progressData;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -86,8 +132,8 @@ export default function CourseDetail() {
             <Badge variant={course.type === 'self' ? 'self' : 'onsite'}>
               {course.type === 'self' ? 'Self-Paced' : 'On-Site'}
             </Badge>
-            <Badge variant={course.status === 'active' ? 'active' : course.status === 'completed' ? 'completed' : 'locked'}>
-              {course.status.charAt(0).toUpperCase() + course.status.slice(1)}
+            <Badge variant={isEnrolled ? 'active' : course.status === 'active' ? 'active' : 'locked'}>
+              {isEnrolled ? 'Enrolled' : course.status?.charAt(0).toUpperCase() + course.status?.slice(1)}
             </Badge>
           </div>
 
@@ -102,13 +148,13 @@ export default function CourseDetail() {
           <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
               <BookOpen className="h-4 w-4" />
-              <span>{course.totalLessons} lessons</span>
+              <span>{totalLessons} lessons</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4" />
-              <span>{course.duration}</span>
+              <span>{course.duration || 'N/A'}</span>
             </div>
-            {course.price && (
+            {course.price > 0 && (
               <div className="flex items-center gap-1.5">
                 <DollarSign className="h-4 w-4" />
                 <span>${course.price}</span>
@@ -118,20 +164,20 @@ export default function CourseDetail() {
         </section>
 
         {/* Progress */}
-        {course.status !== 'locked' && (
+        {isEnrolled && (
           <section className="mb-8 bg-card rounded-xl border border-border/50 p-5 shadow-soft animate-fade-in animate-delay-100">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-medium text-foreground">Your Progress</h3>
-              <span className="font-semibold text-primary">{course.progress}%</span>
+              <span className="font-semibold text-primary">{progress}%</span>
             </div>
             <div className="h-3 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-primary to-success rounded-full transition-all duration-500"
-                style={{ width: `${course.progress}%` }}
+                style={{ width: `${progress}%` }}
               />
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              {course.completedLessons} of {course.totalLessons} lessons completed
+              {completedLessons} of {totalLessons} lessons completed
             </p>
           </section>
         )}
@@ -142,15 +188,19 @@ export default function CourseDetail() {
             Lessons
           </h3>
           <div className="space-y-3">
-            {lessons.map((lesson, index) => (
-              <LessonCard
-                key={lesson.id}
-                lesson={lesson}
-                onClick={() => handleLessonClick(lesson)}
-                className="opacity-0 animate-fade-in"
-                style={{ animationDelay: `${(index + 3) * 100}ms` } as React.CSSProperties}
-              />
-            ))}
+            {lessons.length > 0 ? (
+              lessons.map((lesson, index) => (
+                <LessonCard
+                  key={lesson.id}
+                  lesson={lesson}
+                  onClick={() => handleLessonClick(lesson)}
+                  className="opacity-0 animate-fade-in"
+                  style={{ animationDelay: `${(index + 3) * 100}ms` } as React.CSSProperties}
+                />
+              ))
+            ) : (
+              <p className="text-muted-foreground text-center py-8">No lessons available</p>
+            )}
           </div>
         </section>
       </main>

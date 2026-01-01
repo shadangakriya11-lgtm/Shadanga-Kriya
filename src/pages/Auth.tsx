@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Shield, Eye, EyeOff, HelpCircle, User, Users, BarChart3, ArrowLeft, Mail, Lock, UserCircle } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 type UserRole = 'learner' | 'admin' | 'facilitator';
 type AuthMode = 'login' | 'signup';
@@ -37,6 +38,7 @@ const roleConfig = {
 export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { login, register, isLoggedIn, user } = useAuth();
   
   const [mode, setMode] = useState<AuthMode>((searchParams.get('mode') as AuthMode) || 'login');
   const [selectedRole, setSelectedRole] = useState<UserRole>((searchParams.get('role') as UserRole) || 'learner');
@@ -48,7 +50,13 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [userId, setUserId] = useState('');
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      navigate(roleConfig[user.role]?.redirectTo || '/home');
+    }
+  }, [isLoggedIn, user, navigate]);
 
   useEffect(() => {
     const urlMode = searchParams.get('mode') as AuthMode;
@@ -80,18 +88,34 @@ export default function Auth() {
 
     setIsLoading(true);
     
-    // Simulate auth
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    
-    toast({
-      title: mode === 'login' ? "Welcome back!" : "Account created!",
-      description: mode === 'login' 
-        ? `Signed in as ${roleConfig[selectedRole].title}` 
-        : "Your account has been created successfully."
-    });
-    
-    setIsLoading(false);
-    navigate(roleConfig[selectedRole].redirectTo);
+    try {
+      if (mode === 'login') {
+        const loggedInUser = await login(email, password);
+        toast({
+          title: "Welcome back!",
+          description: `Signed in as ${roleConfig[loggedInUser.role]?.title || loggedInUser.role}`
+        });
+        navigate(roleConfig[loggedInUser.role]?.redirectTo || '/home');
+      } else {
+        const [firstName, ...lastNameParts] = fullName.trim().split(' ');
+        const lastName = lastNameParts.join(' ') || firstName;
+        
+        const newUser = await register({ email, password, firstName, lastName });
+        toast({
+          title: "Account created!",
+          description: "Your account has been created successfully."
+        });
+        navigate(roleConfig[newUser.role]?.redirectTo || '/home');
+      }
+    } catch (error: any) {
+      toast({
+        title: mode === 'login' ? "Login failed" : "Registration failed",
+        description: error.message || "Please check your credentials and try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const RoleIcon = roleConfig[selectedRole].icon;
@@ -201,32 +225,34 @@ export default function Auth() {
               </button>
             </div>
 
-            {/* Role Selection */}
-            <div className="mb-8">
-              <Label className="text-sm font-medium mb-3 block">I am a...</Label>
-              <div className="grid grid-cols-3 gap-3">
-                {(Object.keys(roleConfig) as UserRole[]).map((role) => {
-                  const config = roleConfig[role];
-                  const Icon = config.icon;
-                  return (
-                    <button
-                      key={role}
-                      onClick={() => setSelectedRole(role)}
-                      className={`p-4 rounded-xl border-2 transition-all text-center ${
-                        selectedRole === role
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border hover:border-primary/50'
-                      }`}
-                    >
-                      <div className={`h-10 w-10 rounded-lg ${config.color} flex items-center justify-center mx-auto mb-2`}>
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <div className="text-sm font-medium text-foreground">{config.title}</div>
-                    </button>
-                  );
-                })}
+            {/* Role Selection - Only show for signup */}
+            {mode === 'signup' && (
+              <div className="mb-8">
+                <Label className="text-sm font-medium mb-3 block">I am a...</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {(Object.keys(roleConfig) as UserRole[]).map((role) => {
+                    const config = roleConfig[role];
+                    const Icon = config.icon;
+                    return (
+                      <button
+                        key={role}
+                        onClick={() => setSelectedRole(role)}
+                        className={`p-4 rounded-xl border-2 transition-all text-center ${
+                          selectedRole === role
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <div className={`h-10 w-10 rounded-lg ${config.color} flex items-center justify-center mx-auto mb-2`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="text-sm font-medium text-foreground">{config.title}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {mode === 'signup' && (
@@ -247,39 +273,21 @@ export default function Auth() {
                 </div>
               )}
 
-              {selectedRole === 'learner' && mode === 'login' ? (
-                <div className="space-y-2">
-                  <Label htmlFor="userId">User ID</Label>
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      id="userId"
-                      type="text"
-                      placeholder="Enter your user ID"
-                      value={userId}
-                      onChange={(e) => setUserId(e.target.value)}
-                      className="h-12 pl-12"
-                      required
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 pl-12"
+                    required
+                  />
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="h-12 pl-12"
-                      required
-                    />
-                  </div>
-                </div>
-              )}
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -345,14 +353,26 @@ export default function Auth() {
                 ) : (
                   <>
                     <RoleIcon className="h-5 w-5 mr-2" />
-                    {mode === 'login' ? `Sign In as ${roleConfig[selectedRole].title}` : `Create ${roleConfig[selectedRole].title} Account`}
+                    {mode === 'login' ? 'Sign In' : `Create Account`}
                   </>
                 )}
               </Button>
             </form>
 
+            {/* Demo Credentials */}
+            {mode === 'login' && (
+              <div className="mt-6 p-4 bg-muted/50 rounded-xl">
+                <p className="text-sm font-medium text-foreground mb-2">Demo Credentials:</p>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>Admin: admin@therapyos.com / admin123</p>
+                  <p>Facilitator: facilitator@therapyos.com / facilitator123</p>
+                  <p>Learner: learner@therapyos.com / learner123</p>
+                </div>
+              </div>
+            )}
+
             {/* Help section for learners */}
-            {selectedRole === 'learner' && (
+            {selectedRole === 'learner' && mode === 'signup' && (
               <div className="mt-8 p-4 bg-muted/50 rounded-xl">
                 <div className="flex items-start gap-3">
                   <HelpCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
