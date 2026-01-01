@@ -1,10 +1,10 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LearnerHeader } from '@/components/learner/LearnerHeader';
 import { BottomNav } from '@/components/learner/BottomNav';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
-  User, 
   Mail, 
   Phone, 
   Calendar, 
@@ -15,16 +15,24 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Profile() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [notifications, setNotifications] = useState(true);
 
   const userInfo = {
-    name: 'Sarah Mitchell',
-    email: 'sarah.m@example.com',
-    phone: '+91 98765 43210',
-    joinedDate: 'January 15, 2024',
-    userId: 'USR-2024-001247',
+    name: user ? `${user.firstName} ${user.lastName}` : 'User',
+    email: user?.email || 'email@example.com',
+    phone: user?.phone || 'Not provided',
+    joinedDate: 'Member',
+    userId: user?.id?.substring(0, 12) || 'N/A',
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/auth');
   };
 
   return (
@@ -43,7 +51,9 @@ export default function Profile() {
             {userInfo.name}
           </h1>
           <p className="text-muted-foreground text-sm">{userInfo.userId}</p>
-          <Badge variant="active" className="mt-2">Active Member</Badge>
+          <Badge variant="active" className="mt-2">
+            {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Member'}
+          </Badge>
         </section>
 
         {/* User Info Card */}
@@ -73,7 +83,7 @@ export default function Profile() {
                 <Calendar className="h-5 w-5 text-muted-foreground" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Member Since</p>
+                <p className="text-sm text-muted-foreground">Status</p>
                 <p className="font-medium text-foreground">{userInfo.joinedDate}</p>
               </div>
             </div>
@@ -125,7 +135,11 @@ export default function Profile() {
         </section>
 
         {/* Sign Out */}
-        <Button variant="outline" className="w-full text-destructive hover:text-destructive hover:bg-destructive/10">
+        <Button 
+          variant="outline" 
+          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={handleLogout}
+        >
           <LogOut className="h-4 w-4 mr-2" />
           Sign Out
         </Button>
