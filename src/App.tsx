@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Splash from "./pages/Splash";
@@ -32,47 +34,117 @@ const queryClient = new QueryClient();
 const App = () => (
   <ThemeProvider defaultTheme="light" storageKey="therapy-ui-theme">
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Landing */}
-            <Route path="/" element={<Index />} />
-            
-            {/* Auth */}
-            <Route path="/auth" element={<Auth />} />
-            
-            {/* Learner Routes */}
-            <Route path="/splash" element={<Splash />} />
-            <Route path="/login" element={<LearnerLogin />} />
-            <Route path="/home" element={<LearnerHome />} />
-            <Route path="/course/:id" element={<CourseDetail />} />
-            <Route path="/progress" element={<Progress />} />
-            <Route path="/profile" element={<Profile />} />
-            
-            {/* Admin Routes */}
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/courses" element={<AdminCourses />} />
-            <Route path="/admin/lessons" element={<AdminLessons />} />
-            <Route path="/admin/monitoring" element={<AdminMonitoring />} />
-            <Route path="/admin/payments" element={<AdminPayments />} />
-            <Route path="/admin/subadmins" element={<AdminSubAdmins />} />
-            <Route path="/admin/analytics" element={<AdminAnalytics />} />
-            <Route path="/admin/settings" element={<AdminSettings />} />
-            
-            {/* Facilitator Routes */}
-            <Route path="/facilitator" element={<FacilitatorDashboard />} />
-            <Route path="/facilitator/attendance" element={<FacilitatorAttendance />} />
-            <Route path="/facilitator/sessions" element={<FacilitatorSessions />} />
-            <Route path="/facilitator/reports" element={<FacilitatorReports />} />
-            
-            {/* Catch-all */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Landing */}
+              <Route path="/" element={<Index />} />
+              
+              {/* Auth */}
+              <Route path="/auth" element={<Auth />} />
+              
+              {/* Learner Routes */}
+              <Route path="/splash" element={<Splash />} />
+              <Route path="/login" element={<LearnerLogin />} />
+              <Route path="/home" element={
+                <ProtectedRoute allowedRoles={['learner']}>
+                  <LearnerHome />
+                </ProtectedRoute>
+              } />
+              <Route path="/course/:id" element={
+                <ProtectedRoute allowedRoles={['learner']}>
+                  <CourseDetail />
+                </ProtectedRoute>
+              } />
+              <Route path="/progress" element={
+                <ProtectedRoute allowedRoles={['learner']}>
+                  <Progress />
+                </ProtectedRoute>
+              } />
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <Profile />
+                </ProtectedRoute>
+              } />
+              
+              {/* Admin Routes */}
+              <Route path="/admin" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/users" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminUsers />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/courses" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminCourses />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/lessons" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminLessons />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/monitoring" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminMonitoring />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/payments" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminPayments />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/subadmins" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminSubAdmins />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/analytics" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminAnalytics />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/settings" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminSettings />
+                </ProtectedRoute>
+              } />
+              
+              {/* Facilitator Routes */}
+              <Route path="/facilitator" element={
+                <ProtectedRoute allowedRoles={['facilitator']}>
+                  <FacilitatorDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/facilitator/attendance" element={
+                <ProtectedRoute allowedRoles={['facilitator']}>
+                  <FacilitatorAttendance />
+                </ProtectedRoute>
+              } />
+              <Route path="/facilitator/sessions" element={
+                <ProtectedRoute allowedRoles={['facilitator']}>
+                  <FacilitatorSessions />
+                </ProtectedRoute>
+              } />
+              <Route path="/facilitator/reports" element={
+                <ProtectedRoute allowedRoles={['facilitator']}>
+                  <FacilitatorReports />
+                </ProtectedRoute>
+              } />
+              
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
     </QueryClientProvider>
   </ThemeProvider>
 );

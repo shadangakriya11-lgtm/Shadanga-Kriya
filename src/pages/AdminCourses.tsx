@@ -5,9 +5,8 @@ import { DataTable } from '@/components/admin/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { mockCourses } from '@/data/mockData';
-import { Course } from '@/types';
-import { Plus, Search, Filter, MoreHorizontal, BookOpen, Clock, Users } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Plus, Search, Filter, MoreHorizontal, BookOpen, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,90 +29,146 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-const courseColumns = [
-  {
-    key: 'title',
-    header: 'Course',
-    render: (course: Course) => (
-      <div className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
-          <BookOpen className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <p className="font-medium text-foreground">{course.title}</p>
-          <p className="text-sm text-muted-foreground">{course.totalLessons} lessons • {course.duration}</p>
-        </div>
-      </div>
-    ),
-  },
-  {
-    key: 'type',
-    header: 'Type',
-    render: (course: Course) => (
-      <Badge variant={course.type === 'self' ? 'self' : 'onsite'}>
-        {course.type === 'self' ? 'Self-Paced' : 'On-Site'}
-      </Badge>
-    ),
-  },
-  {
-    key: 'status',
-    header: 'Status',
-    render: (course: Course) => (
-      <Badge variant={course.status === 'active' ? 'active' : course.status === 'completed' ? 'completed' : 'locked'}>
-        {course.status.charAt(0).toUpperCase() + course.status.slice(1)}
-      </Badge>
-    ),
-  },
-  {
-    key: 'price',
-    header: 'Price',
-    render: (course: Course) => (
-      <span className="font-semibold text-foreground">
-        {course.price ? `$${course.price}` : 'Free'}
-      </span>
-    ),
-  },
-  {
-    key: 'enrollments',
-    header: 'Enrollments',
-    render: () => (
-      <div className="flex items-center gap-2">
-        <Users className="h-4 w-4 text-muted-foreground" />
-        <span className="text-muted-foreground">{Math.floor(Math.random() * 200) + 50}</span>
-      </div>
-    ),
-  },
-  {
-    key: 'actions',
-    header: '',
-    render: () => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem>View Details</DropdownMenuItem>
-          <DropdownMenuItem>Edit Course</DropdownMenuItem>
-          <DropdownMenuItem>Manage Lessons</DropdownMenuItem>
-          <DropdownMenuItem>View Enrollments</DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive">Archive</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-    className: 'w-12',
-  },
-];
+import { useCourses, useCourseStats, useCreateCourse, useUpdateCourse, useDeleteCourse } from '@/hooks/useApi';
 
 export default function AdminCourses() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [newCourse, setNewCourse] = useState({ 
+    title: '', 
+    description: '', 
+    type: 'self', 
+    price: 0, 
+    status: 'active',
+    duration: ''
+  });
 
-  const filteredCourses = mockCourses.filter((course) =>
-    course.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const { data: coursesData, isLoading } = useCourses();
+  const { data: statsData } = useCourseStats();
+  const createCourse = useCreateCourse();
+  const updateCourse = useUpdateCourse();
+  const deleteCourse = useDeleteCourse();
+
+  const courses = (coursesData?.courses || []).filter((course: any) =>
+    course.title?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const stats = statsData || { total: 0, active: 0, selfPaced: 0, onsite: 0 };
+
+  const handleCreateCourse = async () => {
+    try {
+      await createCourse.mutateAsync(newCourse);
+      setIsCreateOpen(false);
+      setNewCourse({ title: '', description: '', type: 'self', price: 0, status: 'active', duration: '' });
+    } catch (error) {
+      console.error('Failed to create course:', error);
+    }
+  };
+
+  const handleDeleteCourse = async (courseId: string) => {
+    if (confirm('Are you sure you want to delete this course?')) {
+      try {
+        await deleteCourse.mutateAsync(courseId);
+      } catch (error) {
+        console.error('Failed to delete course:', error);
+      }
+    }
+  };
+
+  const courseColumns = [
+    {
+      key: 'title',
+      header: 'Course',
+      render: (course: any) => (
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center">
+            <BookOpen className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <p className="font-medium text-foreground">{course.title}</p>
+            <p className="text-sm text-muted-foreground">{course.total_lessons || 0} lessons • {course.duration || 'N/A'}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (course: any) => (
+        <Badge variant={course.type === 'self' ? 'self' : 'onsite'}>
+          {course.type === 'self' ? 'Self-Paced' : 'On-Site'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (course: any) => (
+        <Badge variant={course.status === 'active' ? 'active' : course.status === 'completed' ? 'completed' : 'locked'}>
+          {course.status?.charAt(0).toUpperCase() + course.status?.slice(1)}
+        </Badge>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      render: (course: any) => (
+        <span className="font-semibold text-foreground">
+          {course.price ? `$${course.price}` : 'Free'}
+        </span>
+      ),
+    },
+    {
+      key: 'enrollments',
+      header: 'Enrollments',
+      render: (course: any) => (
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-muted-foreground">{course.enrollment_count || 0}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (course: any) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>View Details</DropdownMenuItem>
+            <DropdownMenuItem>Edit Course</DropdownMenuItem>
+            <DropdownMenuItem>Manage Lessons</DropdownMenuItem>
+            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCourse(course.id)}>
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+      className: 'w-12',
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AdminSidebar />
+        <div className="lg:ml-64">
+          <AdminHeader title="Course Management" subtitle="Create and manage therapy courses" />
+          <main className="p-4 lg:p-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-20 rounded-xl" />
+              ))}
+            </div>
+            <Skeleton className="h-96 rounded-xl" />
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,16 +209,28 @@ export default function AdminCourses() {
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label>Course Title</Label>
-                    <Input placeholder="Enter course title" />
+                    <Input 
+                      value={newCourse.title}
+                      onChange={(e) => setNewCourse(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Enter course title" 
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Description</Label>
-                    <Textarea placeholder="Enter course description" rows={4} />
+                    <Textarea 
+                      value={newCourse.description}
+                      onChange={(e) => setNewCourse(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Enter course description" 
+                      rows={4} 
+                    />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Type</Label>
-                      <Select>
+                      <Select 
+                        value={newCourse.type} 
+                        onValueChange={(v) => setNewCourse(prev => ({ ...prev, type: v }))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
@@ -175,13 +242,21 @@ export default function AdminCourses() {
                     </div>
                     <div className="space-y-2">
                       <Label>Price ($)</Label>
-                      <Input type="number" placeholder="0" />
+                      <Input 
+                        type="number" 
+                        value={newCourse.price}
+                        onChange={(e) => setNewCourse(prev => ({ ...prev, price: Number(e.target.value) }))}
+                        placeholder="0" 
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Status</Label>
-                      <Select>
+                      <Select 
+                        value={newCourse.status} 
+                        onValueChange={(v) => setNewCourse(prev => ({ ...prev, status: v }))}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
@@ -194,12 +269,18 @@ export default function AdminCourses() {
                     </div>
                     <div className="space-y-2">
                       <Label>Duration</Label>
-                      <Input placeholder="e.g., 6 hours" />
+                      <Input 
+                        value={newCourse.duration}
+                        onChange={(e) => setNewCourse(prev => ({ ...prev, duration: e.target.value }))}
+                        placeholder="e.g., 6 hours" 
+                      />
                     </div>
                   </div>
                   <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                     <Button variant="outline" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Cancel</Button>
-                    <Button variant="premium" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Create Course</Button>
+                    <Button variant="premium" onClick={handleCreateCourse} disabled={createCourse.isPending} className="w-full sm:w-auto">
+                      {createCourse.isPending ? 'Creating...' : 'Create Course'}
+                    </Button>
                   </div>
                 </div>
               </DialogContent>
@@ -210,25 +291,25 @@ export default function AdminCourses() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Total Courses</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">24</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.total}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Active</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-success">18</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{stats.active}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Self-Paced</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">15</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.selfPaced}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">On-Site</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">9</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.onsite}</p>
             </div>
           </div>
 
           {/* Courses Table */}
           <div className="overflow-x-auto">
-            <DataTable columns={courseColumns} data={filteredCourses} />
+            <DataTable columns={courseColumns} data={courses} />
           </div>
         </main>
       </div>
