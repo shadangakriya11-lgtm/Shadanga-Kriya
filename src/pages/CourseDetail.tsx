@@ -29,13 +29,15 @@ export default function CourseDetail() {
     id: l.id,
     courseId: l.course_id,
     title: l.title,
-    description: l.description,
+    description: l.description || '',
     duration: l.duration || '10 min',
+    durationSeconds: l.duration_seconds || 600,
     audioUrl: l.audio_url,
     order: l.order_index || index + 1,
+    maxPauses: l.max_pauses ?? 3,
+    pausesUsed: progressData?.lessons?.[l.id]?.pauses_used || 0,
     status: progressData?.lessons?.[l.id]?.completed ? 'completed' : 
             (index === 0 || progressData?.lessons?.[lessonsData?.lessons[index - 1]?.id]?.completed) ? 'active' : 'locked',
-    progress: progressData?.lessons?.[l.id]?.progress || 0,
   }));
 
   const isLoading = courseLoading || lessonsLoading;
