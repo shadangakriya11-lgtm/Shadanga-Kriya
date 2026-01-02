@@ -26,4 +26,10 @@ router.post('/:paymentId/refund', verifyToken, isAdmin, [
   param('paymentId').isUUID().withMessage('Valid payment ID required')
 ], validate, paymentController.refundPayment);
 
+// Manual Activation
+router.post('/activate', verifyToken, isAdmin, [
+  body('userId').isUUID().withMessage('Valid User ID required'),
+  body('courseId').isUUID().withMessage('Valid Course ID required')
+], validate, paymentController.activateCourse);
+
 module.exports = router;

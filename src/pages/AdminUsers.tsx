@@ -33,8 +33,16 @@ import { toast } from '@/hooks/use-toast';
 
 export default function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', password: '', firstName: '', lastName: '', role: 'learner' });
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any | null>(null);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    role: 'learner',
+    status: 'active'
+  });
 
   const { data: usersData, isLoading } = useUsers({ search: searchQuery });
   const { data: statsData } = useUserStats();
@@ -45,22 +53,44 @@ export default function AdminUsers() {
   const users = usersData?.users || [];
   const stats = statsData || { total: 0, active: 0, inactive: 0, admins: 0 };
 
-  const handleCreateUser = async () => {
+  const handleCreateOrUpdateUser = async () => {
     try {
-      await createUser.mutateAsync(newUser);
-      setIsCreateOpen(false);
-      setNewUser({ email: '', password: '', firstName: '', lastName: '', role: 'learner' });
+      if (editingUser) {
+        // Remove password if empty during edit to avoid overwriting with empty string
+        const { password, ...dataToUpdate } = formData;
+        const payload = password ? formData : dataToUpdate;
+        await updateUser.mutateAsync({ id: editingUser.id, data: payload });
+      } else {
+        await createUser.mutateAsync(formData);
+      }
+      setIsDialogOpen(false);
+      setEditingUser(null);
+      setFormData({ email: '', password: '', firstName: '', lastName: '', role: 'learner', status: 'active' });
     } catch (error) {
-      console.error('Failed to create user:', error);
+      console.error('Failed to save user:', error);
     }
   };
 
-  const handleToggleActive = async (userId: string, isActive: boolean) => {
+  const handleToggleActive = async (userId: string, currentStatus: string) => {
     try {
-      await updateUser.mutateAsync({ id: userId, data: { isActive: !isActive } });
+      const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      await updateUser.mutateAsync({ id: userId, data: { status: newStatus } });
     } catch (error) {
       console.error('Failed to update user:', error);
     }
+  };
+
+  const openEditDialog = (user: any) => {
+    setEditingUser(user);
+    setFormData({
+      email: user.email,
+      password: '', // Don't fill password
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      status: user.status
+    });
+    setIsDialogOpen(true);
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -80,11 +110,11 @@ export default function AdminUsers() {
       render: (user: any) => (
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-            {(user.first_name || user.email || 'U').charAt(0).toUpperCase()}
-            {(user.last_name || '').charAt(0).toUpperCase()}
+            {(user.firstName || user.email || 'U').charAt(0).toUpperCase()}
+            {(user.lastName || '').charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-medium text-foreground">{user.first_name} {user.last_name}</p>
+            <p className="font-medium text-foreground">{user.firstName} {user.lastName}</p>
             <p className="text-sm text-muted-foreground">{user.email}</p>
           </div>
         </div>
@@ -100,20 +130,20 @@ export default function AdminUsers() {
       ),
     },
     {
-      key: 'is_active',
+      key: 'status',
       header: 'Status',
       render: (user: any) => (
-        <Badge variant={user.is_active ? 'active' : 'locked'}>
-          {user.is_active ? 'Active' : 'Inactive'}
+        <Badge variant={user.status === 'active' ? 'active' : 'locked'}>
+          {user.status === 'active' ? 'Active' : 'Inactive'}
         </Badge>
       ),
     },
     {
-      key: 'created_at',
+      key: 'createdAt',
       header: 'Created',
       render: (user: any) => (
         <span className="text-muted-foreground">
-          {new Date(user.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          {user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
         </span>
       ),
     },
@@ -128,10 +158,9 @@ export default function AdminUsers() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>View Details</DropdownMenuItem>
-            <DropdownMenuItem>Edit User</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleToggleActive(user.id, user.is_active)}>
-              {user.is_active ? 'Deactivate' : 'Activate'}
+            <DropdownMenuItem onClick={() => openEditDialog(user)}>Edit User</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleToggleActive(user.id, user.status)}>
+              {user.status === 'active' ? 'Deactivate' : 'Activate'}
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(user.id)}>
               Delete
@@ -165,10 +194,10 @@ export default function AdminUsers() {
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      
+
       <div className="lg:ml-64">
         <AdminHeader title="User Management" subtitle="Manage learners and their access" />
-        
+
         <main className="p-4 lg:p-6">
           {/* Actions Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
@@ -187,7 +216,13 @@ export default function AdminUsers() {
                 Filters
               </Button>
             </div>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <Dialog open={isDialogOpen} onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                setEditingUser(null);
+                setFormData({ email: '', password: '', firstName: '', lastName: '', role: 'learner', status: 'active' });
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button variant="premium" className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
@@ -196,62 +231,77 @@ export default function AdminUsers() {
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle className="font-serif">Add New User</DialogTitle>
+                  <DialogTitle className="font-serif">{editingUser ? 'Edit User' : 'Add New User'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>First Name</Label>
-                      <Input 
-                        value={newUser.firstName}
-                        onChange={(e) => setNewUser(prev => ({ ...prev, firstName: e.target.value }))}
+                      <Input
+                        value={formData.firstName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
                         placeholder="First name"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Last Name</Label>
-                      <Input 
-                        value={newUser.lastName}
-                        onChange={(e) => setNewUser(prev => ({ ...prev, lastName: e.target.value }))}
+                      <Input
+                        value={formData.lastName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                         placeholder="Last name"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label>Email</Label>
-                    <Input 
+                    <Input
                       type="email"
-                      value={newUser.email}
-                      onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
+                      value={formData.email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="user@example.com"
+                      disabled={!!editingUser}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Password</Label>
-                    <Input 
+                    <Label>Password {editingUser && '(Leave blank to keep current)'}</Label>
+                    <Input
                       type="password"
-                      value={newUser.password}
-                      onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
+                      value={formData.password}
+                      onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                       placeholder="••••••••"
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Role</Label>
-                    <Select value={newUser.role} onValueChange={(v) => setNewUser(prev => ({ ...prev, role: v }))}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="learner">Learner</SelectItem>
-                        <SelectItem value="facilitator">Facilitator</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select value={formData.role} onValueChange={(v) => setFormData(prev => ({ ...prev, role: v }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="learner">Learner</SelectItem>
+                          <SelectItem value="facilitator">Facilitator</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select value={formData.status} onValueChange={(v) => setFormData(prev => ({ ...prev, status: v }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div className="flex justify-end gap-3 pt-4">
-                    <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                    <Button variant="premium" onClick={handleCreateUser} disabled={createUser.isPending}>
-                      {createUser.isPending ? 'Creating...' : 'Create User'}
+                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                    <Button variant="premium" onClick={handleCreateOrUpdateUser} disabled={createUser.isPending || updateUser.isPending}>
+                      {createUser.isPending || updateUser.isPending ? 'Saving...' : (editingUser ? 'Update User' : 'Create User')}
                     </Button>
                   </div>
                 </div>

@@ -20,6 +20,7 @@ const getLessonsByCourse = async (req, res) => {
       videoUrl: l.video_url,
       durationMinutes: l.duration_minutes,
       orderIndex: l.order_index,
+      maxPauses: l.max_pauses,
       isLocked: l.is_locked,
       createdAt: l.created_at
     }));
@@ -74,6 +75,7 @@ const getLessonById = async (req, res) => {
       videoUrl: l.video_url,
       durationMinutes: l.duration_minutes,
       orderIndex: l.order_index,
+      maxPauses: l.max_pauses,
       isLocked: l.is_locked,
       createdAt: l.created_at,
       progress: progress ? {
@@ -91,7 +93,10 @@ const getLessonById = async (req, res) => {
 // Create lesson
 const createLesson = async (req, res) => {
   try {
-    const { courseId, title, description, content, audioUrl, videoUrl, durationMinutes, orderIndex, isLocked } = req.body;
+    const { courseId, title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses } = req.body;
+
+    // Get audio URL from uploaded file or request body (fallback)
+    const audioUrl = req.file ? req.file.path : req.body.audioUrl;
 
     // Verify course exists
     const courseCheck = await pool.query('SELECT id FROM courses WHERE id = $1', [courseId]);
@@ -110,10 +115,10 @@ const createLesson = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO lessons (course_id, title, description, content, audio_url, video_url, duration_minutes, order_index, is_locked)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO lessons (course_id, title, description, content, audio_url, video_url, duration_minutes, order_index, is_locked, max_pauses)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [courseId, title, description, content, audioUrl, videoUrl, durationMinutes || 0, finalOrderIndex, isLocked || false]
+      [courseId, title, description, content, audioUrl, videoUrl, durationMinutes || 0, finalOrderIndex, isLocked || false, maxPauses || 3]
     );
 
     const l = result.rows[0];
@@ -127,8 +132,10 @@ const createLesson = async (req, res) => {
         description: l.description,
         durationMinutes: l.duration_minutes,
         orderIndex: l.order_index,
+        maxPauses: l.max_pauses,
         isLocked: l.is_locked,
-        createdAt: l.created_at
+        createdAt: l.created_at,
+        audioUrl: l.audio_url
       }
     });
   } catch (error) {
@@ -141,7 +148,10 @@ const createLesson = async (req, res) => {
 const updateLesson = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, content, audioUrl, videoUrl, durationMinutes, orderIndex, isLocked } = req.body;
+    const { title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses } = req.body;
+
+    // Get audio URL from uploaded file or request body
+    const audioUrl = req.file ? req.file.path : req.body.audioUrl;
 
     const result = await pool.query(
       `UPDATE lessons 
@@ -153,10 +163,11 @@ const updateLesson = async (req, res) => {
            duration_minutes = COALESCE($6, duration_minutes),
            order_index = COALESCE($7, order_index),
            is_locked = COALESCE($8, is_locked),
+           max_pauses = COALESCE($9, max_pauses),
            updated_at = NOW()
-       WHERE id = $9
+       WHERE id = $10
        RETURNING *`,
-      [title, description, content, audioUrl, videoUrl, durationMinutes, orderIndex, isLocked, id]
+      [title, description, content, audioUrl, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses, id]
     );
 
     if (result.rows.length === 0) {

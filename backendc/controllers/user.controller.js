@@ -8,39 +8,44 @@ const getAllUsers = async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-      SELECT id, email, first_name, last_name, role, status, avatar_url, phone, created_at, last_active
-      FROM users WHERE 1=1
+      SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.avatar_url, u.phone, u.created_at, u.last_active,
+             array_remove(array_agg(sap.permission), NULL) as permissions
+      FROM users u
+      LEFT JOIN sub_admin_permissions sap ON u.id = sap.user_id
+      WHERE 1=1
     `;
     const params = [];
     let paramIndex = 1;
 
     if (role) {
-      query += ` AND role = $${paramIndex}`;
+      query += ` AND u.role = $${paramIndex}`;
       params.push(role);
       paramIndex++;
     }
 
     if (status) {
-      query += ` AND status = $${paramIndex}`;
+      query += ` AND u.status = $${paramIndex}`;
       params.push(status);
       paramIndex++;
     }
 
     if (search) {
-      query += ` AND (first_name ILIKE $${paramIndex} OR last_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex})`;
+      query += ` AND (u.first_name ILIKE $${paramIndex} OR u.last_name ILIKE $${paramIndex} OR u.email ILIKE $${paramIndex})`;
       params.push(`%${search}%`);
       paramIndex++;
     }
 
+    query += ` GROUP BY u.id`;
+
     // Get total count
     const countResult = await pool.query(
-      query.replace('SELECT id, email, first_name, last_name, role, status, avatar_url, phone, created_at, last_active', 'SELECT COUNT(*)'),
+      `SELECT COUNT(DISTINCT u.id) FROM users u WHERE ${query.split('WHERE')[1].split('GROUP BY')[0]}`,
       params
     );
-    const total = parseInt(countResult.rows[0].count);
+    const total = parseInt(countResult.rows[0]?.count || 0);
 
     // Get paginated results
-    query += ` ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    query += ` ORDER BY u.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
 
     const result = await pool.query(query, params);
@@ -55,7 +60,8 @@ const getAllUsers = async (req, res) => {
       avatarUrl: user.avatar_url,
       phone: user.phone,
       createdAt: user.created_at,
-      lastActive: user.last_active
+      lastActive: user.last_active,
+      permissions: user.permissions || []
     }));
 
     res.json({
@@ -110,16 +116,19 @@ const getUserById = async (req, res) => {
 
 // Create user (admin only)
 const createUser = async (req, res) => {
+  const client = await pool.connect();
   try {
-    const { email, password, firstName, lastName, role, status = 'active', phone } = req.body;
+    await client.query('BEGIN');
+    const { email, password, firstName, lastName, role, status = 'active', phone, permissions } = req.body;
 
     // Check if user exists
-    const existingUser = await pool.query(
+    const existingUser = await client.query(
       'SELECT id FROM users WHERE email = $1',
       [email.toLowerCase()]
     );
 
     if (existingUser.rows.length > 0) {
+      await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Email already registered' });
     }
 
@@ -127,7 +136,7 @@ const createUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    const result = await pool.query(
+    const result = await client.query(
       `INSERT INTO users (email, password_hash, first_name, last_name, role, status, phone)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING id, email, first_name, last_name, role, status, phone, created_at`,
@@ -135,6 +144,18 @@ const createUser = async (req, res) => {
     );
 
     const user = result.rows[0];
+
+    // Handle Sub-Admin Permissions
+    let userPermissions = [];
+    if (role === 'sub_admin' && permissions && Array.isArray(permissions) && permissions.length > 0) {
+      const permissionValues = permissions.map(p => `('${user.id}', '${p}')`).join(',');
+      await client.query(
+        `INSERT INTO sub_admin_permissions (user_id, permission) VALUES ${permissionValues}`
+      );
+      userPermissions = permissions;
+    }
+
+    await client.query('COMMIT');
 
     res.status(201).json({
       message: 'User created',
@@ -146,22 +167,29 @@ const createUser = async (req, res) => {
         role: user.role,
         status: user.status,
         phone: user.phone,
-        createdAt: user.created_at
+        createdAt: user.created_at,
+        permissions: userPermissions
       }
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Create user error:', error);
     res.status(500).json({ error: 'Failed to create user' });
+  } finally {
+    client.release();
   }
 };
 
 // Update user (admin only)
 const updateUser = async (req, res) => {
+  const client = await pool.connect();
   try {
+    await client.query('BEGIN');
     const { id } = req.params;
-    const { firstName, lastName, role, status, phone, avatarUrl } = req.body;
+    const { firstName, lastName, role, status, phone, avatarUrl, permissions, password } = req.body; // Added password here if needed in future, but distinct endpoint usually better. Kept consistent with request.
 
-    const result = await pool.query(
+    // 1. Update User Basic Info
+    const result = await client.query(
       `UPDATE users 
        SET first_name = COALESCE($1, first_name),
            last_name = COALESCE($2, last_name),
@@ -176,10 +204,33 @@ const updateUser = async (req, res) => {
     );
 
     if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ error: 'User not found' });
     }
 
     const user = result.rows[0];
+
+    // 2. Handle Permissions (if role is sub_admin OR just updating permissions for existing sub_admin)
+    // If permissions array is provided, we replace existing permissions.
+    let currentPermissions = [];
+    if (permissions && Array.isArray(permissions)) {
+      // Delete existing
+      await client.query('DELETE FROM sub_admin_permissions WHERE user_id = $1', [id]);
+
+      if (permissions.length > 0) {
+        const permissionValues = permissions.map(p => `('${id}', '${p}')`).join(',');
+        await client.query(
+          `INSERT INTO sub_admin_permissions (user_id, permission) VALUES ${permissionValues}`
+        );
+        currentPermissions = permissions;
+      }
+    } else {
+      // Fetch existing if not updated
+      const permResult = await client.query('SELECT permission FROM sub_admin_permissions WHERE user_id = $1', [id]);
+      currentPermissions = permResult.rows.map(r => r.permission);
+    }
+
+    await client.query('COMMIT');
 
     res.json({
       message: 'User updated',
@@ -191,12 +242,16 @@ const updateUser = async (req, res) => {
         role: user.role,
         status: user.status,
         phone: user.phone,
-        avatarUrl: user.avatar_url
+        avatarUrl: user.avatar_url,
+        permissions: currentPermissions
       }
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Update user error:', error);
     res.status(500).json({ error: 'Failed to update user' });
+  } finally {
+    client.release();
   }
 };
 

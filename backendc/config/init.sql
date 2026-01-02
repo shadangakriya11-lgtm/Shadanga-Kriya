@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
   completed BOOLEAN DEFAULT false,
   completed_at TIMESTAMP WITH TIME ZONE,
   started_at TIMESTAMP WITH TIME ZONE,
-  current_time INTEGER DEFAULT 0,
+    current_time_seconds INTEGER DEFAULT 0,
   time_spent_seconds INTEGER DEFAULT 0,
   last_position_seconds INTEGER DEFAULT 0,
   pauses_used INTEGER DEFAULT 0,

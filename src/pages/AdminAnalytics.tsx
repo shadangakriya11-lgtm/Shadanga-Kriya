@@ -31,7 +31,7 @@ import { useState } from 'react';
 
 export default function AdminAnalytics() {
   const [period, setPeriod] = useState('30');
-  
+
   const { data: dashboardData, isLoading: dashboardLoading } = useDashboardAnalytics();
   const { data: enrollmentData, isLoading: enrollmentLoading } = useEnrollmentTrends(period);
   const { data: revenueData, isLoading: revenueLoading } = useRevenueAnalytics(period);
@@ -100,13 +100,53 @@ export default function AdminAnalytics() {
     );
   }
 
+  const handleExport = () => {
+    // Prepare CSV data
+    const headers = ['Metric', 'Value'];
+    const rows = [
+      ['Completion Rate', `${stats.completionRate}%`],
+      ['Avg Session Time', `${stats.avgSessionTime}m`],
+      ['Active Learners', stats.activeUsers],
+      ['Interruption Rate', `${stats.interruptionRate}%`],
+      [],
+      ['Course Performance', ''],
+      ['Course', 'Enrollments', 'Completions'],
+      ...(coursePerformance?.map((c: any) => [c.title || c.name, c.enrollments || 0, c.completions || 0]) || []),
+      [],
+      ['Daily Engagement', ''],
+      ['Date', 'Sessions', 'Completions'],
+      ...(engagementData?.map((d: any) => [
+        d.date || d.day,
+        d.sessions || 0,
+        d.completions || 0
+      ]) || [])
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'analytics_report.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      
+
       <div className="lg:ml-64">
         <AdminHeader title="Analytics & Reports" subtitle="Insights into platform performance" />
-        
+
         <main className="p-4 lg:p-6">
           {/* Actions Bar */}
           <div className="flex items-center justify-between mb-6">
@@ -123,7 +163,7 @@ export default function AdminAnalytics() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline">
+            <Button variant="outline" onClick={handleExport}>
               <Download className="h-4 w-4 mr-2" />
               Export Report
             </Button>

@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -13,12 +13,14 @@ import {
   Shield,
   Menu,
   X,
+  Bell,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { removeAuthToken } from '@/lib/api';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
@@ -29,6 +31,7 @@ const navItems = [
   { icon: CreditCard, label: 'Payments', href: '/admin/payments' },
   { icon: UserCog, label: 'Sub-Admins', href: '/admin/subadmins' },
   { icon: BarChart3, label: 'Analytics', href: '/admin/analytics' },
+  { icon: Bell, label: 'Notifications', href: '/admin/notifications' },
 ];
 
 const bottomItems = [
@@ -37,6 +40,12 @@ const bottomItems = [
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleSignOut = () => {
+    removeAuthToken();
+    navigate('/login');
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -102,7 +111,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
             </NavLink>
           );
         })}
-        <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-colors w-full">
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-colors w-full"
+        >
           <LogOut className="h-5 w-5" />
           <span>Sign Out</span>
         </button>

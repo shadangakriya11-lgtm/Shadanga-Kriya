@@ -5,17 +5,25 @@ const getDashboardStats = async (req, res) => {
   try {
     const stats = await pool.query(`
       SELECT 
-        (SELECT COUNT(*) FROM users WHERE role = 'learner') as total_learners,
-        (SELECT COUNT(*) FROM users WHERE role = 'facilitator') as total_facilitators,
-        (SELECT COUNT(*) FROM courses WHERE status = 'published') as active_courses,
-        (SELECT COUNT(*) FROM enrollments) as total_enrollments,
+        (SELECT COUNT(*) FROM users) as total_users,
+        (SELECT COUNT(*) FROM users WHERE status = 'active') as active_users,
+        (SELECT COUNT(*) FROM courses WHERE status != 'archived') as total_courses,
         (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'completed') as total_revenue,
-        (SELECT COUNT(*) FROM sessions WHERE status = 'scheduled') as upcoming_sessions,
-        (SELECT COUNT(*) FROM users WHERE created_at > NOW() - INTERVAL '7 days') as new_users_this_week,
-        (SELECT ROUND(AVG(progress_percent), 1) FROM enrollments) as avg_completion_rate
+        (SELECT COUNT(*) FROM sessions WHERE status = 'scheduled' AND scheduled_at < NOW() + INTERVAL '24 hours') as alerts,
+        (SELECT COALESCE(ROUND(AVG(progress_percent), 1), 0) FROM enrollments) as avg_completion_rate
     `);
 
-    res.json(stats.rows[0]);
+    const row = stats.rows[0];
+
+    // Map to camelCase keys expected by frontend
+    res.json({
+      totalUsers: parseInt(row.total_users),
+      activeUsers: parseInt(row.active_users),
+      totalCourses: parseInt(row.total_courses),
+      revenue: parseFloat(row.total_revenue),
+      completionRate: parseFloat(row.avg_completion_rate),
+      alerts: parseInt(row.alerts)
+    });
   } catch (error) {
     console.error('Get dashboard stats error:', error);
     res.status(500).json({ error: 'Failed to get stats' });
@@ -74,8 +82,8 @@ const getRevenueAnalytics = async (req, res) => {
     `);
 
     res.json({
-      daily: result.rows,
-      topCourses: topCourses.rows
+      weekly: result.rows,
+      coursePerformance: topCourses.rows
     });
   } catch (error) {
     console.error('Get revenue analytics error:', error);
@@ -217,11 +225,79 @@ const getLearnerStats = async (req, res) => {
   }
 };
 
+// Get monitoring stats
+const getMonitoringStats = async (req, res) => {
+  try {
+    // Stats Summary
+    const statsQuery = await pool.query(`
+      SELECT
+        (SELECT COUNT(DISTINCT user_id) FROM lesson_progress WHERE updated_at > NOW() - INTERVAL '1 hour') as active_sessions,
+        (SELECT COUNT(*) FROM lesson_progress WHERE completed = true AND completed_at::date = CURRENT_DATE) as completed_today,
+        (SELECT COUNT(*) FROM lesson_progress WHERE pauses_used >= 3) as interrupted,
+        (SELECT COUNT(*) FROM lesson_progress WHERE pauses_used > 0) as pause_requests
+    `);
+
+    // Recent Progress (Real-time monitoring table)
+    const progressQuery = await pool.query(`
+      SELECT 
+        lp.id,
+        u.id as user_id,
+        u.first_name || ' ' || u.last_name as user_name,
+        u.email as user_email,
+        l.id as lesson_id,
+        l.title as lesson_title,
+        c.title as course_title,
+        lp.time_spent_seconds as progress_seconds,
+        l.duration_seconds as total_seconds,
+        lp.pauses_used,
+        l.max_pauses,
+        lp.status,
+        lp.updated_at as last_activity
+      FROM lesson_progress lp
+      JOIN users u ON lp.user_id = u.id
+      JOIN lessons l ON lp.lesson_id = l.id
+      JOIN courses c ON l.course_id = c.id
+      ORDER BY lp.updated_at DESC
+      LIMIT 50
+    `);
+
+    const stats = statsQuery.rows[0];
+    const progress = progressQuery.rows.map(row => ({
+      id: row.id,
+      userId: row.user_id,
+      userName: row.user_name,
+      userEmail: row.user_email,
+      lessonId: row.lesson_id,
+      lessonTitle: row.lesson_title,
+      courseTitle: row.course_title,
+      progress: Math.min(100, Math.round((row.progress_seconds / (row.total_seconds || 1)) * 100)), // Approximate percentage
+      pausesUsed: row.pauses_used,
+      maxPauses: row.max_pauses,
+      status: row.status === 'locked' ? 'interrupted' : (row.status === 'completed' ? 'completed' : 'in_progress'), // Map DB status to frontend status
+      lastActivity: row.last_activity
+    }));
+
+    res.json({
+      stats: {
+        activeSessions: parseInt(stats.active_sessions) || 0,
+        completedToday: parseInt(stats.completed_today) || 0,
+        interrupted: parseInt(stats.interrupted) || 0,
+        pauseRequests: parseInt(stats.pause_requests) || 0
+      },
+      monitoring: progress
+    });
+  } catch (error) {
+    console.error('Get monitoring stats error:', error);
+    res.status(500).json({ error: 'Failed to get monitoring stats' });
+  }
+};
+
 module.exports = {
   getDashboardStats,
   getEnrollmentTrends,
   getRevenueAnalytics,
   getCourseAnalytics,
   getFacilitatorStats,
-  getLearnerStats
+  getLearnerStats,
+  getMonitoringStats
 };

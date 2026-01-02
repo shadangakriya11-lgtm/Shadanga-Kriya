@@ -25,7 +25,7 @@ router.post('/', [
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('firstName').trim().notEmpty().withMessage('First name required'),
   body('lastName').trim().notEmpty().withMessage('Last name required'),
-  body('role').isIn(['admin', 'facilitator', 'learner']).withMessage('Valid role required')
+  body('role').isIn(['admin', 'facilitator', 'learner', 'sub_admin']).withMessage('Valid role required')
 ], validate, userController.createUser);
 
 // Update user

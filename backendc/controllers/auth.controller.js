@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db.js');
+const { notifyAdmins } = require('./notification.controller.js');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const JWT_EXPIRES_IN = '7d';
@@ -24,21 +25,30 @@ const register = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Only allow learner registration by default
-    const allowedRole = role === 'learner' ? 'learner' : 'learner';
+    // Allow all roles for now as requested
+    const validRoles = ['learner', 'admin', 'facilitator'];
+    const assignedRole = validRoles.includes(role) ? role : 'learner';
 
     // Create user
     const result = await pool.query(
       `INSERT INTO users (email, password_hash, first_name, last_name, role, status)
        VALUES ($1, $2, $3, $4, $5, 'active')
        RETURNING id, email, first_name, last_name, role, status, created_at`,
-      [email.toLowerCase(), passwordHash, firstName, lastName, allowedRole]
+      [email.toLowerCase(), passwordHash, firstName, lastName, assignedRole]
     );
 
     const user = result.rows[0];
 
     // Generate token
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+
+    // Notify admins
+    notifyAdmins(
+      'New User Registration',
+      `New user ${user.first_name} ${user.last_name} (${user.email}) has registered.`,
+      'info',
+      `/admin/users`
+    ).catch(err => console.error('Notification error', err));
 
     res.status(201).json({
       message: 'Registration successful',

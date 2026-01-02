@@ -5,8 +5,7 @@ import { DataTable } from '@/components/admin/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { mockUsers, mockLessons, mockCourses } from '@/data/mockData';
-import { Search, Filter, MoreHorizontal, Play, Pause, RotateCcw, Lock, Plus } from 'lucide-react';
+import { Search, MoreHorizontal, Plus, RotateCcw, Lock, Pause } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +13,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Progress } from '@/components/ui/progress';
+import { useMonitoringStats } from '@/hooks/useApi';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface UserLessonProgress {
   id: string;
@@ -27,53 +28,8 @@ interface UserLessonProgress {
   pausesUsed: number;
   maxPauses: number;
   status: 'in_progress' | 'completed' | 'paused' | 'interrupted';
-  lastActivity: Date;
+  lastActivity: Date | string; // Handle string from JSON
 }
-
-const mockProgress: UserLessonProgress[] = [
-  {
-    id: 'p1',
-    userId: 'u1',
-    userName: 'Sarah Mitchell',
-    userEmail: 'sarah.m@example.com',
-    lessonId: 'l5',
-    lessonTitle: 'The 4-7-8 Technique',
-    courseTitle: 'Foundations of Mindful Breathing',
-    progress: 65,
-    pausesUsed: 2,
-    maxPauses: 3,
-    status: 'in_progress',
-    lastActivity: new Date('2024-12-27T10:30:00'),
-  },
-  {
-    id: 'p2',
-    userId: 'u2',
-    userName: 'James Chen',
-    userEmail: 'james.chen@example.com',
-    lessonId: 'l3',
-    lessonTitle: 'Rhythmic Breath Patterns',
-    courseTitle: 'Foundations of Mindful Breathing',
-    progress: 100,
-    pausesUsed: 1,
-    maxPauses: 3,
-    status: 'completed',
-    lastActivity: new Date('2024-12-26T15:45:00'),
-  },
-  {
-    id: 'p3',
-    userId: 'u1',
-    userName: 'Sarah Mitchell',
-    userEmail: 'sarah.m@example.com',
-    lessonId: 'l2',
-    lessonTitle: 'Diaphragmatic Breathing',
-    courseTitle: 'Foundations of Mindful Breathing',
-    progress: 45,
-    pausesUsed: 3,
-    maxPauses: 3,
-    status: 'interrupted',
-    lastActivity: new Date('2024-12-25T09:15:00'),
-  },
-];
 
 const progressColumns = [
   {
@@ -82,7 +38,7 @@ const progressColumns = [
     render: (item: UserLessonProgress) => (
       <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-          {item.userName.split(' ').map(n => n[0]).join('')}
+          {(item.userName || 'U').split(' ').map((n: string) => n[0]).join('')}
         </div>
         <div>
           <p className="font-medium text-foreground">{item.userName}</p>
@@ -136,8 +92,8 @@ const progressColumns = [
         interrupted: 'locked',
       };
       return (
-        <Badge variant={variants[item.status]}>
-          {item.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+        <Badge variant={variants[item.status] || 'outline'}>
+          {(item.status || 'Unknown').replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
         </Badge>
       );
     },
@@ -147,7 +103,7 @@ const progressColumns = [
     header: 'Last Activity',
     render: (item: UserLessonProgress) => (
       <span className="text-muted-foreground">
-        {item.lastActivity.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        {new Date(item.lastActivity).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
       </span>
     ),
   },
@@ -185,20 +141,44 @@ export default function AdminMonitoring() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const filteredProgress = mockProgress.filter((item) => {
-    const matchesSearch = item.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.lessonTitle.toLowerCase().includes(searchQuery.toLowerCase());
+  const { data, isLoading } = useMonitoringStats();
+
+  const monitoringData: UserLessonProgress[] = data?.monitoring || [];
+  const stats = data?.stats || { activeSessions: 0, completedToday: 0, interrupted: 0, pauseRequests: 0 };
+
+  const filteredProgress = monitoringData.filter((item) => {
+    const matchesSearch = (item.userName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.lessonTitle || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AdminSidebar />
+        <div className="lg:ml-64">
+          <AdminHeader title="Lesson Monitoring" subtitle="Track user progress and manage playback" />
+          <main className="p-4 lg:p-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-20 rounded-xl" />
+              ))}
+            </div>
+            <Skeleton className="h-96 rounded-xl" />
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      
+
       <div className="lg:ml-64">
         <AdminHeader title="Lesson Monitoring" subtitle="Track user progress and manage playback" />
-        
+
         <main className="p-4 lg:p-6">
           {/* Actions Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
@@ -213,22 +193,22 @@ export default function AdminMonitoring() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button 
-                  variant={statusFilter === 'all' ? 'default' : 'outline'} 
+                <Button
+                  variant={statusFilter === 'all' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('all')}
                 >
                   All
                 </Button>
-                <Button 
-                  variant={statusFilter === 'in_progress' ? 'default' : 'outline'} 
+                <Button
+                  variant={statusFilter === 'in_progress' ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('in_progress')}
                 >
                   In Progress
                 </Button>
-                <Button 
-                  variant={statusFilter === 'interrupted' ? 'warning' : 'outline'} 
+                <Button
+                  variant={statusFilter === 'interrupted' ? 'warning' : 'outline'}
                   size="sm"
                   onClick={() => setStatusFilter('interrupted')}
                 >
@@ -236,25 +216,29 @@ export default function AdminMonitoring() {
                 </Button>
               </div>
             </div>
+            {/* Auto-refresh indicator or controls could go here */}
+            <div className="text-xs text-muted-foreground self-center">
+              Live updates active
+            </div>
           </div>
 
           {/* Stats Summary */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
-              <p className="text-xs lg:text-sm text-muted-foreground">Active Sessions</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">47</p>
+              <p className="text-xs lg:text-sm text-muted-foreground">Active Sessions (1h)</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.activeSessions}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Completed Today</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-success">156</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{stats.completedToday}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Interrupted</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-destructive">12</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-destructive">{stats.interrupted}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Pause Requests</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">8</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">{stats.pauseRequests}</p>
             </div>
           </div>
 

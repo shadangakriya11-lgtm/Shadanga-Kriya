@@ -28,25 +28,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useAllPayments, usePaymentStats, useUsers, useCourses, useCompletePayment } from '@/hooks/useApi';
+import { useAllPayments, usePaymentStats, useUsers, useCourses, useCompletePayment, useActivateCourse } from '@/hooks/useApi';
 
 export default function AdminPayments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isActivateOpen, setIsActivateOpen] = useState(false);
+  const [activateData, setActivateData] = useState({ userId: '', courseId: '', notes: '' });
 
   const { data: paymentsData, isLoading } = useAllPayments();
   const { data: statsData } = usePaymentStats();
   const { data: usersData } = useUsers();
   const { data: coursesData } = useCourses();
   const completePayment = useCompletePayment();
+  const activateCourse = useActivateCourse();
 
   const payments = (paymentsData?.payments || []).filter((payment: any) =>
-    payment.user_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    payment.course_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    payment.transaction_id?.toLowerCase().includes(searchQuery.toLowerCase())
+    payment.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    payment.courseTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    payment.transactionId?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
-  const stats = statsData || { totalRevenue: 0, completed: 0, pending: 0, thisMonth: 0 };
+
+  const stats = statsData || { totalRevenue: 0, completed: 0, pending: 0, revenueThisMonth: 0 };
   const users = usersData?.users || [];
   const courses = coursesData?.courses || [];
 
@@ -58,6 +60,16 @@ export default function AdminPayments() {
     }
   };
 
+  const handleActivate = async () => {
+    try {
+      await activateCourse.mutateAsync(activateData);
+      setIsActivateOpen(false);
+      setActivateData({ userId: '', courseId: '', notes: '' });
+    } catch (error) {
+      console.error('Failed to activate course:', error);
+    }
+  };
+
   const transactionColumns = [
     {
       key: 'user',
@@ -65,11 +77,11 @@ export default function AdminPayments() {
       render: (tx: any) => (
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-            {(tx.user_name || tx.user_email || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+            {(tx.userName || tx.userEmail || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <p className="font-medium text-foreground">{tx.user_name || 'Unknown'}</p>
-            <p className="text-sm text-muted-foreground">{tx.user_email}</p>
+            <p className="font-medium text-foreground">{tx.userName || 'Unknown'}</p>
+            <p className="text-sm text-muted-foreground">{tx.userEmail}</p>
           </div>
         </div>
       ),
@@ -78,7 +90,7 @@ export default function AdminPayments() {
       key: 'course',
       header: 'Course',
       render: (tx: any) => (
-        <p className="font-medium text-foreground">{tx.course_title || 'Unknown Course'}</p>
+        <p className="font-medium text-foreground">{tx.courseTitle || 'Unknown Course'}</p>
       ),
     },
     {
@@ -105,7 +117,7 @@ export default function AdminPayments() {
           refunded: <XCircle className="h-3 w-3" />,
         };
         return (
-          <Badge variant={variants[tx.status] || 'outline'} className="gap-1">
+          <Badge variant={variants[tx.status]} className="gap-1">
             {icons[tx.status]}
             {tx.status?.charAt(0).toUpperCase() + tx.status?.slice(1)}
           </Badge>
@@ -116,7 +128,7 @@ export default function AdminPayments() {
       key: 'transactionId',
       header: 'Transaction ID',
       render: (tx: any) => (
-        <code className="text-xs bg-muted px-2 py-1 rounded">{tx.transaction_id || 'N/A'}</code>
+        <code className="text-xs bg-muted px-2 py-1 rounded">{tx.transactionId || 'N/A'}</code>
       ),
     },
     {
@@ -124,7 +136,7 @@ export default function AdminPayments() {
       header: 'Date',
       render: (tx: any) => (
         <span className="text-muted-foreground">
-          {new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          {new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </span>
       ),
     },
@@ -178,10 +190,10 @@ export default function AdminPayments() {
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      
+
       <div className="lg:ml-64">
         <AdminHeader title="Payments & Transactions" subtitle="Manage payments and course activations" />
-        
+
         <main className="p-4 lg:p-6">
           {/* Actions Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
@@ -219,14 +231,14 @@ export default function AdminPayments() {
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
                       <Label>User</Label>
-                      <Select>
+                      <Select value={activateData.userId} onValueChange={(val) => setActivateData({ ...activateData, userId: val })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select user" />
                         </SelectTrigger>
                         <SelectContent>
                           {users.map((user: any) => (
                             <SelectItem key={user.id} value={user.id}>
-                              {user.first_name} {user.last_name} ({user.email})
+                              {user.firstName} {user.lastName} ({user.email})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -234,7 +246,7 @@ export default function AdminPayments() {
                     </div>
                     <div className="space-y-2">
                       <Label>Course</Label>
-                      <Select>
+                      <Select value={activateData.courseId} onValueChange={(val) => setActivateData({ ...activateData, courseId: val })}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select course" />
                         </SelectTrigger>
@@ -247,11 +259,17 @@ export default function AdminPayments() {
                     </div>
                     <div className="space-y-2">
                       <Label>Notes (optional)</Label>
-                      <Input placeholder="e.g., Scholarship, Promotional access" />
+                      <Input
+                        placeholder="e.g., Scholarship, Promotional access"
+                        value={activateData.notes}
+                        onChange={(e) => setActivateData({ ...activateData, notes: e.target.value })}
+                      />
                     </div>
                     <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                       <Button variant="outline" onClick={() => setIsActivateOpen(false)} className="w-full sm:w-auto">Cancel</Button>
-                      <Button variant="premium" onClick={() => setIsActivateOpen(false)} className="w-full sm:w-auto">Activate Course</Button>
+                      <Button variant="premium" onClick={handleActivate} className="w-full sm:w-auto" disabled={activateCourse.isPending}>
+                        {activateCourse.isPending ? 'Activating...' : 'Activate Course'}
+                      </Button>
                     </div>
                   </div>
                 </DialogContent>
@@ -275,7 +293,7 @@ export default function AdminPayments() {
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">This Month</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">${stats.thisMonth?.toLocaleString()}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">${stats.revenueThisMonth?.toLocaleString()}</p>
             </div>
           </div>
 
