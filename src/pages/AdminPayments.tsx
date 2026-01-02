@@ -5,6 +5,7 @@ import { DataTable } from '@/components/admin/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Search, Filter, MoreHorizontal, Download, CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
 import {
   DropdownMenu,
@@ -27,173 +28,152 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { mockCourses, mockUsers } from '@/data/mockData';
-
-interface Transaction {
-  id: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  courseId: string;
-  courseTitle: string;
-  amount: number;
-  status: 'completed' | 'pending' | 'failed' | 'refunded';
-  paymentMethod: string;
-  transactionId: string;
-  createdAt: Date;
-}
-
-const mockTransactions: Transaction[] = [
-  {
-    id: 't1',
-    userId: 'u1',
-    userName: 'Sarah Mitchell',
-    userEmail: 'sarah.m@example.com',
-    courseId: '1',
-    courseTitle: 'Foundations of Mindful Breathing',
-    amount: 149,
-    status: 'completed',
-    paymentMethod: 'Razorpay',
-    transactionId: 'pay_OxY123456789',
-    createdAt: new Date('2024-12-26T14:30:00'),
-  },
-  {
-    id: 't2',
-    userId: 'u2',
-    userName: 'James Chen',
-    userEmail: 'james.chen@example.com',
-    courseId: '2',
-    courseTitle: 'Stress Response Protocol',
-    amount: 99,
-    status: 'pending',
-    paymentMethod: 'Razorpay',
-    transactionId: 'pay_OxY987654321',
-    createdAt: new Date('2024-12-27T09:15:00'),
-  },
-  {
-    id: 't3',
-    userId: 'u1',
-    userName: 'Sarah Mitchell',
-    userEmail: 'sarah.m@example.com',
-    courseId: '3',
-    courseTitle: 'Guided Recovery Sessions',
-    amount: 299,
-    status: 'completed',
-    paymentMethod: 'Razorpay',
-    transactionId: 'pay_OxY111222333',
-    createdAt: new Date('2024-12-24T11:00:00'),
-  },
-];
-
-const transactionColumns = [
-  {
-    key: 'user',
-    header: 'User',
-    render: (tx: Transaction) => (
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-          {tx.userName.split(' ').map(n => n[0]).join('')}
-        </div>
-        <div>
-          <p className="font-medium text-foreground">{tx.userName}</p>
-          <p className="text-sm text-muted-foreground">{tx.userEmail}</p>
-        </div>
-      </div>
-    ),
-  },
-  {
-    key: 'course',
-    header: 'Course',
-    render: (tx: Transaction) => (
-      <p className="font-medium text-foreground">{tx.courseTitle}</p>
-    ),
-  },
-  {
-    key: 'amount',
-    header: 'Amount',
-    render: (tx: Transaction) => (
-      <span className="font-semibold text-foreground">${tx.amount}</span>
-    ),
-  },
-  {
-    key: 'status',
-    header: 'Status',
-    render: (tx: Transaction) => {
-      const variants: Record<string, 'active' | 'completed' | 'pending' | 'locked'> = {
-        completed: 'completed',
-        pending: 'pending',
-        failed: 'locked',
-        refunded: 'locked',
-      };
-      const icons: Record<string, React.ReactNode> = {
-        completed: <CheckCircle className="h-3 w-3" />,
-        pending: <Clock className="h-3 w-3" />,
-        failed: <XCircle className="h-3 w-3" />,
-        refunded: <XCircle className="h-3 w-3" />,
-      };
-      return (
-        <Badge variant={variants[tx.status]} className="gap-1">
-          {icons[tx.status]}
-          {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
-        </Badge>
-      );
-    },
-  },
-  {
-    key: 'transactionId',
-    header: 'Transaction ID',
-    render: (tx: Transaction) => (
-      <code className="text-xs bg-muted px-2 py-1 rounded">{tx.transactionId}</code>
-    ),
-  },
-  {
-    key: 'date',
-    header: 'Date',
-    render: (tx: Transaction) => (
-      <span className="text-muted-foreground">
-        {tx.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-      </span>
-    ),
-  },
-  {
-    key: 'actions',
-    header: '',
-    render: (tx: Transaction) => (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem>View Details</DropdownMenuItem>
-          <DropdownMenuItem>Send Receipt</DropdownMenuItem>
-          {tx.status === 'pending' && (
-            <DropdownMenuItem>Mark as Completed</DropdownMenuItem>
-          )}
-          {tx.status === 'completed' && (
-            <DropdownMenuItem className="text-destructive">Process Refund</DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    ),
-    className: 'w-12',
-  },
-];
+import { useAllPayments, usePaymentStats, useUsers, useCourses, useCompletePayment } from '@/hooks/useApi';
 
 export default function AdminPayments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isActivateOpen, setIsActivateOpen] = useState(false);
 
-  const filteredTransactions = mockTransactions.filter((tx) =>
-    tx.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.courseTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.transactionId.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const { data: paymentsData, isLoading } = useAllPayments();
+  const { data: statsData } = usePaymentStats();
+  const { data: usersData } = useUsers();
+  const { data: coursesData } = useCourses();
+  const completePayment = useCompletePayment();
 
-  const totalRevenue = mockTransactions
-    .filter(tx => tx.status === 'completed')
-    .reduce((sum, tx) => sum + tx.amount, 0);
+  const payments = (paymentsData?.payments || []).filter((payment: any) =>
+    payment.user_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    payment.course_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    payment.transaction_id?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  
+  const stats = statsData || { totalRevenue: 0, completed: 0, pending: 0, thisMonth: 0 };
+  const users = usersData?.users || [];
+  const courses = coursesData?.courses || [];
+
+  const handleCompletePayment = async (paymentId: string) => {
+    try {
+      await completePayment.mutateAsync(paymentId);
+    } catch (error) {
+      console.error('Failed to complete payment:', error);
+    }
+  };
+
+  const transactionColumns = [
+    {
+      key: 'user',
+      header: 'User',
+      render: (tx: any) => (
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+            {(tx.user_name || tx.user_email || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+          </div>
+          <div>
+            <p className="font-medium text-foreground">{tx.user_name || 'Unknown'}</p>
+            <p className="text-sm text-muted-foreground">{tx.user_email}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'course',
+      header: 'Course',
+      render: (tx: any) => (
+        <p className="font-medium text-foreground">{tx.course_title || 'Unknown Course'}</p>
+      ),
+    },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (tx: any) => (
+        <span className="font-semibold text-foreground">${tx.amount}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (tx: any) => {
+        const variants: Record<string, 'active' | 'completed' | 'pending' | 'locked'> = {
+          completed: 'completed',
+          pending: 'pending',
+          failed: 'locked',
+          refunded: 'locked',
+        };
+        const icons: Record<string, React.ReactNode> = {
+          completed: <CheckCircle className="h-3 w-3" />,
+          pending: <Clock className="h-3 w-3" />,
+          failed: <XCircle className="h-3 w-3" />,
+          refunded: <XCircle className="h-3 w-3" />,
+        };
+        return (
+          <Badge variant={variants[tx.status] || 'outline'} className="gap-1">
+            {icons[tx.status]}
+            {tx.status?.charAt(0).toUpperCase() + tx.status?.slice(1)}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: 'transactionId',
+      header: 'Transaction ID',
+      render: (tx: any) => (
+        <code className="text-xs bg-muted px-2 py-1 rounded">{tx.transaction_id || 'N/A'}</code>
+      ),
+    },
+    {
+      key: 'date',
+      header: 'Date',
+      render: (tx: any) => (
+        <span className="text-muted-foreground">
+          {new Date(tx.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+        </span>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (tx: any) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>View Details</DropdownMenuItem>
+            <DropdownMenuItem>Send Receipt</DropdownMenuItem>
+            {tx.status === 'pending' && (
+              <DropdownMenuItem onClick={() => handleCompletePayment(tx.id)}>
+                Mark as Completed
+              </DropdownMenuItem>
+            )}
+            {tx.status === 'completed' && (
+              <DropdownMenuItem className="text-destructive">Process Refund</DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+      className: 'w-12',
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AdminSidebar />
+        <div className="lg:ml-64">
+          <AdminHeader title="Payments & Transactions" subtitle="Manage payments and course activations" />
+          <main className="p-4 lg:p-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-20 rounded-xl" />
+              ))}
+            </div>
+            <Skeleton className="h-96 rounded-xl" />
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -244,8 +224,10 @@ export default function AdminPayments() {
                           <SelectValue placeholder="Select user" />
                         </SelectTrigger>
                         <SelectContent>
-                          {mockUsers.map((user) => (
-                            <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                          {users.map((user: any) => (
+                            <SelectItem key={user.id} value={user.id}>
+                              {user.first_name} {user.last_name} ({user.email})
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -257,7 +239,7 @@ export default function AdminPayments() {
                           <SelectValue placeholder="Select course" />
                         </SelectTrigger>
                         <SelectContent>
-                          {mockCourses.map((course) => (
+                          {courses.map((course: any) => (
                             <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>
                           ))}
                         </SelectContent>
@@ -281,29 +263,25 @@ export default function AdminPayments() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Total Revenue</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">${totalRevenue.toLocaleString()}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">${stats.totalRevenue?.toLocaleString()}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Completed</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-success">
-                {mockTransactions.filter(tx => tx.status === 'completed').length}
-              </p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{stats.completed}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Pending</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">
-                {mockTransactions.filter(tx => tx.status === 'pending').length}
-              </p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">{stats.pending}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">This Month</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">$12,450</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">${stats.thisMonth?.toLocaleString()}</p>
             </div>
           </div>
 
           {/* Transactions Table */}
           <div className="overflow-x-auto">
-            <DataTable columns={transactionColumns} data={filteredTransactions} />
+            <DataTable columns={transactionColumns} data={payments} />
           </div>
         </main>
       </div>
