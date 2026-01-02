@@ -25,4 +25,7 @@ router.get('/facilitator', verifyToken, isFacilitatorOrAdmin, analyticsControlle
 // Learner stats (for self or admin viewing others)
 router.get('/learner/:learnerId?', verifyToken, analyticsController.getLearnerStats);
 
+// Monitoring stats (real-time)
+router.get('/monitoring', verifyToken, isAdmin, analyticsController.getMonitoringStats);
+
 module.exports = router;

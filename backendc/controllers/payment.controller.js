@@ -1,5 +1,6 @@
 const pool = require('../config/db.js');
 const { v4: uuidv4 } = require('uuid');
+const { notifyAdmins } = require('./notification.controller.js');
 
 // Get user's payments
 const getMyPayments = async (req, res) => {
@@ -121,6 +122,14 @@ const completePayment = async (req, res) => {
          ON CONFLICT (user_id, course_id) DO NOTHING`,
         [payment.user_id, payment.course_id]
       );
+
+      // Notify admins - Fire and forget
+      notifyAdmins(
+        'Payment Received',
+        `Payment of $${payment.amount} received for course ID: ${payment.course_id}`,
+        'success',
+        `/admin/payments`
+      ).catch(err => console.error('Notification error:', err));
     }
 
     res.json({
@@ -266,11 +275,73 @@ const refundPayment = async (req, res) => {
   }
 };
 
+// Manual Activation (Admin)
+const activateCourse = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { userId, courseId, notes } = req.body;
+
+    // 1. Verify User and Course
+    const courseRes = await client.query('SELECT price, title FROM courses WHERE id = $1', [courseId]);
+    if (courseRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Course not found' });
+    }
+    const course = courseRes.rows[0];
+
+    // 2. Check Enrollment
+    const enrollCheck = await client.query(
+      'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [userId, courseId]
+    );
+    if (enrollCheck.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'User already enrolled' });
+    }
+
+    // 3. Create "Manual" Payment Record
+    const transactionId = `MAN-${uuidv4().slice(0, 8).toUpperCase()}`;
+    const paymentRes = await client.query(
+      `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id`,
+      [userId, courseId, 0, 'USD', 'completed', 'manual', transactionId] // Amount 0 for manual? or course.price? Let's use 0 to indicate no system revenue collected, or maybe add a note column?
+      // Notes are not in schema. I'll just use 0 amount for now as it's a "grant".
+    );
+
+    // 4. Enroll
+    await client.query(
+      `INSERT INTO enrollments (user_id, course_id) VALUES ($1, $2)`,
+      [userId, courseId]
+    );
+
+    await client.query('COMMIT');
+
+    // Notify admins (audit log)
+    notifyAdmins(
+      'Manual Course Activation',
+      `Course "${course.title}" manually activated for user ID: ${userId}`,
+      'warning',
+      `/admin/enrollments`
+    ).catch(err => console.error('Notification error', err));
+    res.json({ message: 'Course activated successfully', paymentId: paymentRes.rows[0].id });
+
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Manual activation error:', error);
+    res.status(500).json({ error: 'Failed to activate course' });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getMyPayments,
   createPayment,
   completePayment,
   getAllPayments,
   getPaymentStats,
-  refundPayment
+  refundPayment,
+  activateCourse
 };

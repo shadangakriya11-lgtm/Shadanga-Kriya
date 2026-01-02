@@ -22,6 +22,7 @@ import AdminMonitoring from "./pages/AdminMonitoring";
 import AdminPayments from "./pages/AdminPayments";
 import AdminSubAdmins from "./pages/AdminSubAdmins";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import AdminNotifications from "./pages/AdminNotifications";
 import AdminSettings from "./pages/AdminSettings";
 import FacilitatorDashboard from "./pages/FacilitatorDashboard";
 import FacilitatorAttendance from "./pages/FacilitatorAttendance";
@@ -42,10 +43,10 @@ const App = () => (
             <Routes>
               {/* Landing */}
               <Route path="/" element={<Index />} />
-              
+
               {/* Auth */}
               <Route path="/auth" element={<Auth />} />
-              
+
               {/* Learner Routes */}
               <Route path="/splash" element={<Splash />} />
               <Route path="/login" element={<LearnerLogin />} />
@@ -69,7 +70,7 @@ const App = () => (
                   <Profile />
                 </ProtectedRoute>
               } />
-              
+
               {/* Admin Routes */}
               <Route path="/admin" element={
                 <ProtectedRoute allowedRoles={['admin']}>
@@ -111,12 +112,17 @@ const App = () => (
                   <AdminAnalytics />
                 </ProtectedRoute>
               } />
+              <Route path="/admin/notifications" element={
+                <ProtectedRoute allowedRoles={['admin']}>
+                  <AdminNotifications />
+                </ProtectedRoute>
+              } />
               <Route path="/admin/settings" element={
                 <ProtectedRoute allowedRoles={['admin']}>
                   <AdminSettings />
                 </ProtectedRoute>
               } />
-              
+
               {/* Facilitator Routes */}
               <Route path="/facilitator" element={
                 <ProtectedRoute allowedRoles={['facilitator']}>
@@ -138,7 +144,7 @@ const App = () => (
                   <FacilitatorReports />
                 </ProtectedRoute>
               } />
-              
+
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
             </Routes>

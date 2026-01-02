@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCourses, useCreateLesson, useDeleteLesson } from '@/hooks/useApi';
+import { useCourses, useCreateLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/useApi';
 import { useQuery } from '@tanstack/react-query';
 import { lessonsApi } from '@/lib/api';
 
@@ -43,6 +43,10 @@ export default function AdminLessons() {
     durationMinutes: 15,
     maxPauses: 3,
   });
+  const [editingLesson, setEditingLesson] = useState<any | null>(null);
+  const [previewLesson, setPreviewLesson] = useState<any | null>(null);
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const { data: coursesData } = useCourses();
   const courses = coursesData?.courses || [];
@@ -70,20 +74,66 @@ export default function AdminLessons() {
 
   const createLesson = useCreateLesson();
   const deleteLesson = useDeleteLesson();
+  const updateLesson = useUpdateLesson(); // Assuming this hook exists or creating it
+
+  // Reuse the existing hook if available or import it
+  // import { useUpdateLesson } from '@/hooks/useApi'; 
 
   const lessons = (lessonsData || []).filter((lesson: any) => {
     const matchesSearch = lesson.title?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCourse = selectedCourse === 'all' || lesson.course_id === selectedCourse;
+    const matchesCourse = selectedCourse === 'all' || lesson.courseId === selectedCourse;
     return matchesSearch && matchesCourse;
   });
 
-  const handleCreateLesson = async () => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  const handleCreateOrUpdateLesson = async () => {
     try {
-      await createLesson.mutateAsync(newLesson);
+      const formData = new FormData();
+      formData.append('courseId', newLesson.courseId);
+      formData.append('title', newLesson.title);
+      formData.append('durationMinutes', String(newLesson.durationMinutes));
+      formData.append('maxPauses', String(newLesson.maxPauses));
+
+      if (selectedFile) {
+        formData.append('audio', selectedFile);
+      }
+
+      if (editingLesson) {
+        await updateLesson.mutateAsync({ id: editingLesson.id, data: formData });
+      } else {
+        await createLesson.mutateAsync(formData);
+      }
+
       setIsCreateOpen(false);
+      setEditingLesson(null);
       setNewLesson({ courseId: '', title: '', durationMinutes: 15, maxPauses: 3 });
+      setSelectedFile(null);
     } catch (error) {
-      console.error('Failed to create lesson:', error);
+      console.error('Failed to save lesson:', error);
+    }
+  };
+
+  const openEditDialog = (lesson: any) => {
+    setEditingLesson(lesson);
+    setNewLesson({
+      courseId: lesson.courseId,
+      title: lesson.title,
+      durationMinutes: lesson.durationMinutes || 15,
+      maxPauses: lesson.maxPauses || 3
+    });
+    setIsCreateOpen(true);
+  };
+
+  const openPreview = (lesson: any) => {
+    if (lesson.audioUrl) {
+      setPreviewLesson(lesson);
+    } else {
+      alert("No audio uploaded for this lesson.");
     }
   };
 
@@ -121,7 +171,11 @@ export default function AdminLessons() {
       render: (lesson: any) => (
         <div className="flex items-center gap-2">
           <Clock className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">{lesson.duration || `${lesson.duration_seconds / 60} min`}</span>
+          <span className="text-muted-foreground">
+            {lesson.durationMinutes
+              ? `${lesson.durationMinutes} min`
+              : (lesson.duration_seconds ? `${Math.round(lesson.duration_seconds / 60)} min` : '0 min')}
+          </span>
         </div>
       ),
     },
@@ -139,8 +193,8 @@ export default function AdminLessons() {
       key: 'audio',
       header: 'Audio',
       render: (lesson: any) => (
-        <Badge variant={lesson.audio_url ? 'active' : 'locked'}>
-          {lesson.audio_url ? 'Uploaded' : 'Pending'}
+        <Badge variant={lesson.audioUrl ? 'active' : 'locked'}>
+          {lesson.audioUrl ? 'Uploaded' : 'Pending'}
         </Badge>
       ),
     },
@@ -155,9 +209,15 @@ export default function AdminLessons() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>Edit Lesson</DropdownMenuItem>
-            <DropdownMenuItem>Upload Audio</DropdownMenuItem>
-            <DropdownMenuItem>Preview</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openEditDialog(lesson)}>
+              Edit Lesson
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openEditDialog(lesson)}>
+              Upload Audio
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openPreview(lesson)} disabled={!lesson.audioUrl}>
+              Preview
+            </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteLesson(lesson.id)}>
               Delete
             </DropdownMenuItem>
@@ -169,7 +229,7 @@ export default function AdminLessons() {
   ];
 
   const totalLessons = lessons.length;
-  const withAudio = lessons.filter((l: any) => l.audio_url).length;
+  const withAudio = lessons.filter((l: any) => l.audioUrl).length;
   const pendingUpload = totalLessons - withAudio;
 
   if (isLoading) {
@@ -194,10 +254,10 @@ export default function AdminLessons() {
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      
+
       <div className="lg:ml-64">
         <AdminHeader title="Lesson Management" subtitle="Upload and configure audio lessons" />
-        
+
         <main className="p-4 lg:p-6">
           {/* Actions Bar */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
@@ -223,7 +283,14 @@ export default function AdminLessons() {
                 </SelectContent>
               </Select>
             </div>
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <Dialog open={isCreateOpen} onOpenChange={(open) => {
+              setIsCreateOpen(open);
+              if (!open) {
+                setEditingLesson(null);
+                setNewLesson({ courseId: '', title: '', durationMinutes: 15, maxPauses: 3 });
+                setSelectedFile(null);
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button variant="premium" className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />
@@ -232,21 +299,21 @@ export default function AdminLessons() {
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle className="font-serif">Add New Lesson</DialogTitle>
+                  <DialogTitle className="font-serif">{editingLesson ? 'Edit Lesson' : 'Add New Lesson'}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
                     <Label>Lesson Title</Label>
-                    <Input 
+                    <Input
                       value={newLesson.title}
                       onChange={(e) => setNewLesson(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Enter lesson title" 
+                      placeholder="Enter lesson title"
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Course</Label>
-                    <Select 
-                      value={newLesson.courseId} 
+                    <Select
+                      value={newLesson.courseId}
                       onValueChange={(v) => setNewLesson(prev => ({ ...prev, courseId: v }))}
                     >
                       <SelectTrigger>
@@ -262,29 +329,42 @@ export default function AdminLessons() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Duration (minutes)</Label>
-                      <Input 
-                        type="number" 
+                      <Input
+                        type="number"
                         value={newLesson.durationMinutes}
                         onChange={(e) => setNewLesson(prev => ({ ...prev, durationMinutes: Number(e.target.value) }))}
-                        placeholder="15" 
+                        placeholder="15"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Max Pauses</Label>
-                      <Input 
-                        type="number" 
+                      <Input
+                        type="number"
                         value={newLesson.maxPauses}
                         onChange={(e) => setNewLesson(prev => ({ ...prev, maxPauses: Number(e.target.value) }))}
-                        placeholder="3" 
+                        placeholder="3"
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Audio File (Encrypted)</Label>
-                    <div className="border-2 border-dashed border-border rounded-lg p-6 lg:p-8 text-center">
-                      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                      <p className="text-sm text-muted-foreground">Drag & drop audio file or click to browse</p>
-                      <p className="text-xs text-muted-foreground mt-1">MP3, WAV up to 100MB</p>
+                    <Label>Audio File</Label>
+                    <div className="border-2 border-dashed border-border rounded-lg p-6 lg:p-8 text-center bg-muted/20 relative">
+                      <input
+                        type="file"
+                        accept="audio/*"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <div className="flex flex-col items-center">
+                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                        <p className="text-sm font-medium">
+                          {selectedFile ? selectedFile.name : (editingLesson?.audioUrl ? 'Change audio file' : 'Click or drag audio file here')}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">MP3, WAV, M4A up to 100MB</p>
+                        {editingLesson?.audioUrl && !selectedFile && (
+                          <p className="text-xs text-success mt-2">✓ Current audio available</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between py-2">
@@ -296,10 +376,24 @@ export default function AdminLessons() {
                   </div>
                   <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                     <Button variant="outline" onClick={() => setIsCreateOpen(false)} className="w-full sm:w-auto">Cancel</Button>
-                    <Button variant="premium" onClick={handleCreateLesson} disabled={createLesson.isPending} className="w-full sm:w-auto">
-                      {createLesson.isPending ? 'Creating...' : 'Create Lesson'}
+                    <Button variant="premium" onClick={handleCreateOrUpdateLesson} disabled={createLesson.isPending || updateLesson.isPending} className="w-full sm:w-auto">
+                      {createLesson.isPending || updateLesson.isPending ? 'Saving...' : (editingLesson ? 'Update Lesson' : 'Create Lesson')}
                     </Button>
                   </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!previewLesson} onOpenChange={() => setPreviewLesson(null)}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{previewLesson?.title || 'Preview'}</DialogTitle>
+                </DialogHeader>
+                <div className="py-6 flex flex-col items-center">
+                  <audio controls className="w-full">
+                    {previewLesson?.audioUrl && <source src={previewLesson.audioUrl} />}
+                    Your browser does not support the audio element.
+                  </audio>
                 </div>
               </DialogContent>
             </Dialog>

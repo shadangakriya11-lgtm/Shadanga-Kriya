@@ -9,9 +9,11 @@ async function apiRequest<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getToken();
-  
+
+  const isFormData = options.body instanceof FormData;
+
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
+    ...(!isFormData && { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   };
@@ -83,8 +85,8 @@ export const coursesApi = {
 export const lessonsApi = {
   getByCourse: (courseId: string) => apiRequest<{ lessons: any[] }>(`/lessons/course/${courseId}`),
   getById: (id: string) => apiRequest<any>(`/lessons/${id}`),
-  create: (data: any) => apiRequest<any>('/lessons', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => apiRequest<any>(`/lessons/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  create: (data: any) => apiRequest<any>('/lessons', { method: 'POST', body: data }),
+  update: (id: string, data: any) => apiRequest<any>(`/lessons/${id}`, { method: 'PUT', body: data }),
   delete: (id: string) => apiRequest<any>(`/lessons/${id}`, { method: 'DELETE' }),
 };
 
@@ -111,6 +113,8 @@ export const paymentsApi = {
   complete: (paymentId: string) => apiRequest<any>(`/payments/${paymentId}/complete`, { method: 'POST', body: JSON.stringify({ status: 'completed' }) }),
   getAll: () => apiRequest<{ payments: any[]; pagination: any }>('/payments'),
   getStats: () => apiRequest<any>('/payments/stats'),
+  activate: (data: { userId: string; courseId: string; notes?: string }) =>
+    apiRequest<any>('/payments/activate', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // Sessions API
@@ -127,9 +131,9 @@ export const sessionsApi = {
 // Attendance API
 export const attendanceApi = {
   getSession: (sessionId: string) => apiRequest<{ attendance: any[]; stats: any }>(`/attendance/session/${sessionId}`),
-  mark: (sessionId: string, userId: string, status: 'present' | 'absent') => 
+  mark: (sessionId: string, userId: string, status: 'present' | 'absent') =>
     apiRequest<any>(`/attendance/session/${sessionId}/user/${userId}`, { method: 'PUT', body: JSON.stringify({ status }) }),
-  bulkMark: (sessionId: string, attendances: any[]) => 
+  bulkMark: (sessionId: string, attendances: any[]) =>
     apiRequest<any>(`/attendance/session/${sessionId}/bulk`, { method: 'PUT', body: JSON.stringify({ attendances }) }),
 };
 
@@ -141,6 +145,15 @@ export const analyticsApi = {
   getCourse: (courseId: string) => apiRequest<any>(`/analytics/course/${courseId}`),
   getFacilitator: () => apiRequest<any>('/analytics/facilitator'),
   getLearner: (learnerId?: string) => apiRequest<any>(`/analytics/learner${learnerId ? `/${learnerId}` : ''}`),
+  getMonitoring: () => apiRequest<any>('/analytics/monitoring'),
+};
+
+// Notifications API
+export const notificationsApi = {
+  getAll: (unreadOnly?: boolean) => apiRequest<{ notifications: any[]; unreadCount: number }>(`/notifications?unreadOnly=${unreadOnly || false}`),
+  markRead: (id: string) => apiRequest<any>(`/notifications/${id}/read`, { method: 'PUT' }),
+  markAllRead: () => apiRequest<any>('/notifications/read-all', { method: 'PUT' }),
+  create: (data: any) => apiRequest<any>('/notifications', { method: 'POST', body: JSON.stringify(data) }), // Admin only
 };
 
 // Auth helpers

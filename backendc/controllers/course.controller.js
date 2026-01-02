@@ -1,4 +1,5 @@
 const pool = require('../config/db.js');
+const { notifyAdmins } = require('./notification.controller.js');
 
 // Get all courses
 const getAllCourses = async (req, res) => {
@@ -168,6 +169,15 @@ const createCourse = async (req, res) => {
         createdAt: course.created_at
       }
     });
+
+    // Notify admins - Fire and forget/Log error, don't block response or trigger main catch
+    notifyAdmins(
+      'New Course Created',
+      `Course "${course.title}" has been created by ${req.user.firstName} ${req.user.lastName}`,
+      'info',
+      `/admin/courses`
+    ).catch(err => console.error('Notification error:', err));
+
   } catch (error) {
     console.error('Create course error:', error);
     res.status(500).json({ error: 'Failed to create course' });
@@ -248,14 +258,24 @@ const getCourseStats = async (req, res) => {
     const stats = await pool.query(`
       SELECT 
         COUNT(*) as total,
-        COUNT(*) FILTER (WHERE status = 'published') as published,
-        COUNT(*) FILTER (WHERE status = 'draft') as draft,
-        COUNT(*) FILTER (WHERE status = 'archived') as archived,
-        COALESCE(SUM(duration_hours), 0) as total_hours
+        COUNT(*) FILTER (WHERE status = 'active' OR status = 'published') as active,
+        COUNT(*) FILTER (WHERE type = 'self') as "selfPaced",
+        COUNT(*) FILTER (WHERE type = 'onsite') as onsite
       FROM courses
     `);
 
-    res.json(stats.rows[0]);
+    // Ensure numbers are integers (Postgres COUNT returns bigint which pg driver parses as string sometimes, or handled by json)
+    // Actually pg driver parses count as string usually.
+    // Let's map it safely.
+    const row = stats.rows[0];
+    const safeStats = {
+      total: parseInt(row.total) || 0,
+      active: parseInt(row.active) || 0,
+      selfPaced: parseInt(row.selfPaced) || 0,
+      onsite: parseInt(row.onsite) || 0
+    };
+
+    res.json(safeStats);
   } catch (error) {
     console.error('Get course stats error:', error);
     res.status(500).json({ error: 'Failed to get course stats' });

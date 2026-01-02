@@ -1,26 +1,59 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LearnerHeader } from '@/components/learner/LearnerHeader';
 import { BottomNav } from '@/components/learner/BottomNav';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Mail, 
-  Phone, 
-  Calendar, 
-  Shield, 
-  Bell, 
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Mail,
+  Phone,
+  Calendar,
+  Shield,
+  Bell,
   LogOut,
   ChevronRight,
-  HelpCircle
+  HelpCircle,
+  Pencil
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
+import { authApi } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
+  const { toast } = useToast();
   const [notifications, setNotifications] = useState(true);
+
+  // Edit Profile State
+  const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    phone: ''
+  });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        phone: user.phone || ''
+      });
+    }
+  }, [user]);
 
   const userInfo = {
     name: user ? `${user.firstName} ${user.lastName}` : 'User',
@@ -35,10 +68,33 @@ export default function Profile() {
     navigate('/auth');
   };
 
+  const handleUpdateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      await authApi.updateProfile(formData);
+      await refreshUser();
+      setIsEditing(false);
+      toast({
+        title: "Profile updated",
+        description: "Your information has been successfully updated.",
+      });
+    } catch (error) {
+      console.error('Update profile error:', error);
+      toast({
+        title: "Update failed",
+        description: "Could not update profile. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <LearnerHeader userName={userInfo.name} />
-      
+
       <main className="px-4 py-6 max-w-3xl mx-auto">
         {/* Profile Header */}
         <section className="text-center mb-8 animate-fade-in">
@@ -58,7 +114,17 @@ export default function Profile() {
 
         {/* User Info Card */}
         <section className="bg-card rounded-xl border border-border/50 p-5 shadow-soft mb-6 animate-fade-in" style={{ animationDelay: '100ms' }}>
-          <h2 className="font-medium text-foreground mb-4">Account Information</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-medium text-foreground">Account Information</h2>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 text-muted-foreground hover:text-primary"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </div>
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
@@ -93,7 +159,7 @@ export default function Profile() {
         {/* Settings */}
         <section className="bg-card rounded-xl border border-border/50 overflow-hidden shadow-soft mb-6 animate-fade-in" style={{ animationDelay: '200ms' }}>
           <h2 className="font-medium text-foreground px-5 pt-5 pb-3">Settings</h2>
-          
+
           <div className="divide-y divide-border/50">
             <div className="flex items-center justify-between px-5 py-4">
               <div className="flex items-center gap-3">
@@ -102,7 +168,7 @@ export default function Profile() {
               </div>
               <Switch checked={notifications} onCheckedChange={setNotifications} />
             </div>
-            
+
             <button className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/50 transition-colors">
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5 text-muted-foreground" />
@@ -110,7 +176,7 @@ export default function Profile() {
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
-            
+
             <button className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/50 transition-colors">
               <div className="flex items-center gap-3">
                 <HelpCircle className="h-5 w-5 text-muted-foreground" />
@@ -121,22 +187,9 @@ export default function Profile() {
           </div>
         </section>
 
-        {/* Contact Admin Notice */}
-        <section className="bg-muted/50 rounded-xl p-5 mb-6 animate-fade-in" style={{ animationDelay: '300ms' }}>
-          <div className="flex items-start gap-3">
-            <HelpCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-foreground mb-1">Need to update your profile?</p>
-              <p className="text-sm text-muted-foreground">
-                Contact your administrator to make changes to your account information.
-              </p>
-            </div>
-          </div>
-        </section>
-
         {/* Sign Out */}
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
           onClick={handleLogout}
         >
@@ -146,6 +199,66 @@ export default function Profile() {
       </main>
 
       <BottomNav />
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogDescription>
+              Make changes to your profile here. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateProfile}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="firstName" className="text-right">
+                  First Name
+                </Label>
+                <Input
+                  id="firstName"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="lastName" className="text-right">
+                  Last Name
+                </Label>
+                <Input
+                  id="lastName"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="phone" className="text-right">
+                  Phone
+                </Label>
+                <Input
+                  id="phone"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="col-span-3"
+                  placeholder="+1 (555) 000-0000"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Saving...' : 'Save changes'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

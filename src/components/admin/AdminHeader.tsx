@@ -4,6 +4,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { Bell, Search, User } from 'lucide-react';
 import { AdminMobileSidebar } from './AdminSidebar';
 
+import { Link } from 'react-router-dom';
+
 interface AdminHeaderProps {
   title: string;
   subtitle?: string;
@@ -29,9 +31,11 @@ export function AdminHeader({ title, subtitle }: AdminHeaderProps) {
           />
         </div>
         <ThemeToggle />
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
+        <Button variant="ghost" size="icon" className="relative" asChild>
+          <Link to="/admin/notifications">
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-1 right-1 h-2 w-2 bg-destructive rounded-full" />
+          </Link>
         </Button>
         {/* User info - simplified on mobile */}
         <div className="flex items-center gap-3 pl-2 lg:pl-4 border-l border-border">

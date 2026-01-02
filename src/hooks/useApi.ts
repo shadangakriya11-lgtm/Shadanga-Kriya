@@ -1,14 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  coursesApi, 
-  lessonsApi, 
-  enrollmentsApi, 
-  progressApi, 
-  paymentsApi, 
-  sessionsApi, 
-  attendanceApi, 
+import {
+  coursesApi,
+  lessonsApi,
+  enrollmentsApi,
+  progressApi,
+  paymentsApi,
+  sessionsApi,
+  attendanceApi,
   analyticsApi,
-  usersApi 
+  usersApi,
+  notificationsApi
 } from '@/lib/api';
 import { toast } from '@/hooks/use-toast';
 
@@ -206,7 +207,7 @@ export function useCourseProgress(courseId: string) {
 export function useUpdateLessonProgress() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ lessonId, data }: { lessonId: string; data: any }) => 
+    mutationFn: ({ lessonId, data }: { lessonId: string; data: any }) =>
       progressApi.updateLesson(lessonId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myProgress'] });
@@ -240,7 +241,7 @@ export function usePaymentStats() {
 export function useCreatePayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ courseId, paymentMethod }: { courseId: string; paymentMethod?: string }) => 
+    mutationFn: ({ courseId, paymentMethod }: { courseId: string; paymentMethod?: string }) =>
       paymentsApi.create(courseId, paymentMethod),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myPayments'] });
@@ -264,6 +265,22 @@ export function useCompletePayment() {
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to complete payment', description: error.message, variant: 'destructive' });
+    },
+  });
+}
+
+export function useActivateCourse() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: paymentsApi.activate,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allPayments'] });
+      queryClient.invalidateQueries({ queryKey: ['paymentStats'] });
+      queryClient.invalidateQueries({ queryKey: ['allEnrollments'] });
+      toast({ title: 'Course activated successfully' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Activation failed', description: error.message, variant: 'destructive' });
     },
   });
 }
@@ -363,7 +380,7 @@ export function useSessionAttendance(sessionId: string) {
 export function useMarkAttendance() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ sessionId, userId, status }: { sessionId: string; userId: string; status: 'present' | 'absent' }) => 
+    mutationFn: ({ sessionId, userId, status }: { sessionId: string; userId: string; status: 'present' | 'absent' }) =>
       attendanceApi.mark(sessionId, userId, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
@@ -378,7 +395,7 @@ export function useMarkAttendance() {
 export function useBulkMarkAttendance() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ sessionId, attendances }: { sessionId: string; attendances: any[] }) => 
+    mutationFn: ({ sessionId, attendances }: { sessionId: string; attendances: any[] }) =>
       attendanceApi.bulkMark(sessionId, attendances),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['attendance'] });
@@ -431,6 +448,44 @@ export function useLearnerAnalytics(learnerId?: string) {
   return useQuery({
     queryKey: ['learnerAnalytics', learnerId],
     queryFn: () => analyticsApi.getLearner(learnerId),
+  });
+}
+
+
+// Notifications hooks
+export function useNotifications(unreadOnly?: boolean) {
+  return useQuery({
+    queryKey: ['notifications', unreadOnly],
+    queryFn: () => notificationsApi.getAll(unreadOnly),
+    refetchInterval: 10000, // Poll every 10 seconds for real-time updates
+  });
+}
+
+export function useMarkNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: notificationsApi.markRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: notificationsApi.markAllRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+export function useMonitoringStats() {
+  return useQuery({
+    queryKey: ['monitoringStats'],
+    queryFn: () => analyticsApi.getMonitoring(),
+    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
   });
 }
 

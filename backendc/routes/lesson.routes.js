@@ -4,6 +4,7 @@ const router = express.Router();
 const validate = require('../middleware/validate.middleware.js');
 const { verifyToken, isFacilitatorOrAdmin, optionalAuth } = require('../middleware/auth.middleware.js');
 const lessonController = require('../controllers/lesson.controller.js');
+const upload = require('../middleware/upload.middleware.js');
 
 // Get lessons by course
 router.get('/course/:courseId', [
@@ -16,13 +17,13 @@ router.get('/:id', [
 ], validate, optionalAuth, lessonController.getLessonById);
 
 // Create lesson (admin/facilitator)
-router.post('/', verifyToken, isFacilitatorOrAdmin, [
+router.post('/', verifyToken, isFacilitatorOrAdmin, upload.single('audio'), [
   body('courseId').isUUID().withMessage('Valid course ID required'),
   body('title').trim().notEmpty().withMessage('Title required')
 ], validate, lessonController.createLesson);
 
 // Update lesson
-router.put('/:id', verifyToken, isFacilitatorOrAdmin, [
+router.put('/:id', verifyToken, isFacilitatorOrAdmin, upload.single('audio'), [
   param('id').isUUID().withMessage('Valid lesson ID required')
 ], validate, lessonController.updateLesson);
 
