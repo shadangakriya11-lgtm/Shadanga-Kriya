@@ -35,6 +35,12 @@ import FacilitatorReports from "./pages/FacilitatorReports";
 import FacilitatorNotifications from "./pages/FacilitatorNotifications";
 import NotFound from "./pages/NotFound";
 
+import { StatusBar, Style } from '@capacitor/status-bar';
+
+
+StatusBar.setStyle({ style: Style.Dark });
+
+
 const queryClient = new QueryClient();
 
 const NotificationPage = () => {
