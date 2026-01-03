@@ -290,6 +290,7 @@ export function useAllSessions() {
   return useQuery({
     queryKey: ['allSessions'],
     queryFn: () => sessionsApi.getAll(),
+    refetchInterval: 10000, // Real-time sessions for admin/facilitator
   });
 }
 
@@ -297,6 +298,7 @@ export function useMySessions() {
   return useQuery({
     queryKey: ['mySessions'],
     queryFn: () => sessionsApi.getMy(),
+    refetchInterval: 10000, // Real-time sessions for facilitator
   });
 }
 
@@ -374,6 +376,7 @@ export function useSessionAttendance(sessionId: string) {
     queryKey: ['attendance', sessionId],
     queryFn: () => attendanceApi.getSession(sessionId),
     enabled: !!sessionId,
+    refetchInterval: 5000, // Frequent updates during active attendance marking
   });
 }
 
@@ -441,6 +444,7 @@ export function useFacilitatorAnalytics() {
   return useQuery({
     queryKey: ['facilitatorAnalytics'],
     queryFn: () => analyticsApi.getFacilitator(),
+    refetchInterval: 10000, // Real-time stats for facilitator dashboard
   });
 }
 
@@ -448,6 +452,7 @@ export function useLearnerAnalytics(learnerId?: string) {
   return useQuery({
     queryKey: ['learnerAnalytics', learnerId],
     queryFn: () => analyticsApi.getLearner(learnerId),
+    refetchInterval: 10000, // Poll every 10 seconds for real-time dashboard updates
   });
 }
 

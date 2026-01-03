@@ -32,4 +32,8 @@ router.post('/activate', verifyToken, isAdmin, [
   body('courseId').isUUID().withMessage('Valid Course ID required')
 ], validate, paymentController.activateCourse);
 
+// Razorpay routes
+router.post('/create-razorpay-order', verifyToken, paymentController.createRazorpayOrder);
+router.post('/verify-razorpay', verifyToken, paymentController.verifyRazorpayPayment);
+
 module.exports = router;

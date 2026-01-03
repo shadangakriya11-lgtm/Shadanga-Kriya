@@ -2,6 +2,7 @@ import { FacilitatorSidebar } from '@/components/facilitator/FacilitatorSidebar'
 import { FacilitatorHeader } from '@/components/facilitator/FacilitatorHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -9,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Download, Users, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { Download, Users, CheckCircle, Clock, TrendingUp, Loader2 } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -23,191 +24,213 @@ import {
   Cell,
   Legend,
 } from 'recharts';
-
-const attendanceData = [
-  { day: 'Mon', present: 45, absent: 5 },
-  { day: 'Tue', present: 48, absent: 2 },
-  { day: 'Wed', present: 42, absent: 8 },
-  { day: 'Thu', present: 50, absent: 0 },
-  { day: 'Fri', present: 47, absent: 3 },
-];
-
-const completionData = [
-  { name: 'Completed', value: 78, color: 'hsl(var(--success))' },
-  { name: 'In Progress', value: 15, color: 'hsl(var(--primary))' },
-  { name: 'Not Started', value: 7, color: 'hsl(var(--muted))' },
-];
-
-const sessionStats = [
-  { label: 'Sessions This Week', value: '12', icon: Clock, change: '+2' },
-  { label: 'Total Participants', value: '156', icon: Users, change: '+18' },
-  { label: 'Completion Rate', value: '87%', icon: CheckCircle, change: '+5%' },
-  { label: 'Avg. Attendance', value: '94%', icon: TrendingUp, change: '+3%' },
-];
-
-const recentSessions = [
-  { id: 1, date: 'Dec 27', course: 'Mindful Breathing', participants: 12, completion: 100 },
-  { id: 2, date: 'Dec 27', course: 'Stress Response', participants: 8, completion: 85 },
-  { id: 3, date: 'Dec 26', course: 'Guided Recovery', participants: 15, completion: 92 },
-  { id: 4, date: 'Dec 26', course: 'Mindful Breathing', participants: 10, completion: 100 },
-  { id: 5, date: 'Dec 25', course: 'Sleep Restoration', participants: 14, completion: 78 },
-];
+import { useFacilitatorAnalytics } from '@/hooks/useApi';
 
 export default function FacilitatorReports() {
+  const { data, isLoading } = useFacilitatorAnalytics();
+
+  const stats = [
+    { label: 'Total Sessions', value: data?.total_sessions || 0, icon: Clock, change: data?.completed_sessions ? `${data.completed_sessions} done` : '0 done' },
+    { label: 'Total Participants', value: data?.total_participants || 0, icon: Users, change: 'Lifetime' },
+    { label: 'Upcoming', value: data?.upcoming_sessions || 0, icon: CheckCircle, change: 'Scheduled' },
+    { label: 'Avg. Attendance', value: `${data?.avg_attendance_rate || 0}%`, icon: TrendingUp, change: 'Present' },
+  ];
+
+  const attendanceData = data?.weeklyAttendance || [];
+
+  const completionData = (data?.completionStats || []).map((s: any) => ({
+    name: s.status.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+    value: parseInt(s.count),
+    color: s.status === 'completed' ? 'hsl(var(--success))' :
+      s.status === 'in_progress' ? 'hsl(var(--primary))' :
+        s.status === 'scheduled' ? 'hsl(var(--warning))' : 'hsl(var(--muted))'
+  }));
+
+  const recentSessions = data?.recentSessions || [];
+
   return (
     <div className="min-h-screen bg-background">
       <div className="hidden lg:block">
         <FacilitatorSidebar />
       </div>
-      
+
       <div className="lg:ml-64">
         <FacilitatorHeader title="Reports" subtitle="View session and attendance reports" />
-        
-        <main className="p-4 lg:p-6">
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-            <Select defaultValue="week">
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Select period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="today">Today</SelectItem>
-                <SelectItem value="week">This Week</SelectItem>
-                <SelectItem value="month">This Month</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export Report
-            </Button>
-          </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
-            {sessionStats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <Card key={stat.label}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <Icon className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-xs text-success font-medium">{stat.change}</span>
-                    </div>
-                    <p className="text-2xl font-serif font-bold mt-2">{stat.value}</p>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+        <main className="p-4 lg:p-6">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+              <Loader2 className="h-10 w-10 animate-spin" />
+              <p>Loading analytics...</p>
+            </div>
+          ) : (
+            <>
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                <Select defaultValue="week">
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Select period" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="week">Last 7 Days</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Report
+                </Button>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
+                {stats.map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <Card key={stat.label}>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <Icon className="h-5 w-5 text-muted-foreground" />
+                          <span className="text-[10px] text-success font-medium uppercase tracking-tighter">{stat.change}</span>
+                        </div>
+                        <p className="text-2xl font-serif font-bold mt-2">{stat.value}</p>
+                        <p className="text-xs text-muted-foreground">{stat.label}</p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Charts */}
+              <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-serif text-lg">Weekly Attendance</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {attendanceData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={attendanceData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                          <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} tickLine={false} axisLine={false} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                            }}
+                          />
+                          <Bar dataKey="present" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} name="Present" />
+                          <Bar dataKey="absent" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} name="Absent" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[250px] flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                        No activity in the last 7 days
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              );
-            })}
-          </div>
 
-          {/* Charts */}
-          <div className="grid lg:grid-cols-2 gap-4 lg:gap-6 mb-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-serif text-lg">Weekly Attendance</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={attendanceData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Bar dataKey="present" fill="hsl(var(--success))" radius={[4, 4, 0, 0]} name="Present" />
-                    <Bar dataKey="absent" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} name="Absent" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-serif text-lg">Course Completion</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={completionData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      dataKey="value"
-                    >
-                      {completionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Recent Sessions Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-serif text-lg">Recent Sessions</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Date</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Course</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Participants</th>
-                      <th className="text-left p-4 text-sm font-medium text-muted-foreground">Completion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentSessions.map((session) => (
-                      <tr key={session.id} className="border-b border-border hover:bg-muted/50 transition-colors">
-                        <td className="p-4 text-sm text-muted-foreground">{session.date}</td>
-                        <td className="p-4 text-sm font-medium text-foreground">{session.course}</td>
-                        <td className="p-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Users className="h-4 w-4" />
-                            {session.participants}
-                          </span>
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className="h-full bg-success rounded-full"
-                                style={{ width: `${session.completion}%` }}
-                              />
-                            </div>
-                            <span className="text-sm text-muted-foreground">{session.completion}%</span>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-serif text-lg">Session Distribution</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {completionData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={completionData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {completionData.map((entry: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: 'hsl(var(--card))',
+                              border: '1px solid hsl(var(--border))',
+                              borderRadius: '8px',
+                            }}
+                          />
+                          <Legend verticalAlign="bottom" height={36} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[250px] flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
+                        No session data available
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Recent Sessions Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-serif text-lg">Recent Sessions</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/30">
+                          <th className="text-left p-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date</th>
+                          <th className="text-left p-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Course</th>
+                          <th className="text-left p-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Participants</th>
+                          <th className="text-left p-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {recentSessions.length > 0 ? (
+                          recentSessions.map((session: any) => (
+                            <tr key={session.id} className="hover:bg-muted/50 transition-colors">
+                              <td className="p-4 text-sm text-muted-foreground">
+                                {new Date(session.scheduled_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                              </td>
+                              <td className="p-4 text-sm font-medium text-foreground">
+                                {session.course_title || session.title}
+                              </td>
+                              <td className="p-4 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Users className="h-4 w-4 opacity-50" />
+                                  {session.participant_count}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <Badge variant={
+                                  session.status === 'completed' ? 'completed' :
+                                    session.status === 'in_progress' ? 'active' : 'outline'
+                                }>
+                                  {session.status.replace('_', ' ').toUpperCase()}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} className="p-8 text-center text-muted-foreground">
+                              No recent sessions found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </main>
       </div>
     </div>
   );
 }
+

@@ -7,16 +7,81 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { Building, Bell, Shield, CreditCard, Mail, Globe } from 'lucide-react';
+import { Building, Bell, Shield, CreditCard, Mail, Globe, Save, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { settingsApi } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminSettings() {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [settings, setSettings] = useState({
+    razorpayKeyId: '',
+    razorpaySecretKey: '',
+    razorpayTestMode: false,
+    autoActivate: true
+  });
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    setIsLoading(true);
+    try {
+      const data = await settingsApi.getSettings();
+      if (data.settings) {
+        setSettings({
+          razorpayKeyId: data.settings.razorpay_key_id || '',
+          razorpaySecretKey: data.settings.razorpay_secret_key || '',
+          razorpayTestMode: data.settings.razorpay_test_mode === 'true',
+          autoActivate: true // Mocked for now OR could be added to DB later
+        });
+      }
+    } catch (error) {
+      console.error('Fetch settings error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load settings",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSavePayments = async () => {
+    setIsSaving(true);
+    try {
+      await settingsApi.updateSettings({
+        razorpayKeyId: settings.razorpayKeyId,
+        razorpaySecretKey: settings.razorpaySecretKey,
+        razorpayTestMode: settings.razorpayTestMode
+      });
+      toast({
+        title: "Settings Saved",
+        description: "Payment settings have been updated successfully",
+      });
+    } catch (error) {
+      console.error('Save settings error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save settings",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      
+
       <div className="lg:ml-64">
         <AdminHeader title="Settings" subtitle="Configure platform settings" />
-        
+
         <main className="p-4 lg:p-6">
           <Tabs defaultValue="organization" className="space-y-6">
             <TabsList>
@@ -58,7 +123,7 @@ export default function AdminSettings() {
                     </div>
                     <div className="space-y-2">
                       <Label>Description</Label>
-                      <Textarea 
+                      <Textarea
                         rows={3}
                         defaultValue="A comprehensive audio-based therapy and training platform designed for mental wellness and personal growth."
                       />
@@ -235,27 +300,58 @@ export default function AdminSettings() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Razorpay Key ID</Label>
-                    <Input placeholder="rzp_live_xxxxxxxx" />
+                    <Input
+                      placeholder="rzp_live_xxxxxxxx"
+                      value={settings.razorpayKeyId}
+                      onChange={(e) => setSettings({ ...settings, razorpayKeyId: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Razorpay Secret Key</Label>
-                    <Input type="password" placeholder="••••••••••••••••" />
+                    <Input
+                      type="password"
+                      placeholder="••••••••••••••••"
+                      value={settings.razorpaySecretKey}
+                      onChange={(e) => setSettings({ ...settings, razorpaySecretKey: e.target.value })}
+                    />
                   </div>
                   <div className="flex items-center justify-between py-3 border-t border-border mt-4">
                     <div>
                       <p className="font-medium">Test Mode</p>
                       <p className="text-sm text-muted-foreground">Use test credentials for development</p>
                     </div>
-                    <Switch />
+                    <Switch
+                      checked={settings.razorpayTestMode}
+                      onCheckedChange={(checked) => setSettings({ ...settings, razorpayTestMode: checked })}
+                    />
                   </div>
                   <div className="flex items-center justify-between py-3 border-t border-border">
                     <div>
                       <p className="font-medium">Auto-activate on Payment</p>
                       <p className="text-sm text-muted-foreground">Automatically activate courses after successful payment</p>
                     </div>
-                    <Switch defaultChecked />
+                    <Switch
+                      checked={settings.autoActivate}
+                      onCheckedChange={(checked) => setSettings({ ...settings, autoActivate: checked })}
+                    />
                   </div>
-                  <Button variant="premium">Save Payment Settings</Button>
+                  <Button
+                    variant="premium"
+                    onClick={handleSavePayments}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Payment Settings
+                      </>
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>

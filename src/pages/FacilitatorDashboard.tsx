@@ -17,7 +17,7 @@ export default function FacilitatorDashboard() {
 
   const isLoading = sessionsLoading || analyticsLoading;
   const sessions = sessionsData?.sessions || [];
-  const stats = analyticsData || { todaySessions: 0, totalAttendees: 0, completed: 0, pending: 0 };
+  const stats = analyticsData || {};
 
   const todaySessions = sessions.filter((s: any) => {
     const sessionDate = new Date(s.scheduled_at || s.start_time);
@@ -27,9 +27,9 @@ export default function FacilitatorDashboard() {
 
   const quickStats = [
     { label: "Today's Sessions", value: todaySessions.length.toString(), icon: Play, color: 'text-primary' },
-    { label: 'Total Attendees', value: stats.totalAttendees?.toString() || '0', icon: Users, color: 'text-secondary-foreground' },
-    { label: 'Completed', value: stats.completed?.toString() || '0', icon: CheckCircle, color: 'text-success' },
-    { label: 'Pending', value: stats.pending?.toString() || '0', icon: Clock, color: 'text-warning' },
+    { label: 'Total Participants', value: stats.total_participants?.toString() || '0', icon: Users, color: 'text-secondary-foreground' },
+    { label: 'Completed', value: stats.completed_sessions?.toString() || '0', icon: CheckCircle, color: 'text-success' },
+    { label: 'Upcoming', value: stats.upcoming_sessions?.toString() || '0', icon: Clock, color: 'text-warning' },
   ];
 
   if (isLoading) {

@@ -169,7 +169,7 @@ export default function Profile() {
               <Switch checked={notifications} onCheckedChange={setNotifications} />
             </div>
 
-            <button className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/50 transition-colors">
+            <button className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/50 transition-colors" onClick={() => navigate('/privacy')}>
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5 text-muted-foreground" />
                 <span className="text-foreground">Privacy & Security</span>
@@ -177,7 +177,7 @@ export default function Profile() {
               <ChevronRight className="h-5 w-5 text-muted-foreground" />
             </button>
 
-            <button className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/50 transition-colors">
+            <button className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/50 transition-colors" onClick={() => navigate('/help')}>
               <div className="flex items-center gap-3">
                 <HelpCircle className="h-5 w-5 text-muted-foreground" />
                 <span className="text-foreground">Help & Support</span>

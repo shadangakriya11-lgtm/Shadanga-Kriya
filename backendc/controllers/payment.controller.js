@@ -1,6 +1,9 @@
 const pool = require('../config/db.js');
 const { v4: uuidv4 } = require('uuid');
 const { notifyAdmins } = require('./notification.controller.js');
+const Razorpay = require('razorpay');
+const crypto = require('crypto');
+const { getSetting } = require('./settings.controller.js');
 
 // Get user's payments
 const getMyPayments = async (req, res) => {
@@ -38,17 +41,28 @@ const createPayment = async (req, res) => {
   try {
     const { courseId, paymentMethod } = req.body;
 
-    // Get course price
+    console.log('Initiating payment for courseId:', courseId);
+
+    // Get course price - more relaxed check
     const courseResult = await pool.query(
-      'SELECT id, title, price FROM courses WHERE id = $1 AND status = $2',
-      [courseId, 'published']
+      'SELECT id, title, price, status FROM courses WHERE id = $1',
+      [courseId]
     );
 
     if (courseResult.rows.length === 0) {
+      console.error(`Course with ID ${courseId} not found in database.`);
+      // Log available course IDs for debugging
+      const allCourses = await pool.query('SELECT id, title, status FROM courses');
+      console.log('Available courses:', allCourses.rows);
       return res.status(404).json({ error: 'Course not found' });
     }
 
     const course = courseResult.rows[0];
+    console.log('Found course:', course);
+
+    if (course.status === 'draft') {
+      return res.status(400).json({ error: 'Cannot purchase a draft course' });
+    }
 
     // Check if already enrolled
     const enrollmentCheck = await pool.query(
@@ -68,7 +82,7 @@ const createPayment = async (req, res) => {
       `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [req.user.id, courseId, course.price, 'USD', 'pending', paymentMethod, transactionId]
+      [req.user.id, courseId, course.price, 'USD', 'pending', paymentMethod || 'mock', transactionId]
     );
 
     const payment = result.rows[0];
@@ -88,6 +102,132 @@ const createPayment = async (req, res) => {
   } catch (error) {
     console.error('Create payment error:', error);
     res.status(500).json({ error: 'Failed to create payment' });
+  }
+};
+
+// Create Razorpay Order
+const createRazorpayOrder = async (req, res) => {
+  try {
+    const { courseId } = req.body;
+
+    // 1. Get Razorpay keys from settings
+    const keyId = await getSetting('razorpay_key_id');
+    const secretKey = await getSetting('razorpay_secret_key');
+
+    if (!keyId || !secretKey) {
+      return res.status(500).json({ error: 'Razorpay is not configured by admin' });
+    }
+
+    console.log('Creating Razorpay order for courseId:', courseId);
+
+    // 2. Get course price - more relaxed check
+    const courseResult = await pool.query(
+      'SELECT id, title, price, status FROM courses WHERE id = $1',
+      [courseId]
+    );
+
+    if (courseResult.rows.length === 0) {
+      console.error(`Course with ID ${courseId} not found in database for Razorpay order.`);
+      // Log available course IDs for debugging
+      const allCourses = await pool.query('SELECT id, title, status FROM courses');
+      console.log('Available courses:', allCourses.rows);
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const course = courseResult.rows[0];
+    console.log('Found course for Razorpay:', course);
+
+    if (course.status === 'draft') {
+      return res.status(400).json({ error: 'Cannot purchase a draft course' });
+    }
+    const amountInPaise = Math.round(course.price * 100);
+
+    // 3. Initialize Razorpay
+    const razorpay = new Razorpay({
+      key_id: keyId,
+      key_secret: secretKey,
+    });
+
+    // 4. Create Order
+    const options = {
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt: `receipt_${uuidv4().slice(0, 8)}`,
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    // 5. Create pending payment record
+    const transactionId = order.id;
+    await pool.query(
+      `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [req.user.id, courseId, course.price, 'INR', 'pending', 'razorpay', transactionId]
+    );
+
+    res.status(201).json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: keyId,
+      courseTitle: course.title
+    });
+  } catch (error) {
+    console.error('Create Razorpay order error:', error);
+    res.status(500).json({ error: 'Failed to create payment order' });
+  }
+};
+
+// Verify Razorpay Payment
+const verifyRazorpayPayment = async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    // 1. Get secret key
+    const secretKey = await getSetting('razorpay_secret_key');
+
+    // 2. Verify signature
+    const generated_signature = crypto
+      .createHmac('sha256', secretKey)
+      .update(razorpay_order_id + "|" + razorpay_payment_id)
+      .digest('hex');
+
+    if (generated_signature !== razorpay_signature) {
+      return res.status(400).json({ error: 'Invalid payment signature' });
+    }
+
+    // 3. Update payment record
+    const paymentResult = await pool.query(
+      'UPDATE payments SET status = $1, payment_id = $2, updated_at = NOW() WHERE transaction_id = $3 RETURNING *',
+      ['completed', razorpay_payment_id, razorpay_order_id]
+    );
+
+    if (paymentResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Payment record not found' });
+    }
+
+    const payment = paymentResult.rows[0];
+
+    // 4. Create enrollment
+    await pool.query(
+      `INSERT INTO enrollments (user_id, course_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, course_id) DO NOTHING`,
+      [payment.user_id, payment.course_id]
+    );
+
+    // 5. Notify admins
+    notifyAdmins(
+      'Payment Successful',
+      `Payment of ₹${payment.amount} received for course ID: ${payment.course_id}`,
+      'success',
+      `/admin/payments`
+    ).catch(err => console.error('Notification error:', err));
+
+    res.json({ message: 'Payment verified and course unlocked', status: 'success' });
+  } catch (error) {
+    console.error('Verify payment error:', error);
+    res.status(500).json({ error: 'Failed to verify payment' });
   }
 };
 
@@ -343,5 +483,7 @@ module.exports = {
   getAllPayments,
   getPaymentStats,
   refundPayment,
-  activateCourse
+  activateCourse,
+  createRazorpayOrder,
+  verifyRazorpayPayment
 };

@@ -34,9 +34,9 @@ export default function LearnerHome() {
       type: course.type || 'self',
       status: enrollment ? (enrollment.status === 'completed' ? 'completed' : 'active') : (course.price > 0 ? 'locked' : 'pending'),
       progress: enrollment?.progress || 0,
-      totalLessons: course.total_lessons || 0,
+      totalLessons: course.lessonCount || 0,
       completedLessons: enrollment?.completed_lessons || 0,
-      duration: course.duration || '0 min',
+      duration: course.durationHours ? `${course.durationHours} hours` : '0 min',
       price: course.price,
     };
   });
@@ -45,11 +45,11 @@ export default function LearnerHome() {
   const completedCourses = mappedCourses.filter((c) => c.status === 'completed');
   const lockedCourses = mappedCourses.filter((c) => c.status === 'locked');
 
-  const filteredCourses = activeTab === 'all' 
-    ? mappedCourses 
-    : activeTab === 'active' 
-    ? activeCourses 
-    : completedCourses;
+  const filteredCourses = activeTab === 'all'
+    ? mappedCourses
+    : activeTab === 'active'
+      ? activeCourses
+      : completedCourses;
 
   const handleCourseClick = (course: Course) => {
     if (course.status === 'locked' && course.price) {
@@ -69,7 +69,7 @@ export default function LearnerHome() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <LearnerHeader userName={user ? `${user.firstName} ${user.lastName}` : 'User'} />
-      
+
       <main className="px-4 py-6 max-w-3xl mx-auto">
         {/* Welcome Section */}
         <section className="mb-8">

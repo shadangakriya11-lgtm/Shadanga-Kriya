@@ -12,6 +12,8 @@ const paymentRoutes = require('./routes/payment.routes.js');
 const sessionRoutes = require('./routes/session.routes.js');
 const attendanceRoutes = require('./routes/attendance.routes.js');
 const analyticsRoutes = require('./routes/analytics.routes.js');
+const settingsRoutes = require('./routes/settings.routes.js');
+const notificationRoutes = require('./routes/notification.routes.js');
 
 const app = express();
 
@@ -38,6 +40,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
