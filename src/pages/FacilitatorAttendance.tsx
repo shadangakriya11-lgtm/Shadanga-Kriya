@@ -1,10 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FacilitatorSidebar } from '@/components/facilitator/FacilitatorSidebar';
 import { FacilitatorHeader } from '@/components/facilitator/FacilitatorHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -13,76 +12,57 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Users, CheckCircle, XCircle, Clock, Save } from 'lucide-react';
+import { Search, CheckCircle, XCircle, Clock, Save, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface Attendee {
-  id: string;
-  name: string;
-  email: string;
-  courseName: string;
-  sessionTime: string;
-  isPresent: boolean | null;
-  arrivalTime?: string;
-}
-
-const mockAttendees: Attendee[] = [
-  { id: 'a1', name: 'Sarah Mitchell', email: 'sarah.m@example.com', courseName: 'Mindful Breathing', sessionTime: '09:00 AM', isPresent: true, arrivalTime: '08:55 AM' },
-  { id: 'a2', name: 'James Chen', email: 'james.c@example.com', courseName: 'Mindful Breathing', sessionTime: '09:00 AM', isPresent: true, arrivalTime: '09:02 AM' },
-  { id: 'a3', name: 'Emily Johnson', email: 'emily.j@example.com', courseName: 'Mindful Breathing', sessionTime: '09:00 AM', isPresent: false },
-  { id: 'a4', name: 'Michael Brown', email: 'michael.b@example.com', courseName: 'Mindful Breathing', sessionTime: '09:00 AM', isPresent: null },
-  { id: 'a5', name: 'Lisa Wang', email: 'lisa.w@example.com', courseName: 'Stress Response', sessionTime: '11:00 AM', isPresent: null },
-  { id: 'a6', name: 'David Kim', email: 'david.k@example.com', courseName: 'Stress Response', sessionTime: '11:00 AM', isPresent: null },
-  { id: 'a7', name: 'Anna Lee', email: 'anna.l@example.com', courseName: 'Stress Response', sessionTime: '11:00 AM', isPresent: null },
-  { id: 'a8', name: 'Robert Taylor', email: 'robert.t@example.com', courseName: 'Guided Recovery', sessionTime: '02:00 PM', isPresent: null },
-];
-
-const sessions = [
-  { id: 'all', label: 'All Sessions' },
-  { id: 's1', label: '09:00 AM - Mindful Breathing' },
-  { id: 's2', label: '11:00 AM - Stress Response' },
-  { id: 's3', label: '02:00 PM - Guided Recovery' },
-];
+import { useMySessions, useSessionAttendance, useMarkAttendance } from '@/hooks/useApi';
 
 export default function FacilitatorAttendance() {
-  const [attendees, setAttendees] = useState(mockAttendees);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSession, setSelectedSession] = useState('all');
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('');
 
-  const filteredAttendees = attendees.filter((attendee) => {
-    const matchesSearch = attendee.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesSession = selectedSession === 'all' || 
-      (selectedSession === 's1' && attendee.sessionTime === '09:00 AM') ||
-      (selectedSession === 's2' && attendee.sessionTime === '11:00 AM') ||
-      (selectedSession === 's3' && attendee.sessionTime === '02:00 PM');
-    return matchesSearch && matchesSession;
+  const { data: sessionsData, isLoading: sessionsLoading } = useMySessions();
+  const sessions = sessionsData?.sessions || [];
+
+  // Auto-select first upcoming or in-progress session if none selected
+  useEffect(() => {
+    if (sessions.length > 0 && !selectedSessionId) {
+      const activeSession = sessions.find((s: any) => s.status !== 'completed');
+      if (activeSession) setSelectedSessionId(activeSession.id);
+      else setSelectedSessionId(sessions[0].id);
+    }
+  }, [sessions, selectedSessionId]);
+
+  const { data: attendanceData, isLoading: attendanceLoading } = useSessionAttendance(selectedSessionId);
+  const markAttendanceMutation = useMarkAttendance();
+
+  const attendees = attendanceData?.attendance || [];
+
+  const filteredAttendees = attendees.filter((attendee: any) => {
+    const name = `${attendee.first_name} ${attendee.last_name}`.toLowerCase();
+    return name.includes(searchQuery.toLowerCase());
   });
 
-  const markAttendance = (id: string, isPresent: boolean) => {
-    setAttendees(prev => prev.map(a => 
-      a.id === id 
-        ? { ...a, isPresent, arrivalTime: isPresent ? new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : undefined }
-        : a
-    ));
+  const handleMark = (userId: string, status: 'present' | 'absent') => {
+    markAttendanceMutation.mutate({
+      sessionId: selectedSessionId,
+      userId,
+      status
+    });
   };
 
-  const saveAttendance = () => {
-    toast.success('Attendance saved successfully!');
-  };
-
-  const presentCount = filteredAttendees.filter(a => a.isPresent === true).length;
-  const absentCount = filteredAttendees.filter(a => a.isPresent === false).length;
-  const pendingCount = filteredAttendees.filter(a => a.isPresent === null).length;
+  const presentCount = attendees.filter((a: any) => a.status === 'present').length;
+  const absentCount = attendees.filter((a: any) => a.status === 'absent').length;
+  const pendingCount = attendees.filter((a: any) => !a.status || a.status === 'pending').length;
 
   return (
     <div className="min-h-screen bg-background">
       <div className="hidden lg:block">
         <FacilitatorSidebar />
       </div>
-      
+
       <div className="lg:ml-64">
         <FacilitatorHeader title="Attendance" subtitle="Mark and manage session attendance" />
-        
+
         <main className="p-4 lg:p-6">
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3 lg:gap-4 mb-6">
@@ -90,7 +70,9 @@ export default function FacilitatorAttendance() {
               <CardContent className="p-4 flex items-center gap-3">
                 <CheckCircle className="h-5 w-5 text-success" />
                 <div>
-                  <p className="text-2xl font-serif font-bold text-success">{presentCount}</p>
+                  <p className="text-2xl font-serif font-bold text-success">
+                    {attendanceLoading ? '...' : presentCount}
+                  </p>
                   <p className="text-xs text-muted-foreground">Present</p>
                 </div>
               </CardContent>
@@ -99,7 +81,9 @@ export default function FacilitatorAttendance() {
               <CardContent className="p-4 flex items-center gap-3">
                 <XCircle className="h-5 w-5 text-destructive" />
                 <div>
-                  <p className="text-2xl font-serif font-bold text-destructive">{absentCount}</p>
+                  <p className="text-2xl font-serif font-bold text-destructive">
+                    {attendanceLoading ? '...' : absentCount}
+                  </p>
                   <p className="text-xs text-muted-foreground">Absent</p>
                 </div>
               </CardContent>
@@ -108,7 +92,9 @@ export default function FacilitatorAttendance() {
               <CardContent className="p-4 flex items-center gap-3">
                 <Clock className="h-5 w-5 text-warning" />
                 <div>
-                  <p className="text-2xl font-serif font-bold text-warning">{pendingCount}</p>
+                  <p className="text-2xl font-serif font-bold text-warning">
+                    {attendanceLoading ? '...' : pendingCount}
+                  </p>
                   <p className="text-xs text-muted-foreground">Pending</p>
                 </div>
               </CardContent>
@@ -126,16 +112,22 @@ export default function FacilitatorAttendance() {
                 className="pl-9"
               />
             </div>
-            <Select value={selectedSession} onValueChange={setSelectedSession}>
-              <SelectTrigger className="w-full sm:w-64">
+            <Select value={selectedSessionId} onValueChange={setSelectedSessionId}>
+              <SelectTrigger className="w-full sm:w-80">
                 <SelectValue placeholder="Select session" />
               </SelectTrigger>
               <SelectContent>
-                {sessions.map((session) => (
-                  <SelectItem key={session.id} value={session.id}>
-                    {session.label}
-                  </SelectItem>
-                ))}
+                {sessionsLoading ? (
+                  <div className="p-2 text-center text-sm text-muted-foreground">Loading sessions...</div>
+                ) : sessions.length === 0 ? (
+                  <div className="p-2 text-center text-sm text-muted-foreground">No sessions found</div>
+                ) : (
+                  sessions.map((session: any) => (
+                    <SelectItem key={session.id} value={session.id}>
+                      {new Date(session.scheduled_at || session.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {session.course_title || session.title}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -145,56 +137,72 @@ export default function FacilitatorAttendance() {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="font-serif text-lg">Attendees</CardTitle>
-                <Button variant="premium" size="sm" onClick={saveAttendance}>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
-                </Button>
+                {markAttendanceMutation.isPending && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="divide-y divide-border">
-                {filteredAttendees.map((attendee) => (
-                  <div 
-                    key={attendee.id}
-                    className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary flex-shrink-0">
-                        {attendee.name.split(' ').map(n => n[0]).join('')}
+              {attendanceLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+                  <Loader2 className="h-8 w-8 animate-spin" />
+                  <p>Loading attendance list...</p>
+                </div>
+              ) : filteredAttendees.length > 0 ? (
+                <div className="divide-y divide-border">
+                  {filteredAttendees.map((attendee: any) => (
+                    <div
+                      key={attendee.user_id}
+                      className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary flex-shrink-0">
+                          {attendee.first_name?.[0]}{attendee.last_name?.[0]}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-foreground truncate">
+                            {attendee.first_name} {attendee.last_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {attendee.email}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-foreground truncate">{attendee.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{attendee.courseName} • {attendee.sessionTime}</p>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {attendee.marked_at && (
+                          <span className="text-xs text-muted-foreground hidden sm:inline">
+                            {new Date(attendee.marked_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                        <div className="flex gap-1">
+                          <Button
+                            variant={attendee.status === 'present' ? 'default' : 'outline'}
+                            size="sm"
+                            className={attendee.status === 'present' ? 'bg-success hover:bg-success/90' : ''}
+                            onClick={() => handleMark(attendee.user_id, 'present')}
+                            disabled={markAttendanceMutation.isPending}
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant={attendee.status === 'absent' ? 'destructive' : 'outline'}
+                            size="sm"
+                            onClick={() => handleMark(attendee.user_id, 'absent')}
+                            disabled={markAttendanceMutation.isPending}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {attendee.arrivalTime && (
-                        <span className="text-xs text-muted-foreground hidden sm:inline">
-                          {attendee.arrivalTime}
-                        </span>
-                      )}
-                      <div className="flex gap-1">
-                        <Button
-                          variant={attendee.isPresent === true ? 'default' : 'outline'}
-                          size="sm"
-                          className={attendee.isPresent === true ? 'bg-success hover:bg-success/90' : ''}
-                          onClick={() => markAttendance(attendee.id, true)}
-                        >
-                          <CheckCircle className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant={attendee.isPresent === false ? 'destructive' : 'outline'}
-                          size="sm"
-                          onClick={() => markAttendance(attendee.id, false)}
-                        >
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <p>{selectedSessionId ? 'No attendees found for this session.' : 'Please select a session to view attendees.'}</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </main>

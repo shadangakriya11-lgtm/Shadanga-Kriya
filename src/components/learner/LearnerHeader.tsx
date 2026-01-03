@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { User, Menu, Bell } from 'lucide-react';
+import { User, Menu } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 interface LearnerHeaderProps {
   userName?: string;
@@ -20,10 +21,7 @@ export function LearnerHeader({ userName = 'User', onMenuClick }: LearnerHeaderP
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-destructive rounded-full" />
-          </Button>
+          <NotificationBell />
           <Button variant="ghost" size="icon">
             <User className="h-5 w-5" />
           </Button>

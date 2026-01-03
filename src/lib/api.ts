@@ -115,6 +115,10 @@ export const paymentsApi = {
   getStats: () => apiRequest<any>('/payments/stats'),
   activate: (data: { userId: string; courseId: string; notes?: string }) =>
     apiRequest<any>('/payments/activate', { method: 'POST', body: JSON.stringify(data) }),
+  createRazorpayOrder: (courseId: string) =>
+    apiRequest<any>('/payments/create-razorpay-order', { method: 'POST', body: JSON.stringify({ courseId }) }),
+  verifyRazorpay: (data: any) =>
+    apiRequest<any>('/payments/verify-razorpay', { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // Sessions API
@@ -154,6 +158,13 @@ export const notificationsApi = {
   markRead: (id: string) => apiRequest<any>(`/notifications/${id}/read`, { method: 'PUT' }),
   markAllRead: () => apiRequest<any>('/notifications/read-all', { method: 'PUT' }),
   create: (data: any) => apiRequest<any>('/notifications', { method: 'POST', body: JSON.stringify(data) }), // Admin only
+};
+
+// Settings API
+export const settingsApi = {
+  getSettings: () => apiRequest<{ settings: any }>('/settings'),
+  updateSettings: (data: any) => apiRequest<any>('/settings', { method: 'PUT', body: JSON.stringify(data) }),
+  getRazorpayKey: () => apiRequest<{ keyId: string }>('/settings/razorpay-key'),
 };
 
 // Auth helpers

@@ -175,9 +175,32 @@ const getFacilitatorStats = async (req, res) => {
       LIMIT 10
     `, [facilitatorId]);
 
+    // Get weekly attendance
+    const weeklyAttendance = await pool.query(`
+      SELECT 
+        TO_CHAR(s.scheduled_at, 'Dy') as day,
+        COUNT(a.id) FILTER (WHERE a.status = 'present') as present,
+        COUNT(a.id) FILTER (WHERE a.status = 'absent') as absent
+      FROM sessions s
+      JOIN attendance a ON a.session_id = s.id
+      WHERE s.facilitator_id = $1 AND s.scheduled_at > NOW() - INTERVAL '7 days'
+      GROUP BY TO_CHAR(s.scheduled_at, 'Dy'), DATE(s.scheduled_at)
+      ORDER BY DATE(s.scheduled_at)
+    `, [facilitatorId]);
+
+    // Get completion distribution
+    const completionStats = await pool.query(`
+      SELECT status, COUNT(*) as count
+      FROM sessions
+      WHERE facilitator_id = $1
+      GROUP BY status
+    `, [facilitatorId]);
+
     res.json({
       ...stats.rows[0],
-      recentSessions: recentSessions.rows
+      recentSessions: recentSessions.rows,
+      weeklyAttendance: weeklyAttendance.rows,
+      completionStats: completionStats.rows
     });
   } catch (error) {
     console.error('Get facilitator stats error:', error);
@@ -194,12 +217,57 @@ const getLearnerStats = async (req, res) => {
       SELECT 
         COUNT(DISTINCT e.course_id) as enrolled_courses,
         COUNT(DISTINCT e.course_id) FILTER (WHERE e.completed_at IS NOT NULL) as completed_courses,
-        ROUND(AVG(e.progress_percent), 1) as avg_progress,
         COALESCE(SUM(lp.time_spent_seconds), 0) as total_learning_time,
         COUNT(DISTINCT lp.lesson_id) FILTER (WHERE lp.completed = true) as completed_lessons
       FROM enrollments e
       LEFT JOIN lesson_progress lp ON lp.user_id = e.user_id
       WHERE e.user_id = $1
+    `, [learnerId]);
+
+    // Get weekly activity (lessons completed per day)
+    const weeklyActivity = await pool.query(`
+      SELECT 
+        DATE(completed_at) as date,
+        COUNT(*) as count
+      FROM lesson_progress
+      WHERE user_id = $1 AND completed = true AND completed_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(completed_at)
+      ORDER BY date
+    `, [learnerId]);
+
+    // Get learning time trend (seconds per day)
+    const timeTrend = await pool.query(`
+      SELECT 
+        DATE(updated_at) as date,
+        SUM(time_spent_seconds) as seconds
+      FROM lesson_progress
+      WHERE user_id = $1 AND updated_at > NOW() - INTERVAL '14 days'
+      GROUP BY DATE(updated_at)
+      ORDER BY date
+    `, [learnerId]);
+
+    // Calculate Streak
+    const streakResult = await pool.query(`
+      WITH activity_dates AS (
+        SELECT DISTINCT DATE(updated_at) as activity_date
+        FROM lesson_progress
+        WHERE user_id = $1
+        ORDER BY activity_date DESC
+      ),
+      streak_calc AS (
+        SELECT 
+          activity_date,
+          activity_date - (ROW_NUMBER() OVER (ORDER BY activity_date DESC))::integer as group_id
+        FROM activity_dates
+      )
+      SELECT COUNT(*) as streak
+      FROM streak_calc
+      WHERE group_id = (
+        SELECT group_id 
+        FROM streak_calc 
+        WHERE activity_date >= CURRENT_DATE - INTERVAL '1 day'
+        LIMIT 1
+      )
     `, [learnerId]);
 
     // Get course progress
@@ -217,6 +285,9 @@ const getLearnerStats = async (req, res) => {
 
     res.json({
       ...stats.rows[0],
+      weeklyActivity: weeklyActivity.rows,
+      learningTimeTrend: timeTrend.rows,
+      streak: parseInt(streakResult.rows[0]?.streak || 0),
       courses: courseProgress.rows
     });
   } catch (error) {

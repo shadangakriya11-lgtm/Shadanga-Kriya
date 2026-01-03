@@ -2,16 +2,38 @@ import { useState } from 'react';
 import { Course } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter
 } from '@/components/ui/dialog';
-import { BookOpen, Clock, Shield, CreditCard, Check } from 'lucide-react';
+import { BookOpen, Clock, Shield, CreditCard, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { paymentsApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
+
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
 
 interface PaymentModalProps {
   course: Course | null;
@@ -21,41 +43,87 @@ interface PaymentModalProps {
 }
 
 export function PaymentModal({ course, isOpen, onClose, onSuccess }: PaymentModalProps) {
+  const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentStep, setPaymentStep] = useState<'details' | 'processing' | 'success'>('details');
+  const [paymentStep, setPaymentStep] = useState<'details' | 'processing' | 'success' | 'error'>('details');
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handlePayment = async () => {
-    if (!course) return;
-    
+    if (!course || !user) return;
+
     setIsProcessing(true);
     setPaymentStep('processing');
 
-    // Simulate Razorpay payment flow
-    // In production, this would integrate with Razorpay SDK
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      setPaymentStep('success');
-      
-      setTimeout(() => {
-        onSuccess(course.id);
-        toast({
-          title: "Payment Successful!",
-          description: `You now have access to "${course.title}"`,
-        });
-        setPaymentStep('details');
-        setIsProcessing(false);
-        onClose();
-      }, 1500);
-    } catch (error) {
+      // 1. Load Razorpay script
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        throw new Error('Razorpay SDK failed to load. Please check your internet connection.');
+      }
+
+      // 2. Create order on backend
+      const orderData = await paymentsApi.createRazorpayOrder(course.id);
+
+      // 3. Open Razorpay Checkout
+      const options = {
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Serene Flow",
+        description: `Enrollment for ${course.title}`,
+        image: "/logo.png",
+        order_id: orderData.orderId,
+        handler: async function (response: any) {
+          try {
+            // 4. Verify payment on backend
+            await paymentsApi.verifyRazorpay({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            });
+
+            setPaymentStep('success');
+
+            setTimeout(() => {
+              onSuccess(course.id);
+              toast({
+                title: "Payment Successful!",
+                description: `You now have access to "${course.title}"`,
+              });
+              setPaymentStep('details');
+              setIsProcessing(false);
+              onClose();
+            }, 2000);
+          } catch (error: any) {
+            console.error('Verification error:', error);
+            setPaymentStep('error');
+            setErrorMessage(error.message || 'Payment verification failed');
+            setIsProcessing(false);
+          }
+        },
+        prefill: {
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+        },
+        theme: {
+          color: "#4A5D4A",
+        },
+        modal: {
+          ondismiss: function () {
+            setPaymentStep('details');
+            setIsProcessing(false);
+          }
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      setPaymentStep('error');
+      setErrorMessage(error.message || 'Something went wrong while initiating payment');
       setIsProcessing(false);
-      setPaymentStep('details');
-      toast({
-        title: "Payment Failed",
-        description: "Please try again or contact support.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -73,8 +141,29 @@ export function PaymentModal({ course, isOpen, onClose, onSuccess }: PaymentModa
               Payment Successful!
             </h3>
             <p className="text-muted-foreground">
-              Redirecting to your course...
+              Your course is being unlocked...
             </p>
+          </div>
+        ) : paymentStep === 'error' ? (
+          <div className="py-8 text-center animate-scale-in">
+            <div className="h-16 w-16 rounded-full bg-destructive/15 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+            </div>
+            <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+              Payment Failed
+            </h3>
+            <p className="text-muted-foreground mb-6 px-4">
+              {errorMessage}
+            </p>
+            <Button variant="outline" onClick={() => setPaymentStep('details')}>
+              Try Again
+            </Button>
+          </div>
+        ) : paymentStep === 'processing' ? (
+          <div className="py-12 text-center">
+            <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
+            <h3 className="font-medium text-lg">Initializing Secure Payment</h3>
+            <p className="text-muted-foreground">Please wait while we connect to Razorpay...</p>
           </div>
         ) : (
           <>
@@ -123,8 +212,8 @@ export function PaymentModal({ course, isOpen, onClose, onSuccess }: PaymentModa
               <Button variant="outline" onClick={onClose} disabled={isProcessing}>
                 Cancel
               </Button>
-              <Button 
-                variant="premium" 
+              <Button
+                variant="premium"
                 onClick={handlePayment}
                 disabled={isProcessing}
                 className="min-w-[140px]"

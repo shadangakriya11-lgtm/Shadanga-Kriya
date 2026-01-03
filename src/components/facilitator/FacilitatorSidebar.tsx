@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/facilitator' },
@@ -19,6 +20,13 @@ const navItems = [
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="flex flex-col h-full bg-sidebar">
@@ -63,7 +71,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex justify-start px-3 py-2">
           <ThemeToggle />
         </div>
-        <button className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-colors w-full">
+        <button
+          onClick={handleSignOut}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-destructive/10 hover:text-destructive transition-colors w-full"
+        >
           <LogOut className="h-5 w-5 flex-shrink-0" />
           <span>Sign Out</span>
         </button>

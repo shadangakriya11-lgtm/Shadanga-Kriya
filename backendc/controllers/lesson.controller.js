@@ -18,6 +18,8 @@ const getLessonsByCourse = async (req, res) => {
       content: l.content,
       audioUrl: l.audio_url,
       videoUrl: l.video_url,
+      duration: l.duration,
+      durationSeconds: l.duration_seconds,
       durationMinutes: l.duration_minutes,
       orderIndex: l.order_index,
       maxPauses: l.max_pauses,
@@ -73,6 +75,8 @@ const getLessonById = async (req, res) => {
       content: l.content,
       audioUrl: l.audio_url,
       videoUrl: l.video_url,
+      duration: l.duration,
+      durationSeconds: l.duration_seconds,
       durationMinutes: l.duration_minutes,
       orderIndex: l.order_index,
       maxPauses: l.max_pauses,
@@ -114,11 +118,16 @@ const createLesson = async (req, res) => {
       finalOrderIndex = maxOrder.rows[0].next_order;
     }
 
+    // Calculate duration fields
+    const durationMins = durationMinutes || 0;
+    const durationSecs = durationMins * 60;
+    const durationStr = durationMins > 0 ? `${durationMins} min` : '0 min';
+
     const result = await pool.query(
-      `INSERT INTO lessons (course_id, title, description, content, audio_url, video_url, duration_minutes, order_index, is_locked, max_pauses)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO lessons (course_id, title, description, content, audio_url, video_url, duration, duration_seconds, duration_minutes, order_index, is_locked, max_pauses)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [courseId, title, description, content, audioUrl, videoUrl, durationMinutes || 0, finalOrderIndex, isLocked || false, maxPauses || 3]
+      [courseId, title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMins, finalOrderIndex, isLocked || false, maxPauses || 3]
     );
 
     const l = result.rows[0];
@@ -153,6 +162,15 @@ const updateLesson = async (req, res) => {
     // Get audio URL from uploaded file or request body
     const audioUrl = req.file ? req.file.path : req.body.audioUrl;
 
+    // Calculate duration fields if durationMinutes is provided
+    let durationStr = null;
+    let durationSecs = null;
+    if (durationMinutes !== undefined) {
+      const durationMins = durationMinutes || 0;
+      durationSecs = durationMins * 60;
+      durationStr = durationMins > 0 ? `${durationMins} min` : '0 min';
+    }
+
     const result = await pool.query(
       `UPDATE lessons 
        SET title = COALESCE($1, title),
@@ -160,14 +178,16 @@ const updateLesson = async (req, res) => {
            content = COALESCE($3, content),
            audio_url = COALESCE($4, audio_url),
            video_url = COALESCE($5, video_url),
-           duration_minutes = COALESCE($6, duration_minutes),
-           order_index = COALESCE($7, order_index),
-           is_locked = COALESCE($8, is_locked),
-           max_pauses = COALESCE($9, max_pauses),
+           duration = COALESCE($6, duration),
+           duration_seconds = COALESCE($7, duration_seconds),
+           duration_minutes = COALESCE($8, duration_minutes),
+           order_index = COALESCE($9, order_index),
+           is_locked = COALESCE($10, is_locked),
+           max_pauses = COALESCE($11, max_pauses),
            updated_at = NOW()
-       WHERE id = $10
+       WHERE id = $12
        RETURNING *`,
-      [title, description, content, audioUrl, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses, id]
+      [title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMinutes, orderIndex, isLocked, maxPauses, id]
     );
 
     if (result.rows.length === 0) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Lesson, PlaybackState } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,33 +12,17 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playback, setPlayback] = useState<PlaybackState>({
     isPlaying: false,
     currentTime: 0,
-    duration: lesson.durationSeconds,
-    pausesRemaining: lesson.maxPauses - lesson.pausesUsed,
+    duration: lesson.durationSeconds || 0,
+    pausesRemaining: lesson.maxPauses - (lesson.pausesUsed || 0),
     isPaused: false,
   });
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isComplete, setIsComplete] = useState(false);
-
-  // Simulate playback progress
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (playback.isPlaying && !isComplete) {
-      interval = setInterval(() => {
-        setPlayback((prev) => {
-          const newTime = prev.currentTime + 1;
-          if (newTime >= prev.duration) {
-            setIsComplete(true);
-            return { ...prev, isPlaying: false, currentTime: prev.duration };
-          }
-          return { ...prev, currentTime: newTime };
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [playback.isPlaying, isComplete]);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
   // Monitor online status
   useEffect(() => {
@@ -52,12 +36,56 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     };
   }, []);
 
+  // Initialize audio
+  useEffect(() => {
+    if (!lesson.audioUrl) {
+      setAudioError("No audio file available");
+      return;
+    }
+
+    const audio = new Audio(lesson.audioUrl);
+    audioRef.current = audio;
+
+    audio.addEventListener('loadedmetadata', () => {
+      // Update duration from actual audio file
+      if (audio.duration && audio.duration !== Infinity) {
+        setPlayback(p => ({ ...p, duration: audio.duration }));
+      }
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      setPlayback(prev => ({
+        ...prev,
+        currentTime: audio.currentTime,
+        // Sync duration if not set correctly yet
+        duration: audio.duration || prev.duration
+      }));
+    });
+
+    audio.addEventListener('ended', () => {
+      setIsComplete(true);
+      setPlayback(prev => ({ ...prev, isPlaying: false, currentTime: audio.duration }));
+    });
+
+    audio.addEventListener('error', (e) => {
+      console.error("Audio playback error:", e);
+      setAudioError("Failed to load audio. Please check your connection.");
+    });
+
+    return () => {
+      audio.pause();
+      audio.src = '';
+      audioRef.current = null;
+    };
+  }, [lesson.audioUrl]);
+
   const togglePlayback = useCallback(() => {
-    if (isComplete) return;
-    
+    if (isComplete || !audioRef.current || audioError) return;
+
     if (playback.isPlaying) {
       // Pausing
       if (playback.pausesRemaining > 0) {
+        audioRef.current.pause();
         setPlayback((prev) => ({
           ...prev,
           isPlaying: false,
@@ -67,22 +95,25 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
       }
     } else {
       // Playing
+      audioRef.current.play().catch(err => console.error("Play error:", err));
       setPlayback((prev) => ({
         ...prev,
         isPlaying: true,
         isPaused: false,
       }));
     }
-  }, [playback.isPlaying, playback.pausesRemaining, isComplete]);
+  }, [playback.isPlaying, playback.pausesRemaining, isComplete, audioError]);
 
   const formatTime = (seconds: number) => {
+    if (!seconds && seconds !== 0) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progress = (playback.currentTime / playback.duration) * 100;
-  const remainingTime = playback.duration - playback.currentTime;
+  const currentDuration = playback.duration || (audioRef.current?.duration || 0);
+  const progress = currentDuration > 0 ? (playback.currentTime / currentDuration) * 100 : 0;
+  const remainingTime = Math.max(0, currentDuration - playback.currentTime);
 
   if (isComplete) {
     return (
@@ -185,6 +216,13 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
           </div>
         </div>
 
+        {/* Error Message */}
+        {audioError && (
+          <div className="mb-4 text-destructive font-medium bg-destructive/10 px-4 py-2 rounded-lg">
+            {audioError}
+          </div>
+        )}
+
         {/* Time Display */}
         <div className="text-center mb-8">
           <p className="font-serif text-5xl font-bold text-foreground mb-2">
@@ -203,7 +241,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2">
             <span>{formatTime(playback.currentTime)}</span>
-            <span>{formatTime(playback.duration)}</span>
+            <span>{formatTime(currentDuration)}</span>
           </div>
         </div>
 
@@ -214,7 +252,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
             size="icon-xl"
             className="rounded-full"
             onClick={togglePlayback}
-            disabled={!playback.isPlaying && playback.pausesRemaining === 0}
+            disabled={(!playback.isPlaying && playback.pausesRemaining === 0) || !!audioError}
           >
             {playback.isPlaying ? (
               <Pause className="h-8 w-8" />

@@ -11,78 +11,58 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Play, Pause, StopCircle, Users, Clock, AlertTriangle, CheckCircle, Volume2 } from 'lucide-react';
+import { Play, Pause, StopCircle, Users, Clock, AlertTriangle, CheckCircle, Volume2, Loader2, ArrowRight, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface Session {
-  id: string;
-  time: string;
-  courseName: string;
-  lessonName: string;
-  location: string;
-  participants: number;
-  duration: number;
-  status: 'upcoming' | 'in_progress' | 'completed' | 'paused';
-}
-
-interface Participant {
-  id: string;
-  name: string;
-  progress: number;
-  pausesUsed: number;
-  maxPauses: number;
-  status: 'listening' | 'paused' | 'completed' | 'interrupted';
-}
-
-const mockSessions: Session[] = [
-  { id: 's1', time: '09:00 AM', courseName: 'Mindful Breathing', lessonName: 'Introduction to Breathing', location: 'Room A', participants: 12, duration: 25, status: 'completed' },
-  { id: 's2', time: '11:00 AM', courseName: 'Stress Response', lessonName: 'Understanding Stress', location: 'Room B', participants: 8, duration: 30, status: 'in_progress' },
-  { id: 's3', time: '02:00 PM', courseName: 'Guided Recovery', lessonName: 'Session 1: Foundation', location: 'Room A', participants: 15, duration: 45, status: 'upcoming' },
-];
-
-const mockParticipants: Participant[] = [
-  { id: 'p1', name: 'Sarah Mitchell', progress: 78, pausesUsed: 1, maxPauses: 3, status: 'listening' },
-  { id: 'p2', name: 'James Chen', progress: 72, pausesUsed: 0, maxPauses: 3, status: 'listening' },
-  { id: 'p3', name: 'Emily Johnson', progress: 45, pausesUsed: 2, maxPauses: 3, status: 'paused' },
-  { id: 'p4', name: 'Michael Brown', progress: 65, pausesUsed: 3, maxPauses: 3, status: 'interrupted' },
-  { id: 'p5', name: 'Lisa Wang', progress: 80, pausesUsed: 1, maxPauses: 3, status: 'listening' },
-];
+import { useMySessions, useStartSession, useEndSession, useUpdateSession, useMonitoringStats } from '@/hooks/useApi';
+import { cn } from '@/lib/utils';
 
 export default function FacilitatorSessions() {
-  const [sessions, setSessions] = useState(mockSessions);
-  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+  const [selectedSession, setSelectedSession] = useState<any>(null);
   const [isMonitorOpen, setIsMonitorOpen] = useState(false);
 
-  const startSession = (sessionId: string) => {
-    setSessions(prev => prev.map(s => 
-      s.id === sessionId ? { ...s, status: 'in_progress' as const } : s
-    ));
-    toast.success('Session started!');
+  const { data: sessionsData, isLoading: sessionsLoading } = useMySessions();
+  const sessions = sessionsData?.sessions || [];
+
+  const startMutation = useStartSession();
+  const endMutation = useEndSession();
+  const updateMutation = useUpdateSession();
+  const { data: monitoringData } = useMonitoringStats();
+
+  const handleStart = (id: string) => {
+    startMutation.mutate(id);
   };
 
-  const pauseSession = (sessionId: string) => {
-    setSessions(prev => prev.map(s => 
-      s.id === sessionId ? { ...s, status: 'paused' as const } : s
-    ));
-    toast.info('Session paused');
+  const handlePause = (id: string) => {
+    updateMutation.mutate({ id, data: { status: 'paused' } });
   };
 
-  const endSession = (sessionId: string) => {
-    setSessions(prev => prev.map(s => 
-      s.id === sessionId ? { ...s, status: 'completed' as const } : s
-    ));
-    setIsMonitorOpen(false);
-    toast.success('Session completed!');
+  const handleResume = (id: string) => {
+    updateMutation.mutate({ id, data: { status: 'in_progress' } });
   };
 
-  const openMonitor = (session: Session) => {
+  const handleEnd = (id: string) => {
+    endMutation.mutate(id, {
+      onSuccess: () => {
+        setIsMonitorOpen(false);
+      }
+    });
+  };
+
+  const openMonitor = (session: any) => {
     setSelectedSession(session);
     setIsMonitorOpen(true);
   };
 
+  // Filter monitoring data for users enrolled in this course (as a proxy for this session)
+  // Ideally, monitoring data should be linkable to a session. 
+  // For now, we'll show users active in the same course.
+  const sessionParticipants = monitoringData?.monitoring?.filter((m: any) =>
+    m.courseTitle === (selectedSession?.course_title || selectedSession?.title)
+  ) || [];
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'listening': return 'text-success';
+      case 'in_progress': return 'text-success';
       case 'paused': return 'text-warning';
       case 'completed': return 'text-primary';
       case 'interrupted': return 'text-destructive';
@@ -95,154 +75,211 @@ export default function FacilitatorSessions() {
       <div className="hidden lg:block">
         <FacilitatorSidebar />
       </div>
-      
+
       <div className="lg:ml-64">
         <FacilitatorHeader title="Sessions" subtitle="Start and supervise therapy sessions" />
-        
+
         <main className="p-4 lg:p-6">
-          {/* Session Cards */}
-          <div className="grid gap-4">
-            {sessions.map((session) => (
-              <Card key={session.id} className={session.status === 'in_progress' ? 'border-primary' : ''}>
-                <CardContent className="p-4 lg:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Volume2 className="h-6 w-6 text-primary" />
+          {sessionsLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
+              <Loader2 className="h-10 w-10 animate-spin" />
+              <p>Loading sessions...</p>
+            </div>
+          ) : sessions.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="py-20 text-center">
+                <Volume2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
+                <h3 className="text-lg font-medium">No sessions found</h3>
+                <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+                  You don't have any sessions assigned to you yet. Contact the administrator if this is a mistake.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {sessions.map((session: any) => (
+                <Card key={session.id} className={session.status === 'in_progress' ? 'border-primary ring-1 ring-primary/20 shadow-md' : 'shadow-sm'}>
+                  <CardContent className="p-4 lg:p-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                      <div className="flex items-start gap-4">
+                        <div className={cn(
+                          "h-12 w-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
+                          session.status === 'in_progress' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                        )}>
+                          <Volume2 className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-serif font-semibold text-foreground text-lg">{session.course_title || session.title}</h3>
+                            <Badge variant={
+                              session.status === 'completed' ? 'completed' :
+                                session.status === 'in_progress' ? 'active' :
+                                  session.status === 'paused' ? 'pending' : 'outline'
+                            }>
+                              {session.status.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{session.title}</p>
+                          <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              {new Date(session.scheduled_at).toLocaleDateString()}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-4 w-4" />
+                              {new Date(session.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Users className="h-4 w-4" />
+                              {session.participantCount} / {session.max_participants}
+                            </span>
+                            <span>{session.location}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-serif font-semibold text-foreground">{session.courseName}</h3>
-                          <Badge variant={
-                            session.status === 'completed' ? 'completed' :
-                            session.status === 'in_progress' ? 'active' :
-                            session.status === 'paused' ? 'pending' : 'outline'
-                          }>
-                            {session.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">{session.lessonName}</p>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-4 w-4" />
-                            {session.time}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Users className="h-4 w-4" />
-                            {session.participants}
-                          </span>
-                          <span>{session.location}</span>
-                          <span>{session.duration} min</span>
-                        </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {session.status === 'scheduled' && (
+                          <Button variant="premium" onClick={() => handleStart(session.id)} disabled={startMutation.isPending}>
+                            {startMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+                            Start Session
+                          </Button>
+                        )}
+                        {session.status === 'in_progress' && (
+                          <>
+                            <Button variant="outline" onClick={() => openMonitor(session)}>
+                              <Users className="h-4 w-4 mr-2" />
+                              Monitor
+                            </Button>
+                            <Button variant="warning" onClick={() => handlePause(session.id)} disabled={updateMutation.isPending}>
+                              <Pause className="h-4 w-4 mr-2" />
+                              Pause
+                            </Button>
+                            <Button variant="destructive" onClick={() => handleEnd(session.id)} disabled={endMutation.isPending}>
+                              <StopCircle className="h-4 w-4 mr-2" />
+                              End
+                            </Button>
+                          </>
+                        )}
+                        {session.status === 'paused' && (
+                          <>
+                            <Button variant="premium" onClick={() => handleResume(session.id)} disabled={updateMutation.isPending}>
+                              <Play className="h-4 w-4 mr-2" />
+                              Resume
+                            </Button>
+                            <Button variant="destructive" onClick={() => handleEnd(session.id)} disabled={endMutation.isPending}>
+                              <StopCircle className="h-4 w-4 mr-2" />
+                              End
+                            </Button>
+                          </>
+                        )}
+                        {session.status === 'completed' && (
+                          <div className="flex items-center gap-2 px-4 py-2 bg-success/10 text-success rounded-full font-medium">
+                            <CheckCircle className="h-4 w-4" />
+                            Completed
+                          </div>
+                        )}
                       </div>
                     </div>
-                    
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {session.status === 'upcoming' && (
-                        <Button variant="premium" onClick={() => startSession(session.id)}>
-                          <Play className="h-4 w-4 mr-2" />
-                          Start Session
-                        </Button>
-                      )}
-                      {session.status === 'in_progress' && (
-                        <>
-                          <Button variant="outline" onClick={() => openMonitor(session)}>
-                            <Users className="h-4 w-4 mr-2" />
-                            Monitor
-                          </Button>
-                          <Button variant="warning" onClick={() => pauseSession(session.id)}>
-                            <Pause className="h-4 w-4 mr-2" />
-                            Pause
-                          </Button>
-                          <Button variant="destructive" onClick={() => endSession(session.id)}>
-                            <StopCircle className="h-4 w-4 mr-2" />
-                            End
-                          </Button>
-                        </>
-                      )}
-                      {session.status === 'paused' && (
-                        <>
-                          <Button variant="premium" onClick={() => startSession(session.id)}>
-                            <Play className="h-4 w-4 mr-2" />
-                            Resume
-                          </Button>
-                          <Button variant="destructive" onClick={() => endSession(session.id)}>
-                            <StopCircle className="h-4 w-4 mr-2" />
-                            End
-                          </Button>
-                        </>
-                      )}
-                      {session.status === 'completed' && (
-                        <Badge variant="completed" className="px-4 py-2">
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Completed
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           {/* Monitor Dialog */}
           <Dialog open={isMonitorOpen} onOpenChange={setIsMonitorOpen}>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle className="font-serif">
-                  Live Session Monitor - {selectedSession?.courseName}
-                </DialogTitle>
+                <div className="flex items-center justify-between pr-8">
+                  <DialogTitle className="font-serif text-2xl">
+                    Live Monitor
+                  </DialogTitle>
+                  <Badge variant="active" className="pulse">Live Updates Enabled</Badge>
+                </div>
+                <p className="text-muted-foreground">{selectedSession?.course_title || selectedSession?.title}</p>
               </DialogHeader>
-              
-              <div className="space-y-4 py-4">
-                {/* Session Progress */}
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Overall Progress</span>
-                      <span className="text-sm text-muted-foreground">68%</span>
-                    </div>
-                    <Progress value={68} className="h-2" />
-                  </CardContent>
-                </Card>
+
+              <div className="space-y-6 py-4">
+                {/* Overall Stats */}
+                <div className="grid grid-cols-3 gap-4">
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold">{sessionParticipants.length}</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Active Users</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold">
+                        {sessionParticipants.filter((m: any) => m.status === 'completed').length}
+                      </p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Finished</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="p-4 text-center">
+                      <p className="text-2xl font-bold text-destructive">
+                        {sessionParticipants.filter((m: any) => m.status === 'interrupted').length}
+                      </p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wider">Help Needed</p>
+                    </CardContent>
+                  </Card>
+                </div>
 
                 {/* Participant List */}
-                <div className="space-y-2">
-                  <h4 className="font-medium text-sm text-muted-foreground">Participants</h4>
-                  {mockParticipants.map((participant) => (
-                    <Card key={participant.id} className={participant.status === 'interrupted' ? 'border-destructive/50' : ''}>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                              {participant.name.split(' ').map(n => n[0]).join('')}
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-foreground border-b pb-2">Individual Progress</h4>
+                  {sessionParticipants.length > 0 ? (
+                    sessionParticipants.map((participant: any) => (
+                      <Card key={participant.id} className={cn(
+                        "transition-all",
+                        participant.status === 'interrupted' ? 'border-destructive ring-1 ring-destructive/20 bg-destructive/5' : ''
+                      )}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                                {participant.userName.split(' ').map((n: any) => n[0]).join('')}
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">{participant.userName}</p>
+                                <p className={`text-xs font-medium ${getStatusColor(participant.status)}`}>
+                                  {participant.status.replace('_', ' ').charAt(0).toUpperCase() + participant.status.replace('_', ' ').slice(1)}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium text-sm">{participant.name}</p>
-                              <p className={`text-xs ${getStatusColor(participant.status)}`}>
-                                {participant.status.charAt(0).toUpperCase() + participant.status.slice(1)}
-                              </p>
+                            <div className="flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="text-sm font-bold">{participant.progress}%</p>
+                                <p className="text-[10px] text-muted-foreground uppercase">
+                                  Pauses: {participant.pausesUsed} / {participant.maxPauses}
+                                </p>
+                              </div>
+                              {participant.status === 'interrupted' && (
+                                <Badge variant="destructive" className="animate-pulse">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />
+                                  Check User
+                                </Badge>
+                              )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <p className="text-sm font-medium">{participant.progress}%</p>
-                              <p className="text-xs text-muted-foreground">
-                                Pauses: {participant.pausesUsed}/{participant.maxPauses}
-                              </p>
-                            </div>
-                            {participant.status === 'interrupted' && (
-                              <Button variant="warning" size="sm">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                Assist
-                              </Button>
+                          <Progress
+                            value={participant.progress}
+                            className={cn(
+                              "h-1.5",
+                              participant.status === 'interrupted' ? "[&>div]:bg-destructive" : ""
                             )}
-                          </div>
-                        </div>
-                        <Progress value={participant.progress} className="h-1 mt-3" />
-                      </CardContent>
-                    </Card>
-                  ))}
+                          />
+                        </CardContent>
+                      </Card>
+                    ))
+                  ) : (
+                    <div className="text-center py-10 border-2 border-dashed rounded-xl">
+                      <Users className="h-10 w-10 text-muted-foreground mx-auto mb-2 opacity-20" />
+                      <p className="text-sm text-muted-foreground">No users currently active in this lesson.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </DialogContent>
@@ -252,3 +289,4 @@ export default function FacilitatorSessions() {
     </div>
   );
 }
+

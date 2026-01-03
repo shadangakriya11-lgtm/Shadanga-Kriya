@@ -4,16 +4,20 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Splash from "./pages/Splash";
 import LearnerLogin from "./pages/LearnerLogin";
 import LearnerHome from "./pages/LearnerHome";
+import LearnerNotifications from "./pages/LearnerNotifications";
 import CourseDetail from "./pages/CourseDetail";
+import LearnerDashboard from "./pages/LearnerDashboard";
 import Progress from "./pages/Progress";
 import Profile from "./pages/Profile";
+import PrivacySecurity from "./pages/PrivacySecurity";
+import HelpSupport from "./pages/HelpSupport";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminCourses from "./pages/AdminCourses";
@@ -28,9 +32,15 @@ import FacilitatorDashboard from "./pages/FacilitatorDashboard";
 import FacilitatorAttendance from "./pages/FacilitatorAttendance";
 import FacilitatorSessions from "./pages/FacilitatorSessions";
 import FacilitatorReports from "./pages/FacilitatorReports";
+import FacilitatorNotifications from "./pages/FacilitatorNotifications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+const NotificationPage = () => {
+  const { user } = useAuth();
+  return user?.role === 'facilitator' ? <FacilitatorNotifications /> : <LearnerNotifications />;
+};
 
 const App = () => (
   <ThemeProvider defaultTheme="light" storageKey="therapy-ui-theme">
@@ -60,6 +70,11 @@ const App = () => (
                   <CourseDetail />
                 </ProtectedRoute>
               } />
+              <Route path="/dashboard" element={
+                <ProtectedRoute allowedRoles={['learner']}>
+                  <LearnerDashboard />
+                </ProtectedRoute>
+              } />
               <Route path="/progress" element={
                 <ProtectedRoute allowedRoles={['learner']}>
                   <Progress />
@@ -68,6 +83,21 @@ const App = () => (
               <Route path="/profile" element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              } />
+              <Route path="/notifications" element={
+                <ProtectedRoute allowedRoles={['learner']}>
+                  <LearnerNotifications />
+                </ProtectedRoute>
+              } />
+              <Route path="/privacy" element={
+                <ProtectedRoute allowedRoles={['learner']}>
+                  <PrivacySecurity />
+                </ProtectedRoute>
+              } />
+              <Route path="/help" element={
+                <ProtectedRoute allowedRoles={['learner']}>
+                  <HelpSupport />
                 </ProtectedRoute>
               } />
 
@@ -137,6 +167,11 @@ const App = () => (
               <Route path="/facilitator/sessions" element={
                 <ProtectedRoute allowedRoles={['facilitator']}>
                   <FacilitatorSessions />
+                </ProtectedRoute>
+              } />
+              <Route path="/notifications" element={
+                <ProtectedRoute allowedRoles={['learner', 'facilitator']}>
+                  <NotificationPage />
                 </ProtectedRoute>
               } />
               <Route path="/facilitator/reports" element={
