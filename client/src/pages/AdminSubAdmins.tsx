@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AdminSidebar } from '@/components/admin/AdminSidebar';
 import { AdminHeader } from '@/components/admin/AdminHeader';
 import { DataTable } from '@/components/admin/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Plus, MoreHorizontal, Shield, Trash2, Edit } from 'lucide-react';
+import { Search, Plus, MoreHorizontal, Shield, Trash2, Edit, X, BookOpen, FileText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,8 +21,14 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/useApi';
+import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, useCourses, useLessonsByCourse } from '@/hooks/useApi';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+interface Assignment {
+  courseId: string | null;
+  lessonId: string | null;
+}
 
 interface SubAdmin {
   id: string;
@@ -32,6 +38,7 @@ interface SubAdmin {
   role: string;
   status: string;
   permissions: string[];
+  assignments: Assignment[];
   createdAt: string;
   lastActive: string | null;
 }
@@ -54,19 +61,28 @@ export default function AdminSubAdmins() {
     email: '',
     password: '',
     permissions: [] as string[],
+    assignments: [] as Assignment[],
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  // Selection state for adding new assignment
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('all_courses');
+  const [selectedLessonId, setSelectedLessonId] = useState<string>('all_lessons');
+
   const { data: usersData, isLoading } = useUsers({ role: 'facilitator' });
+  const { data: coursesData } = useCourses();
+  const { data: lessonsData } = useLessonsByCourse(selectedCourseId !== 'all_courses' ? selectedCourseId : '');
+
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
 
   const subAdmins: SubAdmin[] = (usersData?.users || [])
-    .filter((u: any) => u.permissions && u.permissions.length > 0)
+    .filter((u: any) => (u.permissions && u.permissions.length > 0) || u.role === 'facilitator')
     .map((u: any) => ({
       ...u,
-      permissions: u.permissions || []
+      permissions: u.permissions || [],
+      assignments: u.assignments || []
     }));
 
   const filteredSubAdmins = subAdmins.filter((admin) =>
@@ -83,9 +99,9 @@ export default function AdminSubAdmins() {
           data: {
             firstName: formData.firstName,
             lastName: formData.lastName,
-            // email is usually not editable or handled separately
             permissions: formData.permissions,
-            role: 'facilitator' // ensure role stays
+            assignments: formData.assignments,
+            role: 'facilitator'
           }
         });
       } else {
@@ -99,7 +115,7 @@ export default function AdminSubAdmins() {
       setIsDialogOpen(false);
       resetForm();
     } catch (error) {
-      console.error('Failed to save sub-admin', error);
+      console.error('Failed to save facilitator', error);
     }
   };
 
@@ -110,8 +126,11 @@ export default function AdminSubAdmins() {
       email: '',
       password: '',
       permissions: [],
+      assignments: [],
     });
     setEditingId(null);
+    setSelectedCourseId('all_courses');
+    setSelectedLessonId('all_lessons');
   };
 
   const openEdit = (admin: SubAdmin) => {
@@ -120,8 +139,9 @@ export default function AdminSubAdmins() {
       firstName: admin.firstName,
       lastName: admin.lastName,
       email: admin.email,
-      password: '', // Don't fill password
+      password: '',
       permissions: admin.permissions,
+      assignments: admin.assignments,
     });
     setIsDialogOpen(true);
   };
@@ -132,6 +152,37 @@ export default function AdminSubAdmins() {
       permissions: prev.permissions.includes(permId)
         ? prev.permissions.filter(p => p !== permId)
         : [...prev.permissions, permId]
+    }));
+  };
+
+  const addAssignment = () => {
+    if (selectedCourseId === 'all_courses') return;
+
+    const newAssignment: Assignment = {
+      courseId: selectedCourseId,
+      lessonId: selectedLessonId === 'all_lessons' ? null : selectedLessonId
+    };
+
+    // Check for duplicates
+    const isDuplicate = formData.assignments.some(a =>
+      a.courseId === newAssignment.courseId && a.lessonId === newAssignment.lessonId
+    );
+
+    if (!isDuplicate) {
+      setFormData(prev => ({
+        ...prev,
+        assignments: [...prev.assignments, newAssignment]
+      }));
+    }
+
+    setSelectedCourseId('all_courses');
+    setSelectedLessonId('all_lessons');
+  };
+
+  const removeAssignment = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      assignments: prev.assignments.filter((_, i) => i !== index)
     }));
   };
 
@@ -321,7 +372,90 @@ export default function AdminSubAdmins() {
                       ))}
                     </div>
                   </div>
-                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+                  <div className="space-y-4 border-t pt-4">
+                    <Label className="text-base">Course & Lesson Assignments</Label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1 space-y-2">
+                        <Label>Course</Label>
+                        <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select Course" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all_courses">Select Course</SelectItem>
+                            {coursesData?.courses?.map((c: any) => (
+                              <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 space-y-2">
+                        <Label>Lesson (Optional)</Label>
+                        <Select
+                          value={selectedLessonId}
+                          onValueChange={setSelectedLessonId}
+                          disabled={selectedCourseId === 'all_courses'}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="All Lessons" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all_lessons">All Lessons</SelectItem>
+                            {lessonsData?.lessons?.map((l: any) => (
+                              <SelectItem key={l.id} value={l.id}>{l.title}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={addAssignment}
+                          disabled={selectedCourseId === 'all_courses'}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Active Assignments</Label>
+                      <div className="flex flex-wrap gap-2 p-3 border border-border rounded-lg min-h-[50px] bg-muted/30">
+                        {formData.assignments.length === 0 && (
+                          <p className="text-sm text-muted-foreground w-full text-center py-2">No assignments yet</p>
+                        )}
+                        {formData.assignments.map((assignment, index) => {
+                          const course = coursesData?.courses?.find((c: any) => c.id === assignment.courseId);
+                          return (
+                            <Badge key={index} variant="secondary" className="pl-2 pr-1 py-1 flex items-center gap-1 group">
+                              <span className="flex items-center gap-1">
+                                <BookOpen className="h-3 w-3" />
+                                {course?.title || 'Unknown Course'}
+                                {assignment.lessonId && (
+                                  <>
+                                    <span className="text-muted-foreground">/</span>
+                                    <FileText className="h-3 w-3" />
+                                    Lesson Assigned
+                                  </>
+                                )}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-4 w-4 rounded-full p-0 hover:bg-destructive hover:text-destructive-foreground opacity-50 group-hover:opacity-100 transition-opacity"
+                                onClick={() => removeAssignment(index)}
+                              >
+                                <X className="h-2 w-2" />
+                              </Button>
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
                     <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="w-full sm:w-auto">Cancel</Button>
                     <Button
                       variant="premium"
@@ -329,7 +463,7 @@ export default function AdminSubAdmins() {
                       className="w-full sm:w-auto"
                       disabled={createUser.isPending || updateUser.isPending}
                     >
-                      {editingId ? 'Update Sub-Admin' : 'Create Sub-Admin'}
+                      {editingId ? 'Update Facilitator' : 'Create Facilitator'}
                     </Button>
                   </div>
                 </div>

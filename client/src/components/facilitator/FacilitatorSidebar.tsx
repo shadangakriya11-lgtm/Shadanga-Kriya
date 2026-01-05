@@ -6,6 +6,8 @@ import {
   BarChart3,
   LogOut,
   Shield,
+  BookOpen,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -13,9 +15,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/facilitator' },
+  { icon: BookOpen, label: 'Courses', href: '/facilitator/courses' },
   { icon: Users, label: 'Attendance', href: '/facilitator/attendance' },
   { icon: Play, label: 'Sessions', href: '/facilitator/sessions' },
   { icon: BarChart3, label: 'Reports', href: '/facilitator/reports' },
+  { icon: Activity, label: 'Monitoring', href: '/facilitator/monitoring' },
 ];
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {

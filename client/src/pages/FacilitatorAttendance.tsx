@@ -16,9 +16,15 @@ import { Search, CheckCircle, XCircle, Clock, Save, Loader2 } from 'lucide-react
 import { toast } from 'sonner';
 import { useMySessions, useSessionAttendance, useMarkAttendance } from '@/hooks/useApi';
 
+import { useAuth } from '@/contexts/AuthContext';
+import { ShieldAlert } from 'lucide-react';
+
 export default function FacilitatorAttendance() {
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+
+  const hasPermission = user?.role === 'admin' || user?.permissions?.includes('course_view');
 
   const { data: sessionsData, isLoading: sessionsLoading } = useMySessions();
   const sessions = sessionsData?.sessions || [];
@@ -53,6 +59,27 @@ export default function FacilitatorAttendance() {
   const presentCount = attendees.filter((a: any) => a.status === 'present').length;
   const absentCount = attendees.filter((a: any) => a.status === 'absent').length;
   const pendingCount = attendees.filter((a: any) => !a.status || a.status === 'pending').length;
+
+  if (!hasPermission && !sessionsLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <FacilitatorSidebar />
+        <div className="lg:ml-64">
+          <FacilitatorHeader title="Attendance" subtitle="Mark and manage session attendance" />
+          <main className="p-4 lg:p-6 flex flex-col items-center justify-center min-h-[60vh] text-center">
+            <div className="h-20 w-20 rounded-full bg-warning/10 flex items-center justify-center mb-6">
+              <ShieldAlert className="h-10 w-10 text-warning" />
+            </div>
+            <h2 className="text-2xl font-serif font-bold mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground max-w-md mb-8">
+              You don't have permission to manage attendance.
+              Please request permission from the administrator to access this feature.
+            </p>
+          </main>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -124,7 +151,7 @@ export default function FacilitatorAttendance() {
                 ) : (
                   sessions.map((session: any) => (
                     <SelectItem key={session.id} value={session.id}>
-                      {new Date(session.scheduled_at || session.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {session.course_title || session.title}
+                      {new Date(session.scheduledAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {session.course_title || session.title}
                     </SelectItem>
                   ))
                 )}

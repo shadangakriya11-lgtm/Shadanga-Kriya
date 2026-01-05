@@ -15,12 +15,15 @@ export default function FacilitatorDashboard() {
   const { data: sessionsData, isLoading: sessionsLoading } = useMySessions();
   const { data: analyticsData, isLoading: analyticsLoading } = useFacilitatorAnalytics();
 
+  const hasAnalyticsPermission = user?.role === 'admin' || user?.permissions?.includes('analytics');
+  const hasCoursePermission = user?.role === 'admin' || user?.permissions?.includes('course_view');
+
   const isLoading = sessionsLoading || analyticsLoading;
   const sessions = sessionsData?.sessions || [];
   const stats = analyticsData || {};
 
   const todaySessions = sessions.filter((s: any) => {
-    const sessionDate = new Date(s.scheduled_at || s.start_time);
+    const sessionDate = new Date(s.scheduledAt);
     const today = new Date();
     return sessionDate.toDateString() === today.toDateString();
   });
@@ -55,33 +58,43 @@ export default function FacilitatorDashboard() {
       <div className="lg:ml-64">
         <FacilitatorHeader title="Dashboard" subtitle={`Welcome back, ${user?.firstName || 'Facilitator'}`} />
         <main className="p-4 lg:p-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
-            {quickStats.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <Card key={stat.label}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg bg-muted ${stat.color}`}>
-                        <Icon className="h-5 w-5" />
+          {hasAnalyticsPermission ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
+              {quickStats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <Card key={stat.label}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg bg-muted ${stat.color}`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-serif font-bold">{stat.value}</p>
+                          <p className="text-xs text-muted-foreground">{stat.label}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-2xl font-serif font-bold">{stat.value}</p>
-                        <p className="text-xs text-muted-foreground">{stat.label}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="mb-6 bg-muted/30">
+              <CardContent className="p-4 py-8 text-center text-muted-foreground">
+                <p>General analytics are restricted. Contact admin for permission.</p>
+              </CardContent>
+            </Card>
+          )}
 
           <div className="grid grid-cols-2 gap-3 lg:gap-4 mb-6">
-            <Button variant="premium" className="h-auto py-4 flex-col gap-2" onClick={() => navigate('/facilitator/attendance')}>
+            <Button variant="premium" className="h-auto py-4 flex-col gap-2" onClick={() => navigate('/facilitator/attendance')} disabled={!hasCoursePermission}>
               <Users className="h-6 w-6" /><span>Mark Attendance</span>
+              {!hasCoursePermission && <span className="text-[10px] opacity-70">(Needs Permission)</span>}
             </Button>
-            <Button variant="secondary" className="h-auto py-4 flex-col gap-2" onClick={() => navigate('/facilitator/sessions')}>
+            <Button variant="secondary" className="h-auto py-4 flex-col gap-2" onClick={() => navigate('/facilitator/sessions')} disabled={!hasCoursePermission}>
               <Play className="h-6 w-6" /><span>Start Session</span>
+              {!hasCoursePermission && <span className="text-[10px] opacity-70">(Needs Permission)</span>}
             </Button>
           </div>
 
@@ -94,25 +107,29 @@ export default function FacilitatorDashboard() {
                 </Button>
               </div>
               <div className="space-y-3">
-                {todaySessions.length > 0 ? todaySessions.map((session: any) => (
-                  <div key={session.id} className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/facilitator/sessions')}>
-                    <div className="flex items-center gap-4">
-                      <div className="text-center min-w-[60px]">
-                        <p className="text-sm font-semibold text-foreground">
-                          {new Date(session.scheduled_at || session.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                {hasCoursePermission ? (
+                  todaySessions.length > 0 ? todaySessions.map((session: any) => (
+                    <div key={session.id} className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate('/facilitator/sessions')}>
+                      <div className="flex items-center gap-4">
+                        <div className="text-center min-w-[60px]">
+                          <p className="text-sm font-semibold text-foreground">
+                            {new Date(session.scheduledAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">{session.course_title || session.title}</p>
+                          <p className="text-sm text-muted-foreground">{session.location} • {session.participant_count || 0} participants</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-foreground">{session.course_title || session.title}</p>
-                        <p className="text-sm text-muted-foreground">{session.location} • {session.participant_count || 0} participants</p>
-                      </div>
+                      <Badge variant={session.status === 'in_progress' ? 'active' : 'pending'}>
+                        {session.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
+                      </Badge>
                     </div>
-                    <Badge variant={session.status === 'in_progress' ? 'active' : 'pending'}>
-                      {session.status === 'in_progress' ? 'In Progress' : 'Upcoming'}
-                    </Badge>
-                  </div>
-                )) : (
-                  <p className="text-center text-muted-foreground py-8">No sessions scheduled for today</p>
+                  )) : (
+                    <p className="text-center text-muted-foreground py-8">No sessions scheduled for today</p>
+                  )
+                ) : (
+                  <p className="text-center text-muted-foreground py-8">Session viewing is restricted. Contact admin for permission.</p>
                 )}
               </div>
             </CardContent>
