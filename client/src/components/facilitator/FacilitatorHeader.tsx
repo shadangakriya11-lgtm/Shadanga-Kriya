@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { Bell, Menu, User } from 'lucide-react';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { FacilitatorMobileSidebar } from './FacilitatorSidebar';
-import { useAuth } from '@/contexts/AuthContext';
-import { NotificationBell } from '../learner/NotificationBell';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { Bell, Menu, User } from "lucide-react";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { FacilitatorMobileSidebar } from "./FacilitatorSidebar";
+import { useAuth } from "@/contexts/AuthContext";
+import { NotificationBell } from "../learner/NotificationBell";
 
 interface FacilitatorHeaderProps {
   title: string;
@@ -13,7 +13,11 @@ interface FacilitatorHeaderProps {
   action?: React.ReactNode;
 }
 
-export function FacilitatorHeader({ title, subtitle, action }: FacilitatorHeaderProps) {
+export function FacilitatorHeader({
+  title,
+  subtitle,
+  action,
+}: FacilitatorHeaderProps) {
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -33,8 +37,14 @@ export function FacilitatorHeader({ title, subtitle, action }: FacilitatorHeader
         </Sheet>
 
         <div>
-          <h1 className="font-serif text-lg lg:text-xl font-semibold text-foreground">{title}</h1>
-          {subtitle && <p className="text-xs lg:text-sm text-muted-foreground">{subtitle}</p>}
+          <h1 className="font-serif text-lg lg:text-xl font-semibold text-foreground">
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="text-xs lg:text-sm text-muted-foreground">
+              {subtitle}
+            </p>
+          )}
         </div>
       </div>
 
@@ -46,8 +56,12 @@ export function FacilitatorHeader({ title, subtitle, action }: FacilitatorHeader
         <NotificationBell />
         <div className="flex items-center gap-2 lg:gap-3 pl-2 lg:pl-4 border-l border-border">
           <div className="hidden sm:block text-right">
-            <p className="text-sm font-medium text-foreground">{user?.firstName} {user?.lastName}</p>
-            <p className="text-xs text-muted-foreground">{user?.role === 'facilitator' ? 'Facilitator' : user?.role}</p>
+            <p className="text-sm font-medium text-foreground">
+              {user?.firstName} {user?.lastName}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {user?.role === "facilitator" ? "Facilitator" : user?.role}
+            </p>
           </div>
           <div className="h-9 w-9 lg:h-10 lg:w-10 rounded-full bg-secondary/30 flex items-center justify-center">
             <User className="h-4 w-4 lg:h-5 lg:w-5 text-secondary-foreground" />

@@ -55,12 +55,15 @@ if (Capacitor.isNativePlatform()) {
   StatusBar.setBackgroundColor({ color: "#0d4744" }); // Teal background
 }
 
-
 const queryClient = new QueryClient();
 
 const NotificationPage = () => {
   const { user } = useAuth();
-  return user?.role === 'facilitator' ? <FacilitatorNotifications /> : <LearnerNotifications />;
+  return user?.role === "facilitator" ? (
+    <FacilitatorNotifications />
+  ) : (
+    <LearnerNotifications />
+  );
 };
 
 /**
@@ -68,7 +71,7 @@ const NotificationPage = () => {
  * "Listening for this event will disable the default back button behaviour,
  * so you might want to call window.history.back() manually.
  * If you want to close the app, call App.exitApp()."
- * 
+ *
  * The canGoBack property in BackButtonListenerEvent indicates whether
  * the browser can go back in history.
  */
@@ -168,135 +171,210 @@ const AppContent = () => (
 
               {/* Learner Routes */}
               <Route path="/splash" element={<Splash />} />
-              <Route path="/home" element={
-                <ProtectedRoute allowedRoles={['learner']}>
-                  <LearnerHome />
-                </ProtectedRoute>
-              } />
-              <Route path="/course/:id" element={
-                <ProtectedRoute allowedRoles={['learner']}>
-                  <CourseDetail />
-                </ProtectedRoute>
-              } />
-              <Route path="/dashboard" element={
-                <ProtectedRoute allowedRoles={['learner']}>
-                  <LearnerDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/progress" element={
-                <ProtectedRoute allowedRoles={['learner']}>
-                  <Progress />
-                </ProtectedRoute>
-              } />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              <Route path="/notifications" element={
-                <ProtectedRoute allowedRoles={['learner']}>
-                  <LearnerNotifications />
-                </ProtectedRoute>
-              } />
-              <Route path="/privacy" element={
-                <ProtectedRoute allowedRoles={['learner']}>
-                  <PrivacySecurity />
-                </ProtectedRoute>
-              } />
-              <Route path="/help" element={
-                <ProtectedRoute allowedRoles={['learner']}>
-                  <HelpSupport />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/home"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <LearnerHome />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/course/:id"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <CourseDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <LearnerDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/progress"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <Progress />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <LearnerNotifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/privacy"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <PrivacySecurity />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/help"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <HelpSupport />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Admin Routes */}
-              <Route path="/admin" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/users" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminUsers />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/courses" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminCourses />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/lessons" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminLessons />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/monitoring" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminMonitoring />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/payments" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminPayments />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/subadmins" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminSubAdmins />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/analytics" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminAnalytics />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/notifications" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminNotifications />
-                </ProtectedRoute>
-              } />
-              <Route path="/admin/settings" element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminSettings />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminUsers />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/courses"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminCourses />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/lessons"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminLessons />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/monitoring"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminMonitoring />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/payments"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminPayments />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/subadmins"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminSubAdmins />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/analytics"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminAnalytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/notifications"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminNotifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/settings"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminSettings />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Facilitator Routes */}
-              <Route path="/facilitator" element={
-                <ProtectedRoute allowedRoles={['facilitator']}>
-                  <FacilitatorDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="/facilitator/courses" element={
-                <ProtectedRoute allowedRoles={['facilitator']}>
-                  <FacilitatorCourses />
-                </ProtectedRoute>
-              } />
-              <Route path="/facilitator/attendance" element={
-                <ProtectedRoute allowedRoles={['facilitator']}>
-                  <FacilitatorAttendance />
-                </ProtectedRoute>
-              } />
-              <Route path="/facilitator/sessions" element={
-                <ProtectedRoute allowedRoles={['facilitator']}>
-                  <FacilitatorSessions />
-                </ProtectedRoute>
-              } />
-              <Route path="/notifications" element={
-                <ProtectedRoute allowedRoles={['learner', 'facilitator']}>
-                  <NotificationPage />
-                </ProtectedRoute>
-              } />
-              <Route path="/facilitator/reports" element={
-                <ProtectedRoute allowedRoles={['facilitator']}>
-                  <FacilitatorReports />
-                </ProtectedRoute>
-              } />
-              <Route path="/facilitator/monitoring" element={
-                <ProtectedRoute allowedRoles={['facilitator']}>
-                  <FacilitatorMonitoring />
-                </ProtectedRoute>
-              } />
+              <Route
+                path="/facilitator"
+                element={
+                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                    <FacilitatorDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facilitator/courses"
+                element={
+                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                    <FacilitatorCourses />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facilitator/attendance"
+                element={
+                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                    <FacilitatorAttendance />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facilitator/sessions"
+                element={
+                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                    <FacilitatorSessions />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/notifications"
+                element={
+                  <ProtectedRoute allowedRoles={["learner", "facilitator"]}>
+                    <NotificationPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facilitator/reports"
+                element={
+                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                    <FacilitatorReports />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facilitator/monitoring"
+                element={
+                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                    <FacilitatorMonitoring />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
