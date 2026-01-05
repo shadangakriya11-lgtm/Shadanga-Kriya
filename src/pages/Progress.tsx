@@ -5,11 +5,11 @@ import { BottomNav } from '@/components/learner/BottomNav';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  CheckCircle2, 
-  Clock, 
-  Lock, 
-  TrendingUp, 
+import {
+  CheckCircle2,
+  Clock,
+  Lock,
+  TrendingUp,
   CreditCard,
   Calendar,
   BookOpen,
@@ -41,7 +41,7 @@ export default function Progress() {
   return (
     <div className="min-h-screen bg-background pb-20">
       <LearnerHeader userName={user ? `${user.firstName} ${user.lastName}` : 'User'} />
-      
+
       <main className="px-4 py-6 max-w-3xl mx-auto">
         {/* Header */}
         <section className="mb-8 animate-fade-in">
@@ -99,16 +99,16 @@ export default function Progress() {
                   key={enrollment.id}
                   className="bg-card rounded-xl border border-border/50 p-5 shadow-soft animate-fade-in cursor-pointer hover:shadow-card transition-shadow"
                   style={{ animationDelay: `${(index + 2) * 100}ms` }}
-                  onClick={() => navigate(`/course/${enrollment.course_id}`)}
+                  onClick={() => navigate(`/course/${enrollment.courseId}`)}
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
                       <h3 className="font-serif text-lg font-semibold text-foreground mb-1">
-                        {enrollment.course?.title || 'Course'}
+                        {enrollment.courseTitle || 'Course'}
                       </h3>
                       <div className="flex items-center gap-2">
-                        <Badge variant={enrollment.course?.type === 'self' ? 'self' : 'onsite'}>
-                          {enrollment.course?.type === 'self' ? 'Self-Paced' : 'On-Site'}
+                        <Badge variant={enrollment.category === 'meditation' ? 'self' : 'onsite'}>
+                          {enrollment.category || 'Therapy'}
                         </Badge>
                         <Badge variant={enrollment.status === 'completed' ? 'completed' : 'active'}>
                           {enrollment.status === 'completed' ? 'Completed' : 'In Progress'}
@@ -122,19 +122,19 @@ export default function Progress() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">
-                        {enrollment.completed_lessons || 0} of {enrollment.total_lessons || 0} lessons
+                        {enrollment.completedLessons || 0} of {enrollment.totalLessons || 0} lessons
                       </span>
-                      <span className="font-semibold text-foreground">{enrollment.progress || 0}%</span>
+                      <span className="font-semibold text-foreground">{enrollment.progressPercent || 0}%</span>
                     </div>
                     <div className="h-2 bg-muted rounded-full overflow-hidden">
                       <div
                         className={cn(
                           "h-full rounded-full transition-all duration-500",
-                          (enrollment.progress || 0) === 100
+                          (enrollment.progressPercent || 0) === 100
                             ? "bg-success"
                             : "bg-gradient-to-r from-primary to-success"
                         )}
-                        style={{ width: `${enrollment.progress || 0}%` }}
+                        style={{ width: `${enrollment.progressPercent || 0}%` }}
                       />
                     </div>
                   </div>
@@ -184,10 +184,10 @@ export default function Progress() {
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h4 className="font-medium text-foreground">{payment.course?.title || 'Course'}</h4>
+                        <h4 className="font-medium text-foreground">{payment.courseTitle || 'Course'}</h4>
                         <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                           <Calendar className="h-3.5 w-3.5" />
-                          <span>{new Date(payment.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          <span>{new Date(payment.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                         </div>
                       </div>
                       <div className="text-right">

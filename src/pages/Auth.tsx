@@ -42,12 +42,12 @@ export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { login, register, isLoggedIn, user } = useAuth();
-  
+
   const [mode, setMode] = useState<AuthMode>((searchParams.get('mode') as AuthMode) || 'login');
   const [selectedRole, setSelectedRole] = useState<UserRole>((searchParams.get('role') as UserRole) || 'learner');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Form fields
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,7 +70,7 @@ export default function Auth() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (mode === 'signup' && password !== confirmPassword) {
       toast({
         title: "Passwords don't match",
@@ -90,7 +90,7 @@ export default function Auth() {
     }
 
     setIsLoading(true);
-    
+
     try {
       if (mode === 'login') {
         const loggedInUser = await login(email, password);
@@ -102,7 +102,7 @@ export default function Auth() {
       } else {
         const [firstName, ...lastNameParts] = fullName.trim().split(' ');
         const lastName = lastNameParts.join(' ') || firstName;
-        
+
         const newUser = await register({ email, password, firstName, lastName });
         toast({
           title: "Welcome to Shadanga Kriya! 🙏",
@@ -129,30 +129,30 @@ export default function Auth() {
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         {/* Gradient Background - Teal to darker teal */}
         <div className="absolute inset-0 bg-gradient-to-br from-teal-800 via-teal-700 to-cyan-800" />
-        
+
         {/* Animated Orbs */}
         <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-20 left-10 w-72 h-72 rounded-full blur-3xl opacity-30 animate-float-slow" 
-            style={{ background: 'radial-gradient(circle, hsl(174 65% 50% / 0.5) 0%, transparent 70%)' }} 
+          <div className="absolute top-20 left-10 w-72 h-72 rounded-full blur-3xl opacity-30 animate-float-slow"
+            style={{ background: 'radial-gradient(circle, hsl(174 65% 50% / 0.5) 0%, transparent 70%)' }}
           />
           <div className="absolute bottom-20 right-10 w-96 h-96 rounded-full blur-3xl opacity-20 animate-float"
-            style={{ background: 'radial-gradient(circle, hsl(38 85% 55% / 0.5) 0%, transparent 70%)', animationDelay: '2s' }} 
+            style={{ background: 'radial-gradient(circle, hsl(38 85% 55% / 0.5) 0%, transparent 70%)', animationDelay: '2s' }}
           />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-3xl opacity-25 animate-pulse-gentle"
-            style={{ background: 'radial-gradient(circle, hsl(180 50% 45% / 0.4) 0%, transparent 70%)' }} 
+            style={{ background: 'radial-gradient(circle, hsl(180 50% 45% / 0.4) 0%, transparent 70%)' }}
           />
         </div>
 
         {/* Content */}
         <div className="relative z-10 p-12 flex flex-col justify-between w-full">
           <div>
-            <div 
+            <div
               className="flex items-center gap-4 mb-16 cursor-pointer group"
               onClick={() => navigate('/')}
             >
-              <img 
-                src="/serene-logo.png" 
-                alt="Shadanga Kriya" 
+              <img
+                src="/serene-logo.png"
+                alt="Shadanga Kriya"
                 className="h-16 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
               />
             </div>
@@ -164,7 +164,7 @@ export default function Auth() {
                   {mode === 'login' ? 'Continue Your Journey' : 'Begin Your Transformation'}
                 </span>
               </div>
-              
+
               <h2 className="font-serif text-4xl font-bold text-white mb-6 leading-tight">
                 {mode === 'login' ? (
                   <>
@@ -183,7 +183,7 @@ export default function Auth() {
                 )}
               </h2>
               <p className="text-lg text-white/70 leading-relaxed">
-                {mode === 'login' 
+                {mode === 'login'
                   ? 'Sign in to continue your practice and track your progress on the path to inner peace.'
                   : 'Create your account to access authentic Shadanga Kriya practices and begin your healing journey.'
                 }
@@ -225,9 +225,9 @@ export default function Auth() {
 
         {/* Header */}
         <header className="p-6 flex items-center justify-between">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => navigate('/')}
             className="hover:bg-primary/10 hover:text-primary"
           >
@@ -242,9 +242,9 @@ export default function Auth() {
           <div className="w-full max-w-md animate-fade-in">
             {/* Mobile Logo */}
             <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
-              <img 
-                src="/serene-logo.png" 
-                alt="Shadanga Kriya" 
+              <img
+                src="/serene-logo.png"
+                alt="Shadanga Kriya"
                 className="h-16 w-auto"
               />
             </div>
@@ -253,21 +253,19 @@ export default function Auth() {
             <div className="flex rounded-2xl bg-muted/50 p-1.5 mb-8 backdrop-blur-sm border border-border/50">
               <button
                 onClick={() => setMode('login')}
-                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
-                  mode === 'login' 
-                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg' 
+                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === 'login'
+                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg'
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 Sign In
               </button>
               <button
                 onClick={() => setMode('signup')}
-                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
-                  mode === 'signup' 
-                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg' 
+                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === 'signup'
+                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg'
                     : 'text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 Sign Up
               </button>
@@ -285,11 +283,10 @@ export default function Auth() {
                       <button
                         key={role}
                         onClick={() => setSelectedRole(role)}
-                        className={`p-4 rounded-2xl border-2 transition-all duration-300 text-center group hover:scale-105 ${
-                          selectedRole === role
+                        className={`p-4 rounded-2xl border-2 transition-all duration-300 text-center group hover:scale-105 ${selectedRole === role
                             ? 'border-primary bg-primary/10 shadow-lg'
                             : 'border-border hover:border-primary/50 hover:bg-primary/5'
-                        }`}
+                          }`}
                       >
                         <div className={`h-12 w-12 rounded-xl ${config.color} flex items-center justify-center mx-auto mb-3 shadow-md group-hover:scale-110 transition-transform`}>
                           <Icon className="h-6 w-6 text-white" />

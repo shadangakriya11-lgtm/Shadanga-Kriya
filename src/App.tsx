@@ -65,7 +65,6 @@ const App = () => (
 
               {/* Learner Routes */}
               <Route path="/splash" element={<Splash />} />
-              <Route path="/login" element={<LearnerLogin />} />
               <Route path="/home" element={
                 <ProtectedRoute allowedRoles={['learner']}>
                   <LearnerHome />

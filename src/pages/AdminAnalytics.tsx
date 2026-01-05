@@ -85,12 +85,12 @@ export default function AdminAnalytics() {
         <div className="lg:ml-64">
           <AdminHeader title="Analytics & Reports" subtitle="Insights into platform performance" />
           <main className="p-4 lg:p-6">
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               {[1, 2, 3, 4].map((i) => (
                 <Skeleton key={i} className="h-24 rounded-xl" />
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Skeleton className="h-80 rounded-xl" />
               <Skeleton className="h-80 rounded-xl" />
             </div>
@@ -149,10 +149,10 @@ export default function AdminAnalytics() {
 
         <main className="p-4 lg:p-6">
           {/* Actions Bar */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
             <div className="flex items-center gap-3">
               <Select value={period} onValueChange={setPeriod}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Select period" />
                 </SelectTrigger>
                 <SelectContent>
@@ -163,14 +163,14 @@ export default function AdminAnalytics() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={handleExport}>
+            <Button variant="outline" onClick={handleExport} className="w-full sm:w-auto">
               <Download className="h-4 w-4 mr-2" />
               Export Report
             </Button>
           </div>
 
           {/* Key Metrics */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
@@ -224,7 +224,7 @@ export default function AdminAnalytics() {
           </div>
 
           {/* Charts Row 1 */}
-          <div className="grid grid-cols-2 gap-6 mb-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <Card>
               <CardHeader>
                 <CardTitle className="font-serif text-lg">Completion Rate Trend</CardTitle>
@@ -289,7 +289,7 @@ export default function AdminAnalytics() {
           </div>
 
           {/* Charts Row 2 */}
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="font-serif text-lg">Weekly Engagement</CardTitle>

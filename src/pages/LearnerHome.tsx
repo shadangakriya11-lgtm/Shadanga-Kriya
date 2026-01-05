@@ -26,16 +26,16 @@ export default function LearnerHome() {
 
   // Map courses with enrollment status
   const mappedCourses: Course[] = courses.map((course: any) => {
-    const enrollment = enrollments.find((e: any) => e.course_id === course.id);
+    const enrollment = enrollments.find((e: any) => e.courseId === course.id);
     return {
       id: course.id,
       title: course.title,
       description: course.description,
       type: course.type || 'self',
       status: enrollment ? (enrollment.status === 'completed' ? 'completed' : 'active') : (course.price > 0 ? 'locked' : 'pending'),
-      progress: enrollment?.progress || 0,
+      progress: enrollment?.progressPercent || 0,
       totalLessons: course.lessonCount || 0,
-      completedLessons: enrollment?.completed_lessons || 0,
+      completedLessons: enrollment?.completedLessons || 0,
       duration: course.durationHours ? `${course.durationHours} hours` : '0 min',
       price: course.price,
     };

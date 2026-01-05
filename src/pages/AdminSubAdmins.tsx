@@ -57,15 +57,17 @@ export default function AdminSubAdmins() {
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const { data: usersData, isLoading } = useUsers({ role: 'sub_admin' });
+  const { data: usersData, isLoading } = useUsers({ role: 'facilitator' });
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
 
-  const subAdmins: SubAdmin[] = (usersData?.users || []).map((u: any) => ({
-    ...u,
-    permissions: u.permissions || []
-  }));
+  const subAdmins: SubAdmin[] = (usersData?.users || [])
+    .filter((u: any) => u.permissions && u.permissions.length > 0)
+    .map((u: any) => ({
+      ...u,
+      permissions: u.permissions || []
+    }));
 
   const filteredSubAdmins = subAdmins.filter((admin) =>
     (admin.firstName + ' ' + admin.lastName).toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -83,14 +85,14 @@ export default function AdminSubAdmins() {
             lastName: formData.lastName,
             // email is usually not editable or handled separately
             permissions: formData.permissions,
-            role: 'sub_admin' // ensure role stays
+            role: 'facilitator' // ensure role stays
           }
         });
       } else {
         // Create
         await createUser.mutateAsync({
           ...formData,
-          role: 'sub_admin',
+          role: 'facilitator',
           status: 'active'
         });
       }

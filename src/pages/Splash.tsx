@@ -11,7 +11,7 @@ export default function Splash() {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
-          setTimeout(() => navigate('/login'), 300);
+          setTimeout(() => navigate('/auth'), 300);
           return 100;
         }
         return prev + 2;
