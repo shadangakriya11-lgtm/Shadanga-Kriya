@@ -18,7 +18,7 @@ export function FacilitatorHeader({ title, subtitle, action }: FacilitatorHeader
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6">
+    <header className="sticky top-0 z-50 h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:pt-[env(safe-area-inset-top)]">
       <div className="flex items-center gap-4">
         {/* Mobile menu */}
         <Sheet open={isOpen} onOpenChange={setIsOpen}>

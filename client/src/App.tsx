@@ -2,10 +2,17 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { useEffect, useRef } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Splash from "./pages/Splash";
@@ -37,10 +44,16 @@ import FacilitatorMonitoring from "./pages/FacilitatorMonitoring";
 import FacilitatorCourses from "./pages/FacilitatorCourses";
 import NotFound from "./pages/NotFound";
 
-import { StatusBar, Style } from '@capacitor/status-bar';
+import { StatusBar, Style } from "@capacitor/status-bar";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp, BackButtonListenerEvent } from "@capacitor/app";
 
-
-StatusBar.setStyle({ style: Style.Dark });
+// Configure status bar for native platforms
+if (Capacitor.isNativePlatform()) {
+  StatusBar.setOverlaysWebView({ overlay: true });
+  StatusBar.setStyle({ style: Style.Dark });
+  StatusBar.setBackgroundColor({ color: "#0d4744" }); // Teal background
+}
 
 
 const queryClient = new QueryClient();
@@ -50,7 +63,94 @@ const NotificationPage = () => {
   return user?.role === 'facilitator' ? <FacilitatorNotifications /> : <LearnerNotifications />;
 };
 
-const App = () => (
+/**
+ * Back button handler component - per Capacitor App API documentation:
+ * "Listening for this event will disable the default back button behaviour,
+ * so you might want to call window.history.back() manually.
+ * If you want to close the app, call App.exitApp()."
+ * 
+ * The canGoBack property in BackButtonListenerEvent indicates whether
+ * the browser can go back in history.
+ */
+const BackButtonHandler = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Use ref to always have current pathname in the listener
+  const currentPathRef = useRef(location.pathname);
+
+  // Keep ref updated with current path
+  useEffect(() => {
+    currentPathRef.current = location.pathname;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    let handler: { remove: () => Promise<void> } | null = null;
+
+    const setupListener = async () => {
+      handler = await CapApp.addListener(
+        "backButton",
+        ({ canGoBack }: BackButtonListenerEvent) => {
+          const currentPath = currentPathRef.current;
+
+          // Define home/root pages where back should exit/minimize app
+          const rootPages = [
+            "/",
+            "/home",
+            "/admin",
+            "/facilitator",
+            "/auth",
+            "/splash",
+          ];
+          const isRootPage = rootPages.includes(currentPath);
+
+          console.log(
+            "[BackButton] Path:",
+            currentPath,
+            "canGoBack:",
+            canGoBack,
+            "historyLength:",
+            window.history.length
+          );
+
+          if (isRootPage) {
+            // On root page - minimize app (Android only per docs)
+            console.log("[BackButton] Minimizing app on root page");
+            CapApp.minimizeApp();
+          } else if (canGoBack) {
+            // Use browser history if canGoBack is true (per Capacitor docs)
+            console.log("[BackButton] Going back in history");
+            window.history.back();
+          } else {
+            // Fallback: navigate to appropriate home based on path
+            console.log("[BackButton] Navigating to home fallback");
+            if (currentPath.startsWith("/admin")) {
+              navigate("/admin", { replace: true });
+            } else if (currentPath.startsWith("/facilitator")) {
+              navigate("/facilitator", { replace: true });
+            } else {
+              navigate("/home", { replace: true });
+            }
+          }
+        }
+      );
+    };
+
+    setupListener();
+
+    return () => {
+      // Cleanup: remove listener when component unmounts
+      if (handler) {
+        handler.remove();
+      }
+    };
+  }, [navigate]); // Only depend on navigate, use ref for pathname
+
+  return null;
+};
+
+const AppContent = () => (
   <ThemeProvider defaultTheme="light" storageKey="therapy-ui-theme">
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -58,6 +158,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
+            <BackButtonHandler />
             <Routes>
               {/* Landing */}
               <Route path="/" element={<Index />} />
@@ -206,5 +307,7 @@ const App = () => (
     </QueryClientProvider>
   </ThemeProvider>
 );
+
+const App = () => <AppContent />;
 
 export default App;
