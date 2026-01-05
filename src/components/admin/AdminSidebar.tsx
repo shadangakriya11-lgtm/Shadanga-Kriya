@@ -20,7 +20,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { removeAuthToken } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const navItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/admin' },
@@ -41,10 +41,11 @@ const bottomItems = [
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const handleSignOut = () => {
-    removeAuthToken();
-    navigate('/login');
+    logout();
+    navigate('/auth');
   };
 
   return (

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChevronLeft, Clock, BookOpen, DollarSign } from 'lucide-react';
 import { Lesson } from '@/types';
-import { useCourse, useLessonsByCourse, useCourseProgress } from '@/hooks/useApi';
+import { useCourse, useLessonsByCourse, useCourseProgress, useUpdateLessonProgress } from '@/hooks/useApi';
 import { useAuth } from '@/contexts/AuthContext';
 
 type ViewState = 'details' | 'protocol' | 'player';
@@ -22,23 +22,29 @@ export default function CourseDetail() {
 
   const { data: courseData, isLoading: courseLoading } = useCourse(id || '');
   const { data: lessonsData, isLoading: lessonsLoading } = useLessonsByCourse(id || '');
-  const { data: progressData } = useCourseProgress(id || '');
+  const { data: progressData, refetch: refetchProgress } = useCourseProgress(id || '');
+  const updateProgress = useUpdateLessonProgress();
 
   const course = courseData;
-  const lessons: Lesson[] = (lessonsData?.lessons || []).map((l: any, index: number) => ({
-    id: l.id,
-    courseId: l.course_id,
-    title: l.title,
-    description: l.description || '',
-    duration: l.duration || '0 min',
-    durationSeconds: l.duration_seconds || 0,
-    audioUrl: l.audioUrl,
-    order: l.order_index || index + 1,
-    maxPauses: l.max_pauses ?? 3,
-    pausesUsed: progressData?.lessons?.[l.id]?.pauses_used || 0,
-    status: progressData?.lessons?.[l.id]?.completed ? 'completed' :
-      (index === 0 || progressData?.lessons?.[lessonsData?.lessons[index - 1]?.id]?.completed) ? 'active' : 'locked',
-  }));
+  const lessons: Lesson[] = (lessonsData?.lessons || []).map((l: any, index: number) => {
+    const lessonProgress = progressData?.lessons?.find((p: any) => p.id === l.id);
+    const prevLessonProgress = index > 0 ? progressData?.lessons?.find((p: any) => p.id === lessonsData?.lessons[index - 1]?.id) : null;
+
+    return {
+      id: l.id,
+      courseId: l.course_id,
+      title: l.title,
+      description: l.description || '',
+      duration: l.duration || '0 min',
+      durationSeconds: l.duration_seconds || 0,
+      audioUrl: l.audioUrl,
+      order: l.order_index || index + 1,
+      maxPauses: l.max_pauses ?? 3,
+      pausesUsed: lessonProgress?.pausesUsed || 0,
+      status: lessonProgress?.completed ? 'completed' :
+        (index === 0 || prevLessonProgress?.completed) ? 'active' : 'locked',
+    };
+  });
 
   const isLoading = courseLoading || lessonsLoading;
 
@@ -82,7 +88,22 @@ export default function CourseDetail() {
     setView('player');
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    if (selectedLesson) {
+      try {
+        await updateProgress.mutateAsync({
+          lessonId: selectedLesson.id,
+          data: {
+            completed: true,
+            timeSpentSeconds: selectedLesson.durationSeconds || 0,
+            lastPositionSeconds: selectedLesson.durationSeconds || 0
+          }
+        });
+        await refetchProgress();
+      } catch (error) {
+        console.error('Failed to update progress:', error);
+      }
+    }
     setView('details');
     setSelectedLesson(null);
   };
@@ -107,7 +128,7 @@ export default function CourseDetail() {
     );
   }
 
-  const progress = progressData?.progress || 0;
+  const progress = progressData?.progressPercent || 0;
   const completedLessons = progressData?.completedLessons || 0;
   const totalLessons = lessons.length;
   const isEnrolled = !!progressData;

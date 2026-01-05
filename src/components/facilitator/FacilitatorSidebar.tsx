@@ -25,7 +25,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   const handleSignOut = () => {
     logout();
-    navigate('/login');
+    navigate('/auth');
   };
 
   return (
