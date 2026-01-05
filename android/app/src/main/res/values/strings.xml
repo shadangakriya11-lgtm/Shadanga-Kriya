@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">sereneFlow</string>
-    <string name="title_activity_main">sereneFlow</string>
-    <string name="package_name">com.yourname.sereneflow</string>
-    <string name="custom_url_scheme">com.yourname.sereneflow</string>
-</resources>
