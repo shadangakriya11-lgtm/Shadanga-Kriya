@@ -133,13 +133,13 @@ export default function AdminSettings() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Organization Name</Label>
-                        <Input defaultValue="TherapyOS" />
+                        <Input defaultValue="Shadanga Kriya" />
                       </div>
                       <div className="space-y-2">
                         <Label>Contact Email</Label>
                         <Input
                           type="email"
-                          defaultValue="admin@therapyos.com"
+                          defaultValue="admin@Shadanga Kriya.com"
                         />
                       </div>
                     </div>
@@ -157,7 +157,7 @@ export default function AdminSettings() {
                       </div>
                       <div className="space-y-2">
                         <Label>Website</Label>
-                        <Input defaultValue="https://therapyos.com" />
+                        <Input defaultValue="https://Shadanga Kriya.com" />
                       </div>
                     </div>
                     <Button variant="premium">Save Changes</Button>

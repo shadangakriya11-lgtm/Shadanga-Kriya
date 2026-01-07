@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Shield } from 'lucide-react';
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Shield } from "lucide-react";
 
 export default function Splash() {
   const navigate = useNavigate();
@@ -11,7 +11,7 @@ export default function Splash() {
       setProgress((prev) => {
         if (prev >= 100) {
           clearInterval(interval);
-          setTimeout(() => navigate('/auth'), 300);
+          setTimeout(() => navigate("/auth"), 300);
           return 100;
         }
         return prev + 2;
@@ -26,7 +26,10 @@ export default function Splash() {
       {/* Animated Background Circles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -left-20 w-64 h-64 bg-primary/5 rounded-full blur-3xl animate-breathe" />
-        <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-success/5 rounded-full blur-3xl animate-breathe" style={{ animationDelay: '2s' }} />
+        <div
+          className="absolute bottom-1/4 -right-20 w-80 h-80 bg-success/5 rounded-full blur-3xl animate-breathe"
+          style={{ animationDelay: "2s" }}
+        />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-accent/10 rounded-full blur-3xl animate-pulse-gentle" />
       </div>
 
@@ -42,14 +45,17 @@ export default function Splash() {
 
         {/* Brand */}
         <h1 className="font-serif text-4xl font-bold text-foreground mb-3">
-          TherapyOS
+          Shadanga Kriya
         </h1>
         <p className="text-lg text-muted-foreground mb-2">
           Audio Therapy Platform
         </p>
 
         {/* Tagline */}
-        <p className="font-serif text-xl text-primary/80 italic max-w-xs mx-auto mb-12 animate-fade-in" style={{ animationDelay: '300ms' }}>
+        <p
+          className="font-serif text-xl text-primary/80 italic max-w-xs mx-auto mb-12 animate-fade-in"
+          style={{ animationDelay: "300ms" }}
+        >
           "Discipline in listening,
           <br />
           healing in practice"

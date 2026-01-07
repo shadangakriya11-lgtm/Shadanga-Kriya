@@ -1,4 +1,4 @@
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Users,
@@ -8,18 +8,18 @@ import {
   Shield,
   BookOpen,
   Activity,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { useAuth } from '@/contexts/AuthContext';
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/contexts/AuthContext";
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', href: '/facilitator' },
-  { icon: BookOpen, label: 'Courses', href: '/facilitator/courses' },
-  { icon: Users, label: 'Attendance', href: '/facilitator/attendance' },
-  { icon: Play, label: 'Sessions', href: '/facilitator/sessions' },
-  { icon: BarChart3, label: 'Reports', href: '/facilitator/reports' },
-  { icon: Activity, label: 'Monitoring', href: '/facilitator/monitoring' },
+  { icon: LayoutDashboard, label: "Dashboard", href: "/facilitator" },
+  { icon: BookOpen, label: "Courses", href: "/facilitator/courses" },
+  { icon: Users, label: "Attendance", href: "/facilitator/attendance" },
+  { icon: Play, label: "Sessions", href: "/facilitator/sessions" },
+  { icon: BarChart3, label: "Reports", href: "/facilitator/reports" },
+  { icon: Activity, label: "Monitoring", href: "/facilitator/monitoring" },
 ];
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -29,7 +29,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   const handleSignOut = () => {
     logout();
-    navigate('/auth');
+    navigate("/auth");
   };
 
   return (
@@ -40,7 +40,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <Shield className="h-5 w-5 text-sidebar-primary" />
         </div>
         <div>
-          <h1 className="font-serif font-semibold text-sidebar-foreground">TherapyOS</h1>
+          <h1 className="font-serif font-semibold text-sidebar-foreground">
+            Shadanga Kriya
+          </h1>
           <p className="text-xs text-sidebar-foreground/60">Facilitator</p>
         </div>
       </div>
@@ -98,6 +100,10 @@ export function FacilitatorSidebar() {
   );
 }
 
-export function FacilitatorMobileSidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function FacilitatorMobileSidebar({
+  onNavigate,
+}: {
+  onNavigate?: () => void;
+}) {
   return <SidebarContent onNavigate={onNavigate} />;
 }
