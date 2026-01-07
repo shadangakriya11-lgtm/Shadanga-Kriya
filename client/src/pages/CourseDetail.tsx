@@ -1,50 +1,88 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { LessonCard } from '@/components/learner/LessonCard';
-import { PreLessonProtocol } from '@/components/learner/PreLessonProtocol';
-import { AudioPlayer } from '@/components/learner/AudioPlayer';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ChevronLeft, Clock, BookOpen, DollarSign } from 'lucide-react';
-import { Lesson } from '@/types';
-import { useCourse, useLessonsByCourse, useCourseProgress, useUpdateLessonProgress } from '@/hooks/useApi';
-import { useAuth } from '@/contexts/AuthContext';
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { LessonCard } from "@/components/learner/LessonCard";
+import { PreLessonProtocol } from "@/components/learner/PreLessonProtocol";
+import { AudioPlayer } from "@/components/learner/AudioPlayer";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ChevronLeft,
+  Clock,
+  BookOpen,
+  DollarSign,
+  AlertCircle,
+  Users,
+} from "lucide-react";
+import { Lesson } from "@/types";
+import {
+  useCourse,
+  useLessonsByCourse,
+  useCourseProgress,
+  useUpdateLessonProgress,
+  useMyAttendance,
+} from "@/hooks/useApi";
+import { useAuth } from "@/contexts/AuthContext";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
-type ViewState = 'details' | 'protocol' | 'player';
+type ViewState = "details" | "protocol" | "player";
 
 export default function CourseDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
-  const [view, setView] = useState<ViewState>('details');
+  const { toast } = useToast();
+  const [view, setView] = useState<ViewState>("details");
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
 
-  const { data: courseData, isLoading: courseLoading } = useCourse(id || '');
-  const { data: lessonsData, isLoading: lessonsLoading } = useLessonsByCourse(id || '');
-  const { data: progressData, refetch: refetchProgress } = useCourseProgress(id || '');
+  const { data: courseData, isLoading: courseLoading } = useCourse(id || "");
+  const { data: lessonsData, isLoading: lessonsLoading } = useLessonsByCourse(
+    id || ""
+  );
+  const { data: progressData, refetch: refetchProgress } = useCourseProgress(
+    id || ""
+  );
   const updateProgress = useUpdateLessonProgress();
 
-  const course = courseData;
-  const lessons: Lesson[] = (lessonsData?.lessons || []).map((l: any, index: number) => {
-    const lessonProgress = progressData?.lessons?.find((p: any) => p.id === l.id);
-    const prevLessonProgress = index > 0 ? progressData?.lessons?.find((p: any) => p.id === lessonsData?.lessons[index - 1]?.id) : null;
+  // Check attendance for on-site courses
+  const isOnsiteCourse = courseData?.type === "onsite";
+  const { data: attendanceData } = useMyAttendance(
+    isOnsiteCourse ? id || "" : ""
+  );
 
-    return {
-      id: l.id,
-      courseId: l.course_id,
-      title: l.title,
-      description: l.description || '',
-      duration: l.duration || '0 min',
-      durationSeconds: l.duration_seconds || 0,
-      audioUrl: l.audioUrl,
-      order: l.order_index || index + 1,
-      maxPauses: l.max_pauses ?? 3,
-      pausesUsed: lessonProgress?.pausesUsed || 0,
-      status: lessonProgress?.completed ? 'completed' :
-        (index === 0 || prevLessonProgress?.completed) ? 'active' : 'locked',
-    };
-  });
+  const course = courseData;
+  const lessons: Lesson[] = (lessonsData?.lessons || []).map(
+    (l: any, index: number) => {
+      const lessonProgress = progressData?.lessons?.find(
+        (p: any) => p.id === l.id
+      );
+      const prevLessonProgress =
+        index > 0
+          ? progressData?.lessons?.find(
+              (p: any) => p.id === lessonsData?.lessons[index - 1]?.id
+            )
+          : null;
+
+      return {
+        id: l.id,
+        courseId: l.course_id,
+        title: l.title,
+        description: l.description || "",
+        duration: l.duration || "0 min",
+        durationSeconds: l.duration_seconds || 0,
+        audioUrl: l.audioUrl,
+        order: l.order_index || index + 1,
+        maxPauses: l.max_pauses ?? 3,
+        pausesUsed: lessonProgress?.pausesUsed || 0,
+        status: lessonProgress?.completed
+          ? "completed"
+          : index === 0 || prevLessonProgress?.completed
+          ? "active"
+          : "locked",
+      };
+    }
+  );
 
   const isLoading = courseLoading || lessonsLoading;
 
@@ -53,7 +91,11 @@ export default function CourseDetail() {
       <div className="min-h-screen bg-background">
         <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
           <div className="flex items-center gap-4 px-4 py-4 max-w-3xl mx-auto">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/home")}
+            >
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <Skeleton className="h-6 w-48" />
@@ -78,14 +120,35 @@ export default function CourseDetail() {
   }
 
   const handleLessonClick = (lesson: Lesson) => {
-    if (lesson.status === 'active') {
+    if (lesson.status === "active") {
+      // For on-site courses, check attendance before allowing lesson start
+      if (isOnsiteCourse) {
+        if (!attendanceData?.hasSessionToday) {
+          toast({
+            title: "No Session Today",
+            description:
+              "There is no scheduled session for today. Please check the session schedule.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (!attendanceData?.isMarkedPresent) {
+          toast({
+            title: "Attendance Required",
+            description:
+              "Please ask your facilitator to mark your attendance before starting the lesson.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
       setSelectedLesson(lesson);
-      setView('protocol');
+      setView("protocol");
     }
   };
 
   const handleStartSession = () => {
-    setView('player');
+    setView("player");
   };
 
   const handleComplete = async () => {
@@ -96,33 +159,33 @@ export default function CourseDetail() {
           data: {
             completed: true,
             timeSpentSeconds: selectedLesson.durationSeconds || 0,
-            lastPositionSeconds: selectedLesson.durationSeconds || 0
-          }
+            lastPositionSeconds: selectedLesson.durationSeconds || 0,
+          },
         });
         await refetchProgress();
       } catch (error) {
-        console.error('Failed to update progress:', error);
+        console.error("Failed to update progress:", error);
       }
     }
-    setView('details');
+    setView("details");
     setSelectedLesson(null);
   };
 
-  if (view === 'protocol' && selectedLesson) {
+  if (view === "protocol" && selectedLesson) {
     return (
       <PreLessonProtocol
         lesson={selectedLesson}
-        onBack={() => setView('details')}
+        onBack={() => setView("details")}
         onStart={handleStartSession}
       />
     );
   }
 
-  if (view === 'player' && selectedLesson) {
+  if (view === "player" && selectedLesson) {
     return (
       <AudioPlayer
         lesson={selectedLesson}
-        onBack={() => setView('protocol')}
+        onBack={() => setView("protocol")}
         onComplete={handleComplete}
       />
     );
@@ -138,34 +201,71 @@ export default function CourseDetail() {
       {/* Header */}
       <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
         <div className="flex items-center gap-4 px-4 py-4 max-w-3xl mx-auto">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/home')}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/home")}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide">Course Details</p>
-            <h1 className="font-serif text-lg font-semibold truncate">{course.title}</h1>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide">
+              Course Details
+            </p>
+            <h1 className="font-serif text-lg font-semibold truncate">
+              {course.title}
+            </h1>
           </div>
         </div>
       </header>
 
       <main className="px-4 py-6 max-w-3xl mx-auto">
+        {/* On-Site Attendance Alert */}
+        {isOnsiteCourse && isEnrolled && (
+          <Alert
+            variant={
+              attendanceData?.isMarkedPresent ? "default" : "destructive"
+            }
+            className="mb-6 animate-fade-in"
+          >
+            <Users className="h-4 w-4" />
+            <AlertTitle>
+              {attendanceData?.isMarkedPresent
+                ? "Attendance Confirmed"
+                : "Attendance Required"}
+            </AlertTitle>
+            <AlertDescription>
+              {attendanceData?.hasSessionToday
+                ? attendanceData?.isMarkedPresent
+                  ? "Your attendance has been marked for today's session. You may start lessons."
+                  : "Please ask your facilitator to mark your attendance before starting lessons."
+                : "No session is scheduled for today. Check the schedule for upcoming sessions."}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Course Info */}
         <section className="mb-8 animate-fade-in">
           <div className="flex gap-2 mb-4">
-            <Badge variant={course.type === 'self' ? 'self' : 'onsite'}>
-              {course.type === 'self' ? 'Self-Paced' : 'On-Site'}
+            <Badge variant={course.type === "self" ? "self" : "onsite"}>
+              {course.type === "self" ? "Self-Paced" : "On-Site"}
             </Badge>
-            <Badge variant={isEnrolled ? 'active' : course.status === 'active' ? 'active' : 'locked'}>
-              {isEnrolled ? 'Enrolled' : course.status?.charAt(0).toUpperCase() + course.status?.slice(1)}
+            <Badge
+              variant={
+                isEnrolled
+                  ? "active"
+                  : course.status === "active"
+                  ? "active"
+                  : "locked"
+              }
+            >
+              {isEnrolled
+                ? "Enrolled"
+                : course.status?.charAt(0).toUpperCase() +
+                  course.status?.slice(1)}
             </Badge>
           </div>
 
           <h2 className="font-serif text-2xl font-bold text-foreground mb-3">
             {course.title}
           </h2>
-          <p className="text-muted-foreground mb-6">
-            {course.description}
-          </p>
+          <p className="text-muted-foreground mb-6">{course.description}</p>
 
           {/* Meta */}
           <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
@@ -175,7 +275,7 @@ export default function CourseDetail() {
             </div>
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4" />
-              <span>{course.duration || 'N/A'}</span>
+              <span>{course.duration || "N/A"}</span>
             </div>
             {course.price > 0 && (
               <div className="flex items-center gap-1.5">
@@ -216,13 +316,20 @@ export default function CourseDetail() {
                 <LessonCard
                   key={lesson.id}
                   lesson={lesson}
+                  courseId={id}
                   onClick={() => handleLessonClick(lesson)}
                   className="opacity-0 animate-fade-in"
-                  style={{ animationDelay: `${(index + 3) * 100}ms` } as React.CSSProperties}
+                  style={
+                    {
+                      animationDelay: `${(index + 3) * 100}ms`,
+                    } as React.CSSProperties
+                  }
                 />
               ))
             ) : (
-              <p className="text-muted-foreground text-center py-8">No lessons available</p>
+              <p className="text-muted-foreground text-center py-8">
+                No lessons available
+              </p>
             )}
           </div>
         </section>

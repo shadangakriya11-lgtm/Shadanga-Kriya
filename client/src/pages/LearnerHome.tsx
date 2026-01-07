@@ -1,25 +1,29 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { LearnerHeader } from '@/components/learner/LearnerHeader';
-import { BottomNav } from '@/components/learner/BottomNav';
-import { CourseCard } from '@/components/learner/CourseCard';
-import { PaymentModal } from '@/components/learner/PaymentModal';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, Clock, CheckCircle2 } from 'lucide-react';
-import { Course } from '@/types';
-import { useAuth } from '@/contexts/AuthContext';
-import { useCourses, useMyEnrollments } from '@/hooks/useApi';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { LearnerHeader } from "@/components/learner/LearnerHeader";
+import { BottomNav } from "@/components/learner/BottomNav";
+import { CourseCard } from "@/components/learner/CourseCard";
+import { PaymentModal } from "@/components/learner/PaymentModal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { BookOpen, Clock, CheckCircle2, Search, X } from "lucide-react";
+import { Course } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { useCourses, useMyEnrollments } from "@/hooks/useApi";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 export default function LearnerHome() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState("all");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: coursesData, isLoading: coursesLoading } = useCourses();
-  const { data: enrollmentsData, isLoading: enrollmentsLoading } = useMyEnrollments();
+  const { data: enrollmentsData, isLoading: enrollmentsLoading } =
+    useMyEnrollments();
 
   const courses = coursesData?.courses || [];
   const enrollments = enrollmentsData?.enrollments || [];
@@ -31,28 +35,56 @@ export default function LearnerHome() {
       id: course.id,
       title: course.title,
       description: course.description,
-      type: course.type || 'self',
-      status: enrollment ? (enrollment.status === 'completed' ? 'completed' : 'active') : (course.price > 0 ? 'locked' : 'pending'),
+      type: course.type || "self",
+      status: enrollment
+        ? enrollment.status === "completed"
+          ? "completed"
+          : "active"
+        : course.price > 0
+        ? "locked"
+        : "pending",
       progress: enrollment?.progressPercent || 0,
       totalLessons: course.lessonCount || 0,
       completedLessons: enrollment?.completedLessons || 0,
-      duration: course.durationHours ? `${course.durationHours} hours` : '0 min',
+      duration: course.durationHours
+        ? `${course.durationHours} hours`
+        : "0 min",
       price: course.price,
     };
   });
 
-  const activeCourses = mappedCourses.filter((c) => c.status === 'active' || c.status === 'pending');
-  const completedCourses = mappedCourses.filter((c) => c.status === 'completed');
-  const lockedCourses = mappedCourses.filter((c) => c.status === 'locked');
+  const activeCourses = mappedCourses.filter(
+    (c) => c.status === "active" || c.status === "pending"
+  );
+  const completedCourses = mappedCourses.filter(
+    (c) => c.status === "completed"
+  );
+  const lockedCourses = mappedCourses.filter((c) => c.status === "locked");
 
-  const filteredCourses = activeTab === 'all'
-    ? mappedCourses
-    : activeTab === 'active'
-      ? activeCourses
-      : completedCourses;
+  // Filter courses by search query
+  const searchFilteredCourses = useMemo(() => {
+    if (!searchQuery.trim()) return mappedCourses;
+    const query = searchQuery.toLowerCase();
+    return mappedCourses.filter(
+      (course) =>
+        course.title.toLowerCase().includes(query) ||
+        course.description?.toLowerCase().includes(query)
+    );
+  }, [mappedCourses, searchQuery]);
+
+  const filteredCourses = useMemo(() => {
+    const baseList = searchQuery.trim() ? searchFilteredCourses : mappedCourses;
+
+    if (activeTab === "all") return baseList;
+    if (activeTab === "active")
+      return baseList.filter(
+        (c) => c.status === "active" || c.status === "pending"
+      );
+    return baseList.filter((c) => c.status === "completed");
+  }, [activeTab, searchFilteredCourses, mappedCourses, searchQuery]);
 
   const handleCourseClick = (course: Course) => {
-    if (course.status === 'locked' && course.price) {
+    if (course.status === "locked" && course.price) {
       setSelectedCourse(course);
       setIsPaymentOpen(true);
     } else {
@@ -68,7 +100,9 @@ export default function LearnerHome() {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <LearnerHeader userName={user ? `${user.firstName} ${user.lastName}` : 'User'} />
+      <LearnerHeader
+        userName={user ? `${user.firstName} ${user.lastName}` : "User"}
+      />
 
       <main className="px-4 py-6 max-w-3xl mx-auto">
         {/* Welcome Section */}
@@ -77,7 +111,8 @@ export default function LearnerHome() {
             Your Therapy Journey
           </h1>
           <p className="text-muted-foreground">
-            Continue your path to wellness with structured, protocol-driven sessions.
+            Continue your path to wellness with structured, protocol-driven
+            sessions.
           </p>
         </section>
 
@@ -85,27 +120,69 @@ export default function LearnerHome() {
         <section className="grid grid-cols-3 gap-3 mb-8">
           <div className="bg-card rounded-xl border border-border/50 p-4 text-center shadow-soft">
             <BookOpen className="h-5 w-5 text-primary mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{isLoading ? '-' : activeCourses.length}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {isLoading ? "-" : activeCourses.length}
+            </p>
             <p className="text-xs text-muted-foreground">Active</p>
           </div>
           <div className="bg-card rounded-xl border border-border/50 p-4 text-center shadow-soft">
             <Clock className="h-5 w-5 text-warning mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{isLoading ? '-' : lockedCourses.length}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {isLoading ? "-" : lockedCourses.length}
+            </p>
             <p className="text-xs text-muted-foreground">Available</p>
           </div>
           <div className="bg-card rounded-xl border border-border/50 p-4 text-center shadow-soft">
             <CheckCircle2 className="h-5 w-5 text-success mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">{isLoading ? '-' : completedCourses.length}</p>
+            <p className="text-2xl font-bold text-foreground">
+              {isLoading ? "-" : completedCourses.length}
+            </p>
             <p className="text-xs text-muted-foreground">Completed</p>
           </div>
+        </section>
+
+        {/* Search Bar */}
+        <section className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search courses..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-12 pl-12 pr-10 rounded-xl border-2 border-border bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+                onClick={() => setSearchQuery("")}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          {searchQuery && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {filteredCourses.length} course
+              {filteredCourses.length !== 1 ? "s" : ""} found
+            </p>
+          )}
         </section>
 
         {/* Courses Tabs */}
         <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full mb-6">
-            <TabsTrigger value="all" className="flex-1">All Courses</TabsTrigger>
-            <TabsTrigger value="active" className="flex-1">Active</TabsTrigger>
-            <TabsTrigger value="completed" className="flex-1">Completed</TabsTrigger>
+            <TabsTrigger value="all" className="flex-1">
+              All Courses
+            </TabsTrigger>
+            <TabsTrigger value="active" className="flex-1">
+              Active
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="flex-1">
+              Completed
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">

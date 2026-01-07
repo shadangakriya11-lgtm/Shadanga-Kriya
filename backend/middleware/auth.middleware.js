@@ -63,7 +63,7 @@ const requireRole = (...roles) => {
 const isAdmin = requireRole('admin');
 
 // Check if user is facilitator or admin
-const isFacilitatorOrAdmin = requireRole('admin', 'facilitator');
+const isFacilitatorOrAdmin = requireRole('admin', 'facilitator', 'sub_admin');
 
 // Check if user is learner
 const isLearner = requireRole('learner');

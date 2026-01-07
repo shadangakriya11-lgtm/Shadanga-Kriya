@@ -1,11 +1,12 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { Home, BookOpen, TrendingUp, User } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { NavLink, useLocation } from "react-router-dom";
+import { Home, TrendingUp, User, Download } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const navItems = [
-  { icon: Home, label: 'Home', href: '/home' },
-  { icon: TrendingUp, label: 'Dashboard', href: '/dashboard' },
-  { icon: User, label: 'Profile', href: '/profile' },
+  { icon: Home, label: "Home", href: "/home" },
+  { icon: Download, label: "Downloads", href: "/downloads" },
+  { icon: TrendingUp, label: "Dashboard", href: "/dashboard" },
+  { icon: User, label: "Profile", href: "/profile" },
 ];
 
 export function BottomNav() {

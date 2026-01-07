@@ -11,9 +11,11 @@ import {
   Moon,
   Shield,
   Users,
-  BarChart3,
   Star,
   Quote,
+  Download,
+  Headphones,
+  Clock,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useEffect, useState } from "react";
@@ -49,9 +51,9 @@ const testimonials = [
 ];
 
 const stats = [
-  { value: "50K+", label: "Active Practitioners", icon: Users },
+  { value: "10K+", label: "Active Practitioners", icon: Users },
   { value: "98%", label: "Completion Rate", icon: CheckCircle },
-  { value: "500+", label: "Wellness Centers", icon: Heart },
+  { value: "45+", label: "Guided Sessions", icon: Headphones },
   { value: "4.9", label: "User Rating", icon: Star },
 ];
 
@@ -60,22 +62,43 @@ const features = [
     icon: Brain,
     title: "Mindful Audio Sessions",
     description:
-      "Carefully crafted audio content designed to guide you through authentic Shadanga Kriya practices.",
+      "Carefully crafted audio content designed to guide you through authentic Shadanga Kriya practices with expert guidance.",
     gradient: "from-teal-500 to-cyan-500",
   },
   {
     icon: Shield,
     title: "Focused Environment",
     description:
-      "Zero distractions. Our controlled playback ensures you complete each session for maximum benefit.",
+      "Zero distractions. Our controlled playback ensures you complete each session for maximum therapeutic benefit.",
     gradient: "from-amber-500 to-orange-500",
   },
   {
     icon: Sunrise,
     title: "Daily Rituals",
     description:
-      "Establish powerful morning and evening routines with pre-session protocols and guided breathing.",
+      "Establish powerful morning and evening routines with pre-session protocols and guided breathing exercises.",
     gradient: "from-teal-600 to-teal-400",
+  },
+  {
+    icon: Download,
+    title: "Offline Access",
+    description:
+      "Download sessions for offline use. Practice anywhere, anytime - even in airplane mode during your daily routine.",
+    gradient: "from-cyan-500 to-blue-500",
+  },
+  {
+    icon: Clock,
+    title: "Progress Tracking",
+    description:
+      "Monitor your journey with detailed progress tracking. See your growth and maintain consistency in your practice.",
+    gradient: "from-purple-500 to-pink-500",
+  },
+  {
+    icon: Heart,
+    title: "Holistic Healing",
+    description:
+      "Experience complete mind-body transformation through ancient yogic practices adapted for modern life.",
+    gradient: "from-rose-500 to-red-500",
   },
 ];
 
@@ -144,16 +167,16 @@ export default function Index() {
 
       {/* Sticky Header */}
       <header className={`sticky-nav ${isScrolled ? "scrolled" : ""}`}>
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
           <div
-            className="flex items-center gap-4 cursor-pointer group"
+            className="flex items-center gap-2 sm:gap-4 cursor-pointer group"
             onClick={() => navigate("/")}
           >
             <div className="relative">
               <img
                 src="/shadanga-kriya-logo.png"
                 alt="Shadanga Kriya"
-                className="h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                className="h-10 sm:h-14 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
               />
             </div>
           </div>
@@ -177,10 +200,11 @@ export default function Index() {
               Stories
             </a>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
             <Button
               variant="ghost"
+              size="sm"
               onClick={() => navigate("/auth")}
               className="hidden sm:inline-flex hover:text-primary"
             >
@@ -188,9 +212,10 @@ export default function Index() {
             </Button>
             <Button
               onClick={() => navigate("/auth?mode=signup")}
-              className="brand-button-primary text-white px-6 py-2 rounded-full font-medium"
+              className="brand-button-primary text-white px-4 sm:px-6 py-2 rounded-full font-medium text-sm sm:text-base"
             >
-              Get Started
+              <span className="hidden sm:inline">Get Started</span>
+              <span className="sm:hidden">Start</span>
             </Button>
           </div>
         </div>
@@ -319,12 +344,12 @@ export default function Index() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8 mb-16">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
               {features.map((feature, index) => (
                 <div
                   key={index}
                   className="group brand-card p-8 animate-fade-in-up animation-fill-both"
-                  style={{ animationDelay: `${(index + 1) * 150}ms` }}
+                  style={{ animationDelay: `${(index + 1) * 100}ms` }}
                 >
                   <div
                     className={`h-16 w-16 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300`}
@@ -341,122 +366,67 @@ export default function Index() {
               ))}
             </div>
 
-            {/* Platform Cards */}
-            <div className="grid md:grid-cols-3 gap-6">
-              <div className="group brand-card p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-teal-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
-                <div className="relative">
-                  <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    <Brain className="h-7 w-7 text-teal-600 dark:text-teal-400" />
-                  </div>
-                  <h3 className="font-serif text-xl font-semibold text-foreground mb-3">
-                    Learner App
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    Immersive audio therapy with strict playback rules, offline
-                    support, and pre-session breathing protocols.
-                  </p>
-                  <ul className="space-y-3 mb-6">
-                    {[
-                      "Guided meditations",
-                      "Progress tracking",
-                      "Offline access",
-                    ].map((item, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center gap-3 text-sm text-muted-foreground"
-                      >
-                        <CheckCircle className="h-4 w-4 text-primary shrink-0" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    variant="ghost"
-                    className="p-0 h-auto text-primary hover:text-primary/80 group-hover:underline font-medium"
-                    onClick={() => navigate("/auth?role=learner")}
-                  >
-                    Start as Learner{" "}
-                    <ArrowRight className="h-4 w-4 ml-1 inline" />
-                  </Button>
-                </div>
-              </div>
+            {/* App Preview Card */}
+            <div className="max-w-4xl mx-auto">
+              <div className="brand-card p-8 md:p-12 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-teal-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-amber-500/10 to-transparent rounded-full translate-y-1/2 -translate-x-1/2" />
 
-              <div className="group brand-card p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-amber-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
-                <div className="relative">
-                  <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    <BarChart3 className="h-7 w-7 text-amber-600 dark:text-amber-400" />
+                <div className="relative grid md:grid-cols-2 gap-8 items-center">
+                  <div>
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium text-primary">
+                        Available on Android
+                      </span>
+                    </div>
+                    <h3 className="font-serif text-3xl font-bold text-foreground mb-4">
+                      Your Personal
+                      <span className="gradient-text-brand block">
+                        Meditation Guide
+                      </span>
+                    </h3>
+                    <p className="text-muted-foreground mb-6 leading-relaxed">
+                      Download the Shadanga Kriya app and begin your journey to
+                      inner peace. Access guided sessions, track your progress,
+                      and transform your daily routine.
+                    </p>
+                    <ul className="space-y-3 mb-8">
+                      {[
+                        "Guided audio meditations",
+                        "Offline download support",
+                        "Pre-session breathing protocols",
+                        "Detailed progress tracking",
+                        "Distraction-free experience",
+                      ].map((item, i) => (
+                        <li
+                          key={i}
+                          className="flex items-center gap-3 text-sm text-muted-foreground"
+                        >
+                          <CheckCircle className="h-4 w-4 text-primary shrink-0" />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                    <Button
+                      className="brand-button-primary text-white px-8 py-6 text-lg rounded-full font-semibold"
+                      onClick={() => navigate("/auth?mode=signup")}
+                    >
+                      Start Free Today
+                      <ArrowRight className="h-5 w-5 ml-2" />
+                    </Button>
                   </div>
-                  <h3 className="font-serif text-xl font-semibold text-foreground mb-3">
-                    Admin Dashboard
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    Complete control over users, courses, lessons, payments, and
-                    analytics with enterprise-grade tools.
-                  </p>
-                  <ul className="space-y-3 mb-6">
-                    {[
-                      "User management",
-                      "Course control",
-                      "Analytics & reports",
-                    ].map((item, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center gap-3 text-sm text-muted-foreground"
-                      >
-                        <CheckCircle className="h-4 w-4 text-amber-500 shrink-0" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    variant="ghost"
-                    className="p-0 h-auto text-amber-600 dark:text-amber-400 hover:text-amber-500 group-hover:underline font-medium"
-                    onClick={() => navigate("/auth?role=admin")}
-                  >
-                    Access as Admin{" "}
-                    <ArrowRight className="h-4 w-4 ml-1 inline" />
-                  </Button>
-                </div>
-              </div>
 
-              <div className="group brand-card p-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-teal-600/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
-                <div className="relative">
-                  <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-teal-600/20 to-teal-400/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    <Users className="h-7 w-7 text-teal-700 dark:text-teal-300" />
+                  <div className="hidden md:flex items-center justify-center">
+                    <div className="relative">
+                      <div className="absolute inset-0 blur-3xl opacity-30 bg-gradient-to-br from-teal-400 to-amber-400 rounded-full" />
+                      <img
+                        src="/shadanga-kriya-logo.png"
+                        alt="Shadanga Kriya App"
+                        className="relative w-64 h-auto object-contain animate-float-slow"
+                      />
+                    </div>
                   </div>
-                  <h3 className="font-serif text-xl font-semibold text-foreground mb-3">
-                    Facilitator Panel
-                  </h3>
-                  <p className="text-muted-foreground mb-6">
-                    Tablet-friendly interface for facilitators to mark
-                    attendance, supervise sessions, and view reports.
-                  </p>
-                  <ul className="space-y-3 mb-6">
-                    {[
-                      "Attendance tracking",
-                      "Session supervision",
-                      "Progress reports",
-                    ].map((item, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center gap-3 text-sm text-muted-foreground"
-                      >
-                        <CheckCircle className="h-4 w-4 text-teal-600 dark:text-teal-400 shrink-0" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    variant="ghost"
-                    className="p-0 h-auto text-teal-600 dark:text-teal-400 hover:text-teal-500 group-hover:underline font-medium"
-                    onClick={() => navigate("/auth?role=facilitator")}
-                  >
-                    Access as Facilitator{" "}
-                    <ArrowRight className="h-4 w-4 ml-1 inline" />
-                  </Button>
                 </div>
               </div>
             </div>
@@ -572,7 +542,7 @@ export default function Index() {
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
                 <Heart className="h-4 w-4 text-primary animate-pulse" />
                 <span className="text-sm font-medium text-primary">
-                  Start Your Practice Today
+                  Begin Your Practice Today
                 </span>
               </div>
 
@@ -583,9 +553,9 @@ export default function Index() {
                 </span>
               </h2>
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-                Join thousands of practitioners who have discovered inner peace
-                and clarity through Shadanga Kriya. Your transformation starts
-                with a single step.
+                Join practitioners worldwide who have discovered inner peace and
+                clarity through Shadanga Kriya. Your transformation starts with
+                a single step.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Button
@@ -602,7 +572,7 @@ export default function Index() {
                   className="px-10 py-6 text-lg rounded-full border-2 hover:border-primary hover:text-primary"
                   onClick={() => navigate("/auth")}
                 >
-                  Contact Us
+                  Sign In
                 </Button>
               </div>
             </div>
@@ -614,7 +584,7 @@ export default function Index() {
       <footer className="border-t border-border/50 bg-card/50">
         <div className="container mx-auto px-6 py-12">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
-            <div>
+            <div className="md:col-span-2">
               <div className="flex items-center gap-3 mb-4">
                 <img
                   src="/shadanga-kriya-logo.png"
@@ -622,36 +592,46 @@ export default function Index() {
                   className="h-12 w-auto"
                 />
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground max-w-md">
                 Ancient wisdom for modern healing. Experience transformation
-                through authentic practice.
+                through authentic Shadanga Kriya practice. Begin your journey to
+                inner peace today.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold text-foreground mb-4">Platform</h4>
+              <h4 className="font-semibold text-foreground mb-4">
+                Quick Links
+              </h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="hover:text-primary cursor-pointer transition-colors">
-                  Learner App
+                <li>
+                  <a
+                    href="#features"
+                    className="hover:text-primary cursor-pointer transition-colors"
+                  >
+                    Features
+                  </a>
                 </li>
-                <li className="hover:text-primary cursor-pointer transition-colors">
-                  Admin Dashboard
+                <li>
+                  <a
+                    href="#journey"
+                    className="hover:text-primary cursor-pointer transition-colors"
+                  >
+                    How It Works
+                  </a>
                 </li>
-                <li className="hover:text-primary cursor-pointer transition-colors">
-                  Facilitator Panel
+                <li>
+                  <a
+                    href="#testimonials"
+                    className="hover:text-primary cursor-pointer transition-colors"
+                  >
+                    Testimonials
+                  </a>
                 </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-foreground mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="hover:text-primary cursor-pointer transition-colors">
-                  About Us
-                </li>
-                <li className="hover:text-primary cursor-pointer transition-colors">
-                  Our Teachers
-                </li>
-                <li className="hover:text-primary cursor-pointer transition-colors">
-                  Contact
+                <li
+                  className="hover:text-primary cursor-pointer transition-colors"
+                  onClick={() => navigate("/auth?mode=signup")}
+                >
+                  Get Started
                 </li>
               </ul>
             </div>
@@ -665,14 +645,14 @@ export default function Index() {
                   Terms of Service
                 </li>
                 <li className="hover:text-primary cursor-pointer transition-colors">
-                  Cookie Policy
+                  Contact Us
                 </li>
               </ul>
             </div>
           </div>
           <div className="border-t border-border/50 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 Shadanga Kriya. All rights reserved.
+              © {new Date().getFullYear()} Shadanga Kriya. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               <ThemeToggle />

@@ -118,12 +118,33 @@ export function PaymentModal({
             setIsProcessing(false);
           }
         },
+        theme: {
+          color: "#2d9d92",
+        },
         prefill: {
           name: `${user.firstName} ${user.lastName}`,
           email: user.email,
+          contact: user.phone || undefined,
         },
-        theme: {
-          color: "#2d9d92",
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true,
+        },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "UPI",
+                instruments: [{ method: "upi" }],
+              },
+            },
+            sequence: ["upi", "card", "netbanking", "wallet"],
+            preferences: {
+              show_default_blocks: true,
+            },
+          },
         },
         modal: {
           ondismiss: function () {
@@ -152,6 +173,7 @@ export function PaymentModal({
       <DialogContent className="sm:max-w-md">
         {paymentStep === "success" ? (
           <div className="py-8 text-center animate-scale-in">
+            <DialogTitle className="sr-only">Payment Successful</DialogTitle>
             <div className="h-16 w-16 rounded-full bg-success/15 flex items-center justify-center mx-auto mb-4">
               <Check className="h-8 w-8 text-success" />
             </div>
@@ -164,6 +186,7 @@ export function PaymentModal({
           </div>
         ) : paymentStep === "error" ? (
           <div className="py-8 text-center animate-scale-in">
+            <DialogTitle className="sr-only">Payment Failed</DialogTitle>
             <div className="h-16 w-16 rounded-full bg-destructive/15 flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="h-8 w-8 text-destructive" />
             </div>
@@ -177,6 +200,7 @@ export function PaymentModal({
           </div>
         ) : paymentStep === "processing" ? (
           <div className="py-12 text-center">
+            <DialogTitle className="sr-only">Processing Payment</DialogTitle>
             <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
             <h3 className="font-medium text-lg">Initializing Secure Payment</h3>
             <p className="text-muted-foreground">

@@ -337,6 +337,220 @@ const endSession = async (req, res) => {
   }
 };
 
+// Get available sessions for learners (scheduled, not full)
+const getAvailableSessions = async (req, res) => {
+  try {
+    const { courseId } = req.query;
+
+    let query = `
+      SELECT s.*, 
+             c.title as course_title,
+             u.first_name as facilitator_first_name,
+             u.last_name as facilitator_last_name,
+             COUNT(DISTINCT sb.id) as booked_count,
+             EXISTS(SELECT 1 FROM session_bookings WHERE session_id = s.id AND user_id = $1) as is_booked
+       FROM sessions s
+       JOIN courses c ON s.course_id = c.id
+       LEFT JOIN users u ON s.facilitator_id = u.id
+       LEFT JOIN session_bookings sb ON sb.session_id = s.id AND sb.status = 'booked'
+       WHERE s.status = 'scheduled' AND s.scheduled_at > NOW()
+    `;
+    const params = [req.user.id];
+    let paramIndex = 2;
+
+    if (courseId) {
+      query += ` AND s.course_id = $${paramIndex}`;
+      params.push(courseId);
+      paramIndex++;
+    }
+
+    query += ` GROUP BY s.id, c.title, u.first_name, u.last_name ORDER BY s.scheduled_at ASC`;
+
+    const result = await pool.query(query, params);
+
+    const sessions = result.rows.map(s => ({
+      id: s.id,
+      courseId: s.course_id,
+      courseTitle: s.course_title,
+      facilitatorName: s.facilitator_first_name ? `${s.facilitator_first_name} ${s.facilitator_last_name}` : null,
+      title: s.title,
+      description: s.description,
+      scheduledAt: s.scheduled_at,
+      durationMinutes: s.duration_minutes,
+      location: s.location,
+      maxParticipants: s.max_participants,
+      bookedCount: parseInt(s.booked_count),
+      availableSpots: s.max_participants - parseInt(s.booked_count),
+      isBooked: s.is_booked,
+      status: s.status
+    }));
+
+    res.json({ sessions });
+  } catch (error) {
+    console.error('Get available sessions error:', error);
+    res.status(500).json({ error: 'Failed to get available sessions' });
+  }
+};
+
+// Book a session (learner)
+const bookSession = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check if session exists and is available
+    const sessionResult = await pool.query(
+      `SELECT s.*, COUNT(sb.id) as booked_count
+       FROM sessions s
+       LEFT JOIN session_bookings sb ON sb.session_id = s.id AND sb.status = 'booked'
+       WHERE s.id = $1
+       GROUP BY s.id`,
+      [id]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const session = sessionResult.rows[0];
+
+    if (session.status !== 'scheduled') {
+      return res.status(400).json({ error: 'Session is not available for booking' });
+    }
+
+    if (new Date(session.scheduled_at) < new Date()) {
+      return res.status(400).json({ error: 'Session has already started' });
+    }
+
+    if (parseInt(session.booked_count) >= session.max_participants) {
+      return res.status(400).json({ error: 'Session is full' });
+    }
+
+    // Check if already booked
+    const existingBooking = await pool.query(
+      `SELECT id FROM session_bookings WHERE session_id = $1 AND user_id = $2 AND status = 'booked'`,
+      [id, userId]
+    );
+
+    if (existingBooking.rows.length > 0) {
+      return res.status(400).json({ error: 'You have already booked this session' });
+    }
+
+    // Create booking
+    const result = await pool.query(
+      `INSERT INTO session_bookings (session_id, user_id, status)
+       VALUES ($1, $2, 'booked')
+       ON CONFLICT (session_id, user_id) 
+       DO UPDATE SET status = 'booked', cancelled_at = NULL, booked_at = NOW()
+       RETURNING *`,
+      [id, userId]
+    );
+
+    // Also add to attendance table with pending status
+    await pool.query(
+      `INSERT INTO attendance (session_id, user_id, status)
+       VALUES ($1, $2, 'pending')
+       ON CONFLICT (session_id, user_id) DO NOTHING`,
+      [id, userId]
+    );
+
+    res.status(201).json({
+      message: 'Session booked successfully',
+      booking: {
+        id: result.rows[0].id,
+        sessionId: id,
+        bookedAt: result.rows[0].booked_at
+      }
+    });
+  } catch (error) {
+    console.error('Book session error:', error);
+    res.status(500).json({ error: 'Failed to book session' });
+  }
+};
+
+// Cancel booking (learner)
+const cancelBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    // Check if session hasn't started
+    const sessionResult = await pool.query(
+      `SELECT s.scheduled_at FROM sessions s
+       JOIN session_bookings sb ON sb.session_id = s.id
+       WHERE sb.session_id = $1 AND sb.user_id = $2 AND sb.status = 'booked'`,
+      [id, userId]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (new Date(sessionResult.rows[0].scheduled_at) < new Date()) {
+      return res.status(400).json({ error: 'Cannot cancel booking for a session that has started' });
+    }
+
+    // Cancel the booking
+    await pool.query(
+      `UPDATE session_bookings SET status = 'cancelled', cancelled_at = NOW()
+       WHERE session_id = $1 AND user_id = $2`,
+      [id, userId]
+    );
+
+    // Remove from attendance
+    await pool.query(
+      `DELETE FROM attendance WHERE session_id = $1 AND user_id = $2 AND status = 'pending'`,
+      [id, userId]
+    );
+
+    res.json({ message: 'Booking cancelled successfully' });
+  } catch (error) {
+    console.error('Cancel booking error:', error);
+    res.status(500).json({ error: 'Failed to cancel booking' });
+  }
+};
+
+// Get my bookings (learner)
+const getMyBookings = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const result = await pool.query(
+      `SELECT sb.*, 
+              s.title as session_title, s.description as session_description,
+              s.scheduled_at, s.duration_minutes, s.location, s.status as session_status,
+              c.title as course_title,
+              u.first_name as facilitator_first_name, u.last_name as facilitator_last_name
+       FROM session_bookings sb
+       JOIN sessions s ON sb.session_id = s.id
+       JOIN courses c ON s.course_id = c.id
+       LEFT JOIN users u ON s.facilitator_id = u.id
+       WHERE sb.user_id = $1 AND sb.status = 'booked'
+       ORDER BY s.scheduled_at ASC`,
+      [userId]
+    );
+
+    const bookings = result.rows.map(b => ({
+      id: b.id,
+      sessionId: b.session_id,
+      sessionTitle: b.session_title,
+      sessionDescription: b.session_description,
+      courseTitle: b.course_title,
+      facilitatorName: b.facilitator_first_name ? `${b.facilitator_first_name} ${b.facilitator_last_name}` : null,
+      scheduledAt: b.scheduled_at,
+      durationMinutes: b.duration_minutes,
+      location: b.location,
+      sessionStatus: b.session_status,
+      bookedAt: b.booked_at
+    }));
+
+    res.json({ bookings });
+  } catch (error) {
+    console.error('Get my bookings error:', error);
+    res.status(500).json({ error: 'Failed to get bookings' });
+  }
+};
+
 module.exports = {
   getAllSessions,
   getMySessions,
@@ -345,5 +559,9 @@ module.exports = {
   updateSession,
   deleteSession,
   startSession,
-  endSession
+  endSession,
+  getAvailableSessions,
+  bookSession,
+  cancelBooking,
+  getMyBookings
 };

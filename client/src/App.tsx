@@ -12,9 +12,10 @@ import {
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
 import Splash from "./pages/Splash";
 import LearnerLogin from "./pages/LearnerLogin";
 import LearnerHome from "./pages/LearnerHome";
@@ -42,7 +43,12 @@ import FacilitatorReports from "./pages/FacilitatorReports";
 import FacilitatorNotifications from "./pages/FacilitatorNotifications";
 import FacilitatorMonitoring from "./pages/FacilitatorMonitoring";
 import FacilitatorCourses from "./pages/FacilitatorCourses";
+import DownloadsPage from "./pages/learner/DownloadsPage";
 import NotFound from "./pages/NotFound";
+import About from "./pages/About";
+import VisionMission from "./pages/VisionMission";
+import Gallery from "./pages/Gallery";
+import Contact from "./pages/Contact";
 
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
@@ -50,8 +56,9 @@ import { App as CapApp, BackButtonListenerEvent } from "@capacitor/app";
 
 // Configure status bar for native platforms
 if (Capacitor.isNativePlatform()) {
-  StatusBar.setOverlaysWebView({ overlay: true });
-  StatusBar.setStyle({ style: Style.Dark });
+  // Don't overlay webview - this prevents content from going behind status bar
+  StatusBar.setOverlaysWebView({ overlay: false });
+  StatusBar.setStyle({ style: Style.Light });
   StatusBar.setBackgroundColor({ color: "#0d4744" }); // Teal background
 }
 
@@ -75,11 +82,39 @@ const NotificationPage = () => {
  * The canGoBack property in BackButtonListenerEvent indicates whether
  * the browser can go back in history.
  */
+// Toast component for exit warning
+const ExitToast = ({ visible }: { visible: boolean }) => {
+  if (!visible) return null;
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: "80px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        color: "white",
+        padding: "12px 24px",
+        borderRadius: "8px",
+        fontSize: "14px",
+        zIndex: 9999,
+        animation: "fadeIn 0.2s ease-out",
+      }}
+    >
+      Press back again to exit
+    </div>
+  );
+};
+
 const BackButtonHandler = () => {
   const navigate = useNavigate();
   const location = useLocation();
   // Use ref to always have current pathname in the listener
   const currentPathRef = useRef(location.pathname);
+  // Track last back press time for double-tap to exit
+  const lastBackPressRef = useRef<number>(0);
+  // State for showing exit toast
+  const [showExitToast, setShowExitToast] = React.useState(false);
 
   // Keep ref updated with current path
   useEffect(() => {
@@ -90,6 +125,30 @@ const BackButtonHandler = () => {
     if (!Capacitor.isNativePlatform()) return;
 
     let handler: { remove: () => Promise<void> } | null = null;
+    let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const handleDoubleBackExit = () => {
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastBackPressRef.current;
+      const EXIT_TIMEOUT = 2000; // 2 seconds window for double-tap
+
+      if (timeDiff < EXIT_TIMEOUT) {
+        // Second back press within timeout - exit app
+        console.log("[BackButton] Double back detected - exiting app");
+        CapApp.exitApp();
+      } else {
+        // First back press - show toast and wait for second
+        console.log("[BackButton] First back press - showing exit toast");
+        lastBackPressRef.current = currentTime;
+        setShowExitToast(true);
+
+        // Hide toast after timeout
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          setShowExitToast(false);
+        }, EXIT_TIMEOUT);
+      }
+    };
 
     const setupListener = async () => {
       handler = await CapApp.addListener(
@@ -97,7 +156,7 @@ const BackButtonHandler = () => {
         ({ canGoBack }: BackButtonListenerEvent) => {
           const currentPath = currentPathRef.current;
 
-          // Define home/root pages where back should exit/minimize app
+          // Define home/root pages where back should trigger double-tap exit
           const rootPages = [
             "/",
             "/home",
@@ -118,9 +177,8 @@ const BackButtonHandler = () => {
           );
 
           if (isRootPage) {
-            // On root page - minimize app (Android only per docs)
-            console.log("[BackButton] Minimizing app on root page");
-            CapApp.minimizeApp();
+            // On root page - use double-back to exit (standard Android behavior)
+            handleDoubleBackExit();
           } else if (canGoBack) {
             // Use browser history if canGoBack is true (per Capacitor docs)
             console.log("[BackButton] Going back in history");
@@ -143,14 +201,17 @@ const BackButtonHandler = () => {
     setupListener();
 
     return () => {
-      // Cleanup: remove listener when component unmounts
+      // Cleanup: remove listener and clear timeout when component unmounts
       if (handler) {
         handler.remove();
+      }
+      if (toastTimeout) {
+        clearTimeout(toastTimeout);
       }
     };
   }, [navigate]); // Only depend on navigate, use ref for pathname
 
-  return null;
+  return <ExitToast visible={showExitToast} />;
 };
 
 const AppContent = () => (
@@ -166,8 +227,15 @@ const AppContent = () => (
               {/* Landing */}
               <Route path="/" element={<Index />} />
 
+              {/* Public Pages */}
+              <Route path="/about" element={<About />} />
+              <Route path="/vision-mission" element={<VisionMission />} />
+              <Route path="/gallery" element={<Gallery />} />
+              <Route path="/contact" element={<Contact />} />
+
               {/* Auth */}
               <Route path="/auth" element={<Auth />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
 
               {/* Learner Routes */}
               <Route path="/splash" element={<Splash />} />
@@ -216,6 +284,14 @@ const AppContent = () => (
                 element={
                   <ProtectedRoute allowedRoles={["learner"]}>
                     <LearnerNotifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/downloads"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <DownloadsPage />
                   </ProtectedRoute>
                 }
               />
@@ -296,7 +372,7 @@ const AppContent = () => (
               <Route
                 path="/admin/analytics"
                 element={
-                  <ProtectedRoute allowedRoles={["admin"]}>
+                  <ProtectedRoute allowedRoles={["admin", "sub_admin"]}>
                     <AdminAnalytics />
                   </ProtectedRoute>
                 }
@@ -322,7 +398,7 @@ const AppContent = () => (
               <Route
                 path="/facilitator"
                 element={
-                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                  <ProtectedRoute allowedRoles={["facilitator", "sub_admin"]}>
                     <FacilitatorDashboard />
                   </ProtectedRoute>
                 }
@@ -330,7 +406,7 @@ const AppContent = () => (
               <Route
                 path="/facilitator/courses"
                 element={
-                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                  <ProtectedRoute allowedRoles={["facilitator", "sub_admin"]}>
                     <FacilitatorCourses />
                   </ProtectedRoute>
                 }
@@ -338,7 +414,7 @@ const AppContent = () => (
               <Route
                 path="/facilitator/attendance"
                 element={
-                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                  <ProtectedRoute allowedRoles={["facilitator", "sub_admin"]}>
                     <FacilitatorAttendance />
                   </ProtectedRoute>
                 }
@@ -346,7 +422,7 @@ const AppContent = () => (
               <Route
                 path="/facilitator/sessions"
                 element={
-                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                  <ProtectedRoute allowedRoles={["facilitator", "sub_admin"]}>
                     <FacilitatorSessions />
                   </ProtectedRoute>
                 }
@@ -354,7 +430,9 @@ const AppContent = () => (
               <Route
                 path="/notifications"
                 element={
-                  <ProtectedRoute allowedRoles={["learner", "facilitator"]}>
+                  <ProtectedRoute
+                    allowedRoles={["learner", "facilitator", "sub_admin"]}
+                  >
                     <NotificationPage />
                   </ProtectedRoute>
                 }
@@ -362,7 +440,7 @@ const AppContent = () => (
               <Route
                 path="/facilitator/reports"
                 element={
-                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                  <ProtectedRoute allowedRoles={["facilitator", "sub_admin"]}>
                     <FacilitatorReports />
                   </ProtectedRoute>
                 }
@@ -370,7 +448,7 @@ const AppContent = () => (
               <Route
                 path="/facilitator/monitoring"
                 element={
-                  <ProtectedRoute allowedRoles={["facilitator"]}>
+                  <ProtectedRoute allowedRoles={["facilitator", "sub_admin"]}>
                     <FacilitatorMonitoring />
                   </ProtectedRoute>
                 }

@@ -1,5 +1,9 @@
 import { Capacitor } from "@capacitor/core";
 
+interface HeadphoneDetectionPlugin {
+  isConnected: () => Promise<{ isConnected: boolean }>;
+}
+
 /**
  * Check if the device is in airplane/flight mode
  * Note: This feature is platform-specific and may have limitations
@@ -45,49 +49,83 @@ export async function isAirplaneModeEnabled(): Promise<boolean> {
  * Check if earphones/headphones are connected
  */
 export async function areEarphonesConnected(): Promise<boolean> {
-  // For web, we can use Web Audio API to detect audio output devices
-  if (!Capacitor.isNativePlatform()) {
+  // For native Android, use the native HeadphoneDetection plugin
+  if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
     try {
-      // Request permission to enumerate devices
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioOutputs = devices.filter(
-        (device) => device.kind === "audiooutput"
-      );
-
-      // Check if there are any audio output devices besides the default speaker
-      // This is a heuristic - not perfect but works in most cases
-      return (
-        audioOutputs.length > 1 ||
-        audioOutputs.some(
-          (device) =>
-            device.label.toLowerCase().includes("headphone") ||
-            device.label.toLowerCase().includes("earphone") ||
-            device.label.toLowerCase().includes("headset") ||
-            device.label.toLowerCase().includes("bluetooth")
-        )
-      );
+      const { registerPlugin } = await import("@capacitor/core");
+      const HeadphoneDetection = registerPlugin<HeadphoneDetectionPlugin>("HeadphoneDetection");
+      const result = await HeadphoneDetection.isConnected();
+      console.log("Native headphone detection result:", result);
+      return result.isConnected === true;
     } catch (error) {
-      console.error("Error checking earphones on web:", error);
-      return false;
+      console.error("Native headphone detection failed, falling back to web API:", error);
+      // Fall through to web detection
     }
   }
 
+  // Web/fallback detection
   try {
-    // For native platforms, we need a custom plugin or check audio route
-    // As a fallback, we'll use a manual confirmation approach
+    // Request permission to enumerate devices (required on most browsers)
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (permError) {
+      console.warn("Could not get audio permission:", permError);
+    }
 
-    // Check if audio output route has changed
-    // This would require a native plugin for accurate detection
-    // For now, return false to prompt manual confirmation
-    console.warn("Native earphone detection requires additional setup");
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const audioOutputs = devices.filter(
+      (device) => device.kind === "audiooutput"
+    );
+
+    console.log("Audio output devices:", audioOutputs.map(d => d.label || d.deviceId));
+
+    const hasExternalAudio = audioOutputs.some((device) => {
+      const label = device.label.toLowerCase();
+      return (
+        label.includes("headphone") ||
+        label.includes("earphone") ||
+        label.includes("headset") ||
+        label.includes("bluetooth") ||
+        label.includes("airpod") ||
+        label.includes("wired") ||
+        label.includes("external") ||
+        label.includes("usb")
+      );
+    });
+
+    if (hasExternalAudio) {
+      return true;
+    }
+
+    if (audioOutputs.length > 2) {
+      return true;
+    }
+
+    const audioInputs = devices.filter(
+      (device) => device.kind === "audioinput"
+    );
+
+    const hasHeadsetMic = audioInputs.some((device) => {
+      const label = device.label.toLowerCase();
+      return (
+        label.includes("headset") ||
+        label.includes("wired") ||
+        label.includes("headphone") ||
+        label.includes("bluetooth")
+      );
+    });
+
+    if (hasHeadsetMic) {
+      return true;
+    }
+
     return false;
   } catch (error) {
     console.error("Error checking earphones:", error);
     return false;
   }
 }
+
 
 /**
  * Monitor network status changes

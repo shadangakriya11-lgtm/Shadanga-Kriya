@@ -215,8 +215,8 @@ const getUserAttendanceHistory = async (req, res) => {
       total: history.length,
       present: history.filter(a => a.status === 'present').length,
       absent: history.filter(a => a.status === 'absent').length,
-      attendanceRate: history.length > 0 
-        ? Math.round((history.filter(a => a.status === 'present').length / history.length) * 100) 
+      attendanceRate: history.length > 0
+        ? Math.round((history.filter(a => a.status === 'present').length / history.length) * 100)
         : 0
     };
 
@@ -227,11 +227,123 @@ const getUserAttendanceHistory = async (req, res) => {
   }
 };
 
+// Get learner's own attendance for a course (check if marked present today)
+const getMyAttendance = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const userId = req.user.id;
+
+    // Get today's date range
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Check if there's a session today for this course and if user is marked present
+    const result = await pool.query(
+      `SELECT a.id, a.status, a.marked_at, s.id as session_id, s.title as session_title, s.scheduled_at
+       FROM sessions s
+       LEFT JOIN attendance a ON a.session_id = s.id AND a.user_id = $1
+       WHERE s.course_id = $2 
+         AND s.scheduled_at >= $3 
+         AND s.scheduled_at < $4
+       ORDER BY s.scheduled_at DESC
+       LIMIT 1`,
+      [userId, courseId, today, tomorrow]
+    );
+
+    if (result.rows.length === 0) {
+      return res.json({
+        hasSessionToday: false,
+        isMarkedPresent: false,
+        message: 'No session scheduled for today'
+      });
+    }
+
+    const session = result.rows[0];
+    const isMarkedPresent = session.status === 'present';
+
+    res.json({
+      hasSessionToday: true,
+      sessionId: session.session_id,
+      sessionTitle: session.session_title,
+      scheduledAt: session.scheduled_at,
+      isMarkedPresent,
+      markedAt: session.marked_at,
+      message: isMarkedPresent
+        ? 'Attendance confirmed for today'
+        : 'Please contact your facilitator to mark your attendance'
+    });
+  } catch (error) {
+    console.error('Get my attendance error:', error);
+    res.status(500).json({ error: 'Failed to get attendance status' });
+  }
+};
+
+// Export attendance as CSV
+const exportAttendance = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // Get session info
+    const sessionResult = await pool.query(
+      `SELECT s.title, s.scheduled_at, c.title as course_title
+       FROM sessions s
+       JOIN courses c ON s.course_id = c.id
+       WHERE s.id = $1`,
+      [sessionId]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const session = sessionResult.rows[0];
+
+    // Get attendance records
+    const result = await pool.query(
+      `SELECT a.status, a.marked_at, u.first_name, u.last_name, u.email
+       FROM attendance a
+       JOIN users u ON a.user_id = u.id
+       WHERE a.session_id = $1
+       ORDER BY u.last_name, u.first_name`,
+      [sessionId]
+    );
+
+    // Generate CSV
+    const headers = ['Name', 'Email', 'Status', 'Marked At'];
+    const csvData = result.rows.map(a => [
+      `${a.first_name} ${a.last_name}`,
+      a.email,
+      a.status,
+      a.marked_at ? new Date(a.marked_at).toLocaleString() : 'N/A'
+    ]);
+
+    const csvContent = [
+      `# Attendance Report - ${session.course_title}`,
+      `# Session: ${session.title}`,
+      `# Date: ${new Date(session.scheduled_at).toLocaleDateString()}`,
+      '',
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance_${sessionId}_${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Export attendance error:', error);
+    res.status(500).json({ error: 'Failed to export attendance' });
+  }
+};
+
 module.exports = {
   getSessionAttendance,
   addAttendee,
   markAttendance,
   bulkMarkAttendance,
   removeAttendee,
-  getUserAttendanceHistory
+  getUserAttendanceHistory,
+  getMyAttendance,
+  exportAttendance
 };

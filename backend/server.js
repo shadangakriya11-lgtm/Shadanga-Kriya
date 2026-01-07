@@ -16,6 +16,9 @@ const attendanceRoutes = require('./routes/attendance.routes.js');
 const analyticsRoutes = require('./routes/analytics.routes.js');
 const settingsRoutes = require('./routes/settings.routes.js');
 const notificationRoutes = require('./routes/notification.routes.js');
+const certificateRoutes = require('./routes/certificate.routes.js');
+const exportRoutes = require('./routes/export.routes.js');
+const downloadRoutes = require('./routes/download.routes.js');
 
 const app = express();
 
@@ -101,6 +104,9 @@ app.use('/api/attendance', attendanceRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/certificates', certificateRoutes);
+app.use('/api/exports', exportRoutes);
+app.use('/api/downloads', downloadRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

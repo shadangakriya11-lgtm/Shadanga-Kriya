@@ -235,9 +235,150 @@ const getAllProgress = async (req, res) => {
   }
 };
 
+// Grant extra pause attempts to a user for a lesson (admin)
+const grantExtraPause = async (req, res) => {
+  try {
+    const { userId, lessonId } = req.params;
+    const { additionalPauses = 1 } = req.body;
+
+    // Get current lesson max pauses
+    const lessonResult = await pool.query(
+      'SELECT max_pauses FROM lessons WHERE id = $1',
+      [lessonId]
+    );
+
+    if (lessonResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    // Update or insert lesson progress with reduced pauses_used count
+    const result = await pool.query(
+      `INSERT INTO lesson_progress (user_id, lesson_id, pauses_used, completed)
+       VALUES ($1, $2, 0, false)
+       ON CONFLICT (user_id, lesson_id) 
+       DO UPDATE SET 
+         pauses_used = GREATEST(0, lesson_progress.pauses_used - $3),
+         updated_at = NOW()
+       RETURNING *`,
+      [userId, lessonId, additionalPauses]
+    );
+
+    // Log the action
+    console.log(`Admin ${req.user.id} granted ${additionalPauses} extra pause(s) to user ${userId} for lesson ${lessonId}`);
+
+    res.json({
+      message: `Granted ${additionalPauses} extra pause(s)`,
+      progress: {
+        pausesUsed: result.rows[0].pauses_used,
+        lessonId: result.rows[0].lesson_id,
+        userId: result.rows[0].user_id
+      }
+    });
+  } catch (error) {
+    console.error('Grant extra pause error:', error);
+    res.status(500).json({ error: 'Failed to grant extra pause' });
+  }
+};
+
+// Reset lesson progress for a user (admin)
+const resetLessonProgress = async (req, res) => {
+  try {
+    const { userId, lessonId } = req.params;
+
+    // Get lesson info to find course
+    const lessonResult = await pool.query(
+      'SELECT course_id FROM lessons WHERE id = $1',
+      [lessonId]
+    );
+
+    if (lessonResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    const courseId = lessonResult.rows[0].course_id;
+
+    // Delete the lesson progress
+    await pool.query(
+      'DELETE FROM lesson_progress WHERE user_id = $1 AND lesson_id = $2',
+      [userId, lessonId]
+    );
+
+    // Recalculate enrollment progress
+    const progressStats = await pool.query(
+      `SELECT 
+         COUNT(*) as total,
+         COUNT(*) FILTER (WHERE lp.completed = true) as completed
+       FROM lessons l
+       LEFT JOIN lesson_progress lp ON lp.lesson_id = l.id AND lp.user_id = $1
+       WHERE l.course_id = $2`,
+      [userId, courseId]
+    );
+
+    const { total, completed } = progressStats.rows[0];
+    const progressPercent = parseInt(total) > 0 ? Math.round((parseInt(completed) / parseInt(total)) * 100) : 0;
+
+    await pool.query(
+      `UPDATE enrollments 
+       SET progress_percent = $1,
+           completed_at = CASE WHEN $1 < 100 THEN NULL ELSE completed_at END
+       WHERE user_id = $2 AND course_id = $3`,
+      [progressPercent, userId, courseId]
+    );
+
+    // Log the action
+    console.log(`Admin ${req.user.id} reset lesson ${lessonId} progress for user ${userId}`);
+
+    res.json({
+      message: 'Lesson progress reset successfully',
+      courseProgressPercent: progressPercent
+    });
+  } catch (error) {
+    console.error('Reset lesson progress error:', error);
+    res.status(500).json({ error: 'Failed to reset lesson progress' });
+  }
+};
+
+// Lock a lesson for a user (admin) - sets to interrupted status
+const lockLesson = async (req, res) => {
+  try {
+    const { userId, lessonId } = req.params;
+
+    // Update lesson progress to locked/interrupted status
+    const result = await pool.query(
+      `INSERT INTO lesson_progress (user_id, lesson_id, status, locked)
+       VALUES ($1, $2, 'interrupted', true)
+       ON CONFLICT (user_id, lesson_id) 
+       DO UPDATE SET 
+         status = 'interrupted',
+         locked = true,
+         updated_at = NOW()
+       RETURNING *`,
+      [userId, lessonId]
+    );
+
+    // Log the action
+    console.log(`Admin ${req.user.id} locked lesson ${lessonId} for user ${userId}`);
+
+    res.json({
+      message: 'Lesson locked successfully',
+      progress: {
+        lessonId: result.rows[0].lesson_id,
+        userId: result.rows[0].user_id,
+        locked: result.rows[0].locked
+      }
+    });
+  } catch (error) {
+    console.error('Lock lesson error:', error);
+    res.status(500).json({ error: 'Failed to lock lesson' });
+  }
+};
+
 module.exports = {
   getCourseProgress,
   updateLessonProgress,
   getOverallProgress,
-  getAllProgress
+  getAllProgress,
+  grantExtraPause,
+  resetLessonProgress,
+  lockLesson
 };

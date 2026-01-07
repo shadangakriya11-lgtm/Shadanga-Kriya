@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   coursesApi,
   lessonsApi,
@@ -9,21 +9,21 @@ import {
   attendanceApi,
   analyticsApi,
   usersApi,
-  notificationsApi
-} from '@/lib/api';
-import { toast } from '@/hooks/use-toast';
+  notificationsApi,
+} from "@/lib/api";
+import { toast } from "@/hooks/use-toast";
 
 // Courses hooks
 export function useCourses(params?: Record<string, string>) {
   return useQuery({
-    queryKey: ['courses', params],
+    queryKey: ["courses", params],
     queryFn: () => coursesApi.getAll(params),
   });
 }
 
 export function useCourse(id: string) {
   return useQuery({
-    queryKey: ['course', id],
+    queryKey: ["course", id],
     queryFn: () => coursesApi.getById(id),
     enabled: !!id,
   });
@@ -31,7 +31,7 @@ export function useCourse(id: string) {
 
 export function useCourseStats() {
   return useQuery({
-    queryKey: ['courseStats'],
+    queryKey: ["courseStats"],
     queryFn: () => coursesApi.getStats(),
   });
 }
@@ -41,11 +41,15 @@ export function useCreateCourse() {
   return useMutation({
     mutationFn: coursesApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['courses'] });
-      toast({ title: 'Course created successfully' });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: "Course created successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to create course', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to create course",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -53,13 +57,18 @@ export function useCreateCourse() {
 export function useUpdateCourse() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => coursesApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      coursesApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['courses'] });
-      toast({ title: 'Course updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: "Course updated successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to update course', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to update course",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -69,11 +78,15 @@ export function useDeleteCourse() {
   return useMutation({
     mutationFn: coursesApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['courses'] });
-      toast({ title: 'Course deleted successfully' });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: "Course deleted successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to delete course', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to delete course",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -81,7 +94,7 @@ export function useDeleteCourse() {
 // Lessons hooks
 export function useLessonsByCourse(courseId: string) {
   return useQuery({
-    queryKey: ['lessons', courseId],
+    queryKey: ["lessons", courseId],
     queryFn: () => lessonsApi.getByCourse(courseId),
     enabled: !!courseId,
   });
@@ -89,7 +102,7 @@ export function useLessonsByCourse(courseId: string) {
 
 export function useLesson(id: string) {
   return useQuery({
-    queryKey: ['lesson', id],
+    queryKey: ["lesson", id],
     queryFn: () => lessonsApi.getById(id),
     enabled: !!id,
   });
@@ -100,11 +113,15 @@ export function useCreateLesson() {
   return useMutation({
     mutationFn: lessonsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
-      toast({ title: 'Lesson created successfully' });
+      queryClient.invalidateQueries({ queryKey: ["lessons"] });
+      toast({ title: "Lesson created successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to create lesson', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to create lesson",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -112,13 +129,18 @@ export function useCreateLesson() {
 export function useUpdateLesson() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => lessonsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      lessonsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
-      toast({ title: 'Lesson updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ["lessons"] });
+      toast({ title: "Lesson updated successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to update lesson', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to update lesson",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -128,11 +150,15 @@ export function useDeleteLesson() {
   return useMutation({
     mutationFn: lessonsApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lessons'] });
-      toast({ title: 'Lesson deleted successfully' });
+      queryClient.invalidateQueries({ queryKey: ["lessons"] });
+      toast({ title: "Lesson deleted successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to delete lesson', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to delete lesson",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -140,21 +166,21 @@ export function useDeleteLesson() {
 // Enrollments hooks
 export function useMyEnrollments() {
   return useQuery({
-    queryKey: ['myEnrollments'],
+    queryKey: ["myEnrollments"],
     queryFn: () => enrollmentsApi.getMy(),
   });
 }
 
 export function useAllEnrollments() {
   return useQuery({
-    queryKey: ['allEnrollments'],
+    queryKey: ["allEnrollments"],
     queryFn: () => enrollmentsApi.getAll(),
   });
 }
 
 export function useEnrollmentStats() {
   return useQuery({
-    queryKey: ['enrollmentStats'],
+    queryKey: ["enrollmentStats"],
     queryFn: () => enrollmentsApi.getStats(),
   });
 }
@@ -164,12 +190,16 @@ export function useEnroll() {
   return useMutation({
     mutationFn: enrollmentsApi.enroll,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myEnrollments'] });
-      queryClient.invalidateQueries({ queryKey: ['courses'] });
-      toast({ title: 'Enrolled successfully!' });
+      queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: "Enrolled successfully!" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to enroll', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to enroll",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -179,11 +209,15 @@ export function useUnenroll() {
   return useMutation({
     mutationFn: enrollmentsApi.unenroll,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myEnrollments'] });
-      toast({ title: 'Unenrolled successfully' });
+      queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
+      toast({ title: "Unenrolled successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to unenroll', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to unenroll",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -191,14 +225,14 @@ export function useUnenroll() {
 // Progress hooks
 export function useMyProgress() {
   return useQuery({
-    queryKey: ['myProgress'],
+    queryKey: ["myProgress"],
     queryFn: () => progressApi.getMy(),
   });
 }
 
 export function useCourseProgress(courseId: string) {
   return useQuery({
-    queryKey: ['courseProgress', courseId],
+    queryKey: ["courseProgress", courseId],
     queryFn: () => progressApi.getCourse(courseId),
     enabled: !!courseId,
   });
@@ -210,8 +244,8 @@ export function useUpdateLessonProgress() {
     mutationFn: ({ lessonId, data }: { lessonId: string; data: any }) =>
       progressApi.updateLesson(lessonId, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myProgress'] });
-      queryClient.invalidateQueries({ queryKey: ['courseProgress'] });
+      queryClient.invalidateQueries({ queryKey: ["myProgress"] });
+      queryClient.invalidateQueries({ queryKey: ["courseProgress"] });
     },
   });
 }
@@ -219,21 +253,21 @@ export function useUpdateLessonProgress() {
 // Payments hooks
 export function useMyPayments() {
   return useQuery({
-    queryKey: ['myPayments'],
+    queryKey: ["myPayments"],
     queryFn: () => paymentsApi.getMy(),
   });
 }
 
 export function useAllPayments() {
   return useQuery({
-    queryKey: ['allPayments'],
+    queryKey: ["allPayments"],
     queryFn: () => paymentsApi.getAll(),
   });
 }
 
 export function usePaymentStats() {
   return useQuery({
-    queryKey: ['paymentStats'],
+    queryKey: ["paymentStats"],
     queryFn: () => paymentsApi.getStats(),
   });
 }
@@ -241,15 +275,24 @@ export function usePaymentStats() {
 export function useCreatePayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ courseId, paymentMethod }: { courseId: string; paymentMethod?: string }) =>
-      paymentsApi.create(courseId, paymentMethod),
+    mutationFn: ({
+      courseId,
+      paymentMethod,
+    }: {
+      courseId: string;
+      paymentMethod?: string;
+    }) => paymentsApi.create(courseId, paymentMethod),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myPayments'] });
-      queryClient.invalidateQueries({ queryKey: ['myEnrollments'] });
-      toast({ title: 'Payment initiated' });
+      queryClient.invalidateQueries({ queryKey: ["myPayments"] });
+      queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
+      toast({ title: "Payment initiated" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Payment failed', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Payment failed",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -259,12 +302,16 @@ export function useCompletePayment() {
   return useMutation({
     mutationFn: paymentsApi.complete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myPayments'] });
-      queryClient.invalidateQueries({ queryKey: ['myEnrollments'] });
-      toast({ title: 'Payment completed!' });
+      queryClient.invalidateQueries({ queryKey: ["myPayments"] });
+      queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
+      toast({ title: "Payment completed!" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to complete payment', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to complete payment",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -274,13 +321,17 @@ export function useActivateCourse() {
   return useMutation({
     mutationFn: paymentsApi.activate,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allPayments'] });
-      queryClient.invalidateQueries({ queryKey: ['paymentStats'] });
-      queryClient.invalidateQueries({ queryKey: ['allEnrollments'] });
-      toast({ title: 'Course activated successfully' });
+      queryClient.invalidateQueries({ queryKey: ["allPayments"] });
+      queryClient.invalidateQueries({ queryKey: ["paymentStats"] });
+      queryClient.invalidateQueries({ queryKey: ["allEnrollments"] });
+      toast({ title: "Course activated successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Activation failed', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Activation failed",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -288,7 +339,7 @@ export function useActivateCourse() {
 // Sessions hooks
 export function useAllSessions() {
   return useQuery({
-    queryKey: ['allSessions'],
+    queryKey: ["allSessions"],
     queryFn: () => sessionsApi.getAll(),
     refetchInterval: 10000, // Real-time sessions for admin/facilitator
   });
@@ -296,7 +347,7 @@ export function useAllSessions() {
 
 export function useMySessions() {
   return useQuery({
-    queryKey: ['mySessions'],
+    queryKey: ["mySessions"],
     queryFn: () => sessionsApi.getMy(),
     refetchInterval: 10000, // Real-time sessions for facilitator
   });
@@ -304,7 +355,7 @@ export function useMySessions() {
 
 export function useSession(id: string) {
   return useQuery({
-    queryKey: ['session', id],
+    queryKey: ["session", id],
     queryFn: () => sessionsApi.getById(id),
     enabled: !!id,
   });
@@ -315,12 +366,16 @@ export function useCreateSession() {
   return useMutation({
     mutationFn: sessionsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['mySessions'] });
-      toast({ title: 'Session created successfully' });
+      queryClient.invalidateQueries({ queryKey: ["allSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["mySessions"] });
+      toast({ title: "Session created successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to create session', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to create session",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -328,14 +383,19 @@ export function useCreateSession() {
 export function useUpdateSession() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => sessionsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      sessionsApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['mySessions'] });
-      toast({ title: 'Session updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ["allSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["mySessions"] });
+      toast({ title: "Session updated successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to update session', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to update session",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -345,12 +405,16 @@ export function useStartSession() {
   return useMutation({
     mutationFn: sessionsApi.start,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['mySessions'] });
-      toast({ title: 'Session started!' });
+      queryClient.invalidateQueries({ queryKey: ["allSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["mySessions"] });
+      toast({ title: "Session started!" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to start session', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to start session",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -360,12 +424,16 @@ export function useEndSession() {
   return useMutation({
     mutationFn: sessionsApi.end,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allSessions'] });
-      queryClient.invalidateQueries({ queryKey: ['mySessions'] });
-      toast({ title: 'Session ended' });
+      queryClient.invalidateQueries({ queryKey: ["allSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["mySessions"] });
+      toast({ title: "Session ended" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to end session', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to end session",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -373,24 +441,44 @@ export function useEndSession() {
 // Attendance hooks
 export function useSessionAttendance(sessionId: string) {
   return useQuery({
-    queryKey: ['attendance', sessionId],
+    queryKey: ["attendance", sessionId],
     queryFn: () => attendanceApi.getSession(sessionId),
     enabled: !!sessionId,
     refetchInterval: 5000, // Frequent updates during active attendance marking
   });
 }
 
+export function useMyAttendance(courseId: string) {
+  return useQuery({
+    queryKey: ["myAttendance", courseId],
+    queryFn: () => attendanceApi.getMy(courseId),
+    enabled: !!courseId,
+    staleTime: 30000, // Check every 30 seconds
+  });
+}
+
 export function useMarkAttendance() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ sessionId, userId, status }: { sessionId: string; userId: string; status: 'present' | 'absent' }) =>
-      attendanceApi.mark(sessionId, userId, status),
+    mutationFn: ({
+      sessionId,
+      userId,
+      status,
+    }: {
+      sessionId: string;
+      userId: string;
+      status: "present" | "absent";
+    }) => attendanceApi.mark(sessionId, userId, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      toast({ title: 'Attendance marked' });
+      queryClient.invalidateQueries({ queryKey: ["attendance"] });
+      toast({ title: "Attendance marked" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to mark attendance', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to mark attendance",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -398,14 +486,23 @@ export function useMarkAttendance() {
 export function useBulkMarkAttendance() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ sessionId, attendances }: { sessionId: string; attendances: any[] }) =>
-      attendanceApi.bulkMark(sessionId, attendances),
+    mutationFn: ({
+      sessionId,
+      attendances,
+    }: {
+      sessionId: string;
+      attendances: any[];
+    }) => attendanceApi.bulkMark(sessionId, attendances),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['attendance'] });
-      toast({ title: 'Attendance saved' });
+      queryClient.invalidateQueries({ queryKey: ["attendance"] });
+      toast({ title: "Attendance saved" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to save attendance', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to save attendance",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -413,28 +510,28 @@ export function useBulkMarkAttendance() {
 // Analytics hooks
 export function useDashboardAnalytics() {
   return useQuery({
-    queryKey: ['dashboardAnalytics'],
+    queryKey: ["dashboardAnalytics"],
     queryFn: () => analyticsApi.getDashboard(),
   });
 }
 
 export function useEnrollmentTrends(period?: string) {
   return useQuery({
-    queryKey: ['enrollmentTrends', period],
+    queryKey: ["enrollmentTrends", period],
     queryFn: () => analyticsApi.getEnrollmentTrends(period),
   });
 }
 
 export function useRevenueAnalytics(period?: string) {
   return useQuery({
-    queryKey: ['revenueAnalytics', period],
+    queryKey: ["revenueAnalytics", period],
     queryFn: () => analyticsApi.getRevenue(period),
   });
 }
 
 export function useCourseAnalytics(courseId: string) {
   return useQuery({
-    queryKey: ['courseAnalytics', courseId],
+    queryKey: ["courseAnalytics", courseId],
     queryFn: () => analyticsApi.getCourse(courseId),
     enabled: !!courseId,
   });
@@ -442,7 +539,7 @@ export function useCourseAnalytics(courseId: string) {
 
 export function useFacilitatorAnalytics() {
   return useQuery({
-    queryKey: ['facilitatorAnalytics'],
+    queryKey: ["facilitatorAnalytics"],
     queryFn: () => analyticsApi.getFacilitator(),
     refetchInterval: 10000, // Real-time stats for facilitator dashboard
   });
@@ -450,17 +547,16 @@ export function useFacilitatorAnalytics() {
 
 export function useLearnerAnalytics(learnerId?: string) {
   return useQuery({
-    queryKey: ['learnerAnalytics', learnerId],
+    queryKey: ["learnerAnalytics", learnerId],
     queryFn: () => analyticsApi.getLearner(learnerId),
     refetchInterval: 10000, // Poll every 10 seconds for real-time dashboard updates
   });
 }
 
-
 // Notifications hooks
 export function useNotifications(unreadOnly?: boolean) {
   return useQuery({
-    queryKey: ['notifications', unreadOnly],
+    queryKey: ["notifications", unreadOnly],
     queryFn: () => notificationsApi.getAll(unreadOnly),
     refetchInterval: 10000, // Poll every 10 seconds for real-time updates
   });
@@ -471,7 +567,7 @@ export function useMarkNotificationRead() {
   return useMutation({
     mutationFn: notificationsApi.markRead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
@@ -481,14 +577,14 @@ export function useMarkAllNotificationsRead() {
   return useMutation({
     mutationFn: notificationsApi.markAllRead,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }
 
 export function useMonitoringStats() {
   return useQuery({
-    queryKey: ['monitoringStats'],
+    queryKey: ["monitoringStats"],
     queryFn: () => analyticsApi.getMonitoring(),
     refetchInterval: 5000, // Poll every 5 seconds for real-time updates
   });
@@ -497,14 +593,14 @@ export function useMonitoringStats() {
 // Users hooks (Admin)
 export function useUsers(params?: Record<string, string>) {
   return useQuery({
-    queryKey: ['users', params],
+    queryKey: ["users", params],
     queryFn: () => usersApi.getAll(params),
   });
 }
 
 export function useUser(id: string) {
   return useQuery({
-    queryKey: ['user', id],
+    queryKey: ["user", id],
     queryFn: () => usersApi.getById(id),
     enabled: !!id,
   });
@@ -512,7 +608,7 @@ export function useUser(id: string) {
 
 export function useUserStats() {
   return useQuery({
-    queryKey: ['userStats'],
+    queryKey: ["userStats"],
     queryFn: () => usersApi.getStats(),
   });
 }
@@ -522,11 +618,15 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: usersApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({ title: 'User created successfully' });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast({ title: "User created successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to create user', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to create user",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -534,13 +634,18 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => usersApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      usersApi.update(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({ title: 'User updated successfully' });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast({ title: "User updated successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to update user', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to update user",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }
@@ -550,11 +655,15 @@ export function useDeleteUser() {
   return useMutation({
     mutationFn: usersApi.delete,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({ title: 'User deleted successfully' });
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast({ title: "User deleted successfully" });
     },
     onError: (error: Error) => {
-      toast({ title: 'Failed to delete user', description: error.message, variant: 'destructive' });
+      toast({
+        title: "Failed to delete user",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 }

@@ -1,7 +1,7 @@
 export type CourseStatus = "active" | "completed" | "locked" | "pending";
 export type CourseType = "self" | "onsite";
 export type LessonStatus = "active" | "completed" | "locked" | "skipped";
-export type UserRole = "learner" | "admin" | "subadmin";
+export type UserRole = "learner" | "admin" | "facilitator" | "sub_admin";
 
 export interface User {
   id: string;
@@ -61,10 +61,8 @@ export interface AuthResponse {
   token: string;
 }
 
-export interface ProfileResponse {
-  user: User;
-  token?: string;
-}
+// ProfileResponse is the user object directly (not wrapped)
+export type ProfileResponse = User;
 
 export interface PaginationMeta {
   page: number;

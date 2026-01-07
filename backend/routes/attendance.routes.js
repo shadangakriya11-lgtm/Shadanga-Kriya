@@ -1,9 +1,14 @@
 const express = require('express');
-const { body, param } = require('express-validator');
+const { body, param, query } = require('express-validator');
 const router = express.Router();
 const validate = require('../middleware/validate.middleware.js');
 const { verifyToken, isAdmin, isFacilitatorOrAdmin } = require('../middleware/auth.middleware.js');
 const attendanceController = require('../controllers/attendance.controller.js');
+
+// Get my attendance for a course (learner) - check if marked present today
+router.get('/my/:courseId', verifyToken, [
+  param('courseId').isUUID().withMessage('Valid course ID required')
+], validate, attendanceController.getMyAttendance);
 
 // Get session attendance
 router.get('/session/:sessionId', verifyToken, isFacilitatorOrAdmin, [
@@ -39,5 +44,10 @@ router.delete('/session/:sessionId/user/:userId', verifyToken, isFacilitatorOrAd
 router.get('/user/:userId', verifyToken, isAdmin, [
   param('userId').isUUID().withMessage('Valid user ID required')
 ], validate, attendanceController.getUserAttendanceHistory);
+
+// Export attendance as CSV (facilitator/admin)
+router.get('/export/:sessionId', verifyToken, isFacilitatorOrAdmin, [
+  param('sessionId').isUUID().withMessage('Valid session ID required')
+], validate, attendanceController.exportAttendance);
 
 module.exports = router;

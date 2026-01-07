@@ -62,6 +62,8 @@ const getAllCourses = async (req, res) => {
       durationHours: course.duration_hours,
       status: course.status,
       category: course.category,
+      prerequisites: course.prerequisites,
+      prerequisiteCourseId: course.prerequisite_course_id,
       createdBy: course.created_by,
       creatorName: course.creator_first_name ? `${course.creator_first_name} ${course.creator_last_name}` : null,
       lessonCount: parseInt(course.lesson_count),
@@ -122,6 +124,8 @@ const getCourseById = async (req, res) => {
       durationHours: course.duration_hours,
       status: course.status,
       category: course.category,
+      prerequisites: course.prerequisites,
+      prerequisiteCourseId: course.prerequisite_course_id,
       createdBy: course.created_by,
       creatorName: course.creator_first_name ? `${course.creator_first_name} ${course.creator_last_name}` : null,
       createdAt: course.created_at,
@@ -144,13 +148,13 @@ const getCourseById = async (req, res) => {
 // Create course
 const createCourse = async (req, res) => {
   try {
-    const { title, description, thumbnailUrl, price, durationHours, status, category } = req.body;
+    const { title, description, thumbnailUrl, price, durationHours, status, category, prerequisites, prerequisiteCourseId } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO courses (title, description, thumbnail_url, price, duration_hours, status, category, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO courses (title, description, thumbnail_url, price, duration_hours, status, category, prerequisites, prerequisite_course_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [title, description, thumbnailUrl, price || 0, durationHours || 0, status || 'draft', category, req.user.id]
+      [title, description, thumbnailUrl, price || 0, durationHours || 0, status || 'draft', category, prerequisites, prerequisiteCourseId, req.user.id]
     );
 
     const course = result.rows[0];
@@ -166,6 +170,8 @@ const createCourse = async (req, res) => {
         durationHours: course.duration_hours,
         status: course.status,
         category: course.category,
+        prerequisites: course.prerequisites,
+        prerequisiteCourseId: course.prerequisite_course_id,
         createdAt: course.created_at
       }
     });
@@ -188,7 +194,7 @@ const createCourse = async (req, res) => {
 const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, thumbnailUrl, price, durationHours, status, category } = req.body;
+    const { title, description, thumbnailUrl, price, durationHours, status, category, prerequisites, prerequisiteCourseId } = req.body;
 
     const result = await pool.query(
       `UPDATE courses 
@@ -199,10 +205,12 @@ const updateCourse = async (req, res) => {
            duration_hours = COALESCE($5, duration_hours),
            status = COALESCE($6, status),
            category = COALESCE($7, category),
+           prerequisites = COALESCE($8, prerequisites),
+           prerequisite_course_id = $9,
            updated_at = NOW()
-       WHERE id = $8
+       WHERE id = $10
        RETURNING *`,
-      [title, description, thumbnailUrl, price, durationHours, status, category, id]
+      [title, description, thumbnailUrl, price, durationHours, status, category, prerequisites, prerequisiteCourseId, id]
     );
 
     if (result.rows.length === 0) {
@@ -222,6 +230,8 @@ const updateCourse = async (req, res) => {
         durationHours: course.duration_hours,
         status: course.status,
         category: course.category,
+        prerequisites: course.prerequisites,
+        prerequisiteCourseId: course.prerequisite_course_id,
         updatedAt: course.updated_at
       }
     });

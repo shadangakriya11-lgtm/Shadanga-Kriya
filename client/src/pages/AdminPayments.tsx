@@ -6,12 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Filter, MoreHorizontal, Download, CreditCard, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Download, CreditCard, CheckCircle, XCircle, Clock, FileText, FileSpreadsheet } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -29,11 +30,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAllPayments, usePaymentStats, useUsers, useCourses, useCompletePayment, useActivateCourse } from '@/hooks/useApi';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AdminPayments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isActivateOpen, setIsActivateOpen] = useState(false);
   const [activateData, setActivateData] = useState({ userId: '', courseId: '', notes: '' });
+  const { toast } = useToast();
 
   const { data: paymentsData, isLoading } = useAllPayments();
   const { data: statsData } = usePaymentStats();
@@ -51,6 +54,152 @@ export default function AdminPayments() {
   const stats = statsData || { totalRevenue: 0, completed: 0, pending: 0, revenueThisMonth: 0 };
   const users = usersData?.users || [];
   const courses = coursesData?.courses || [];
+
+  // Export to CSV
+  const exportToCSV = () => {
+    const headers = ['User Name', 'Email', 'Course', 'Amount', 'Status', 'Transaction ID', 'Payment Method', 'Date'];
+    const csvData = payments.map((tx: any) => [
+      tx.userName || 'Unknown',
+      tx.userEmail || '',
+      tx.courseTitle || 'Unknown Course',
+      tx.amount,
+      tx.status,
+      tx.transactionId || 'N/A',
+      tx.paymentMethod || 'N/A',
+      new Date(tx.createdAt).toLocaleDateString('en-US'),
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map((row: string[]) => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `payments_report_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+
+    toast({
+      title: "Export Complete",
+      description: `Exported ${payments.length} payment records to CSV`,
+    });
+  };
+
+  // Export to PDF (simple text-based)
+  const exportToPDF = () => {
+    // Create a printable HTML document
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Export Failed",
+        description: "Please allow pop-ups to export PDF",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const totalAmount = payments.reduce((sum: number, tx: any) => sum + parseFloat(tx.amount || 0), 0);
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Payment Report - ${new Date().toLocaleDateString()}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+          h1 { color: #1a1a1a; border-bottom: 2px solid #4f46e5; padding-bottom: 10px; }
+          .summary { display: flex; gap: 20px; margin: 20px 0; flex-wrap: wrap; }
+          .stat-card { background: #f5f5f5; padding: 15px; border-radius: 8px; min-width: 150px; }
+          .stat-value { font-size: 24px; font-weight: bold; color: #4f46e5; }
+          .stat-label { font-size: 12px; color: #666; }
+          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+          th { background: #4f46e5; color: white; }
+          tr:nth-child(even) { background: #f9f9f9; }
+          .status-completed { color: #059669; font-weight: bold; }
+          .status-pending { color: #d97706; font-weight: bold; }
+          .status-failed { color: #dc2626; font-weight: bold; }
+          .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Shadanga Kriya - Payment Report</h1>
+        <p>Generated on: ${new Date().toLocaleString()}</p>
+        
+        <div class="summary">
+          <div class="stat-card">
+            <div class="stat-value">$${stats.totalRevenue?.toLocaleString()}</div>
+            <div class="stat-label">Total Revenue</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${stats.completed}</div>
+            <div class="stat-label">Completed</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${stats.pending}</div>
+            <div class="stat-label">Pending</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-value">${payments.length}</div>
+            <div class="stat-label">Total Transactions</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Course</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Transaction ID</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${payments.map((tx: any) => `
+              <tr>
+                <td>${tx.userName || 'Unknown'}<br><small>${tx.userEmail || ''}</small></td>
+                <td>${tx.courseTitle || 'Unknown Course'}</td>
+                <td>$${tx.amount}</td>
+                <td class="status-${tx.status}">${tx.status?.charAt(0).toUpperCase() + tx.status?.slice(1)}</td>
+                <td><code>${tx.transactionId || 'N/A'}</code></td>
+                <td>${new Date(tx.createdAt).toLocaleDateString()}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2"><strong>Total</strong></td>
+              <td><strong>$${totalAmount.toLocaleString()}</strong></td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
+        </table>
+
+        <div class="footer">
+          <p>Shadanga Kriya LMS - Confidential Payment Report</p>
+        </div>
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Trigger print after a short delay to ensure content is loaded
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+
+    toast({
+      title: "PDF Ready",
+      description: "Print dialog opened. Save as PDF to download.",
+    });
+  };
 
   const handleCompletePayment = async (paymentId: string) => {
     try {
@@ -213,10 +362,24 @@ export default function AdminPayments() {
               </Button>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <Button variant="outline" className="w-full sm:w-auto">
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full sm:w-auto">
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportToCSV}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={exportToPDF}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Export as PDF
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Dialog open={isActivateOpen} onOpenChange={setIsActivateOpen}>
                 <DialogTrigger asChild>
                   <Button variant="premium" className="w-full sm:w-auto">

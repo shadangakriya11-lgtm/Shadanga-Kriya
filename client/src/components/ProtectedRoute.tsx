@@ -1,12 +1,15 @@
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles?: ('learner' | 'admin' | 'facilitator')[];
+  allowedRoles?: ("learner" | "admin" | "facilitator" | "sub_admin")[];
 }
 
-export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  allowedRoles,
+}: ProtectedRouteProps) {
   const { user, isLoading, isLoggedIn } = useAuth();
   const location = useLocation();
 
@@ -24,8 +27,12 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     // Redirect to appropriate dashboard based on role
-    const redirectTo = user.role === 'admin' ? '/admin' :
-      user.role === 'facilitator' ? '/facilitator' : '/home';
+    const redirectTo =
+      user.role === "admin"
+        ? "/admin"
+        : user.role === "facilitator" || user.role === "sub_admin"
+        ? "/facilitator"
+        : "/home";
     return <Navigate to={redirectTo} replace />;
   }
 

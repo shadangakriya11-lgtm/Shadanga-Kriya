@@ -200,7 +200,7 @@ export function PreLessonProtocol({
             <RefreshCw
               className={cn("h-4 w-4", isCheckingDevices && "animate-spin")}
             />
-            {isCheckingDevices ? "Checking..." : "Auto-check Devices"}
+            {isCheckingDevices ? "Checking..." : "Auto-check/Recheck Device"}
           </Button>
         </div>
 

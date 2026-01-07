@@ -40,6 +40,7 @@ import { Preferences } from "@capacitor/preferences";
 
 // Token storage key
 const TOKEN_KEY = "shadanga_kriya_auth_token";
+const PREFERENCES_GROUP = "ShadangaKriyaAuth";
 
 // In-memory token cache for sync access
 let tokenCache: string | null = null;
@@ -53,6 +54,12 @@ let isInitialized = false;
  * which persists across app restarts, unlike localStorage which can be evicted by OS
  */
 export const initializeAuth = async (): Promise<boolean> => {
+  // Prevent double initialization
+  if (isInitialized) {
+    console.log("[Auth] Already initialized, returning cached state");
+    return !!tokenCache;
+  }
+
   try {
     const platform = Capacitor.getPlatform();
     const isNative = Capacitor.isNativePlatform();
@@ -64,6 +71,20 @@ export const initializeAuth = async (): Promise<boolean> => {
     );
 
     if (isNative) {
+      // Configure Preferences with a specific group for our app
+      try {
+        await Preferences.configure({ group: PREFERENCES_GROUP });
+        console.log(
+          "[Auth] Preferences configured with group:",
+          PREFERENCES_GROUP
+        );
+      } catch (configError) {
+        console.log(
+          "[Auth] Could not configure Preferences group (may not be supported):",
+          configError
+        );
+      }
+
       // Native: Try Capacitor Preferences first (SharedPreferences/UserDefaults)
       console.log("[Auth] Using Capacitor Preferences for native platform");
       const result = await Preferences.get({ key: TOKEN_KEY });
@@ -92,19 +113,24 @@ export const initializeAuth = async (): Promise<boolean> => {
       }
 
       // Debug: List all keys in Preferences
-      const allKeys = await Preferences.keys();
-      console.log("[Auth] All Preferences keys:", allKeys.keys);
+      try {
+        const allKeys = await Preferences.keys();
+        console.log("[Auth] All Preferences keys:", allKeys.keys);
+      } catch (e) {
+        console.log("[Auth] Could not list keys:", e);
+      }
     } else {
       // Web: Use localStorage as fallback
       console.log("[Auth] Using localStorage for web platform");
       tokenCache = localStorage.getItem(TOKEN_KEY);
       console.log(
         "[Auth] Token from localStorage:",
-        tokenCache ? "found" : "not found"
+        tokenCache ? `found (${tokenCache.substring(0, 20)}...)` : "not found"
       );
     }
 
     isInitialized = true;
+    console.log("[Auth] Initialization complete. Has token:", !!tokenCache);
     return !!tokenCache;
   } catch (error) {
     console.error("[Auth] Failed to initialize auth:", error);
@@ -166,6 +192,8 @@ async function apiRequest<T>(
   const headers: HeadersInit = {
     ...(!isFormData && { "Content-Type": "application/json" }),
     ...(token && { Authorization: `Bearer ${token}` }),
+    // Skip ngrok browser warning for free tier tunnels
+    "ngrok-skip-browser-warning": "true",
     ...options.headers,
   };
 
@@ -174,13 +202,28 @@ async function apiRequest<T>(
     headers,
   });
 
-  const data = await response.json();
+  // Parse response text once to avoid stream cloning issues
+  const text = await response.text();
+  let data: any = null;
 
-  if (!response.ok) {
-    throw new Error(data.error || "Request failed");
+  try {
+    if (text && text.trim()) {
+      data = JSON.parse(text);
+    }
+  } catch (e) {
+    // Ignore parse errors, will fall back to text
   }
 
-  return data;
+  if (!response.ok) {
+    // Include status code in error message for auth error detection
+    const errorMessage =
+      (data && (data.error || data.message)) || text || "Request failed";
+    throw new Error(`${response.status}: ${errorMessage}`);
+  }
+
+  // Prefer parsed JSON; otherwise return text as unknown
+  if (data !== null) return data as T;
+  return text as unknown as T;
 }
 
 // Auth API
@@ -290,6 +333,33 @@ export const progressApi = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+  // Admin actions
+  grantPause: (
+    userId: string,
+    lessonId: string,
+    additionalPauses: number = 1
+  ) =>
+    apiRequest<Record<string, unknown>>(
+      `/progress/${userId}/${lessonId}/grant-pause`,
+      {
+        method: "POST",
+        body: JSON.stringify({ additionalPauses }),
+      }
+    ),
+  resetLesson: (userId: string, lessonId: string) =>
+    apiRequest<Record<string, unknown>>(
+      `/progress/${userId}/${lessonId}/reset`,
+      {
+        method: "POST",
+      }
+    ),
+  lockLesson: (userId: string, lessonId: string) =>
+    apiRequest<Record<string, unknown>>(
+      `/progress/${userId}/${lessonId}/lock`,
+      {
+        method: "POST",
+      }
+    ),
 };
 
 // Payments API
@@ -313,10 +383,16 @@ export const paymentsApi = {
       body: JSON.stringify(data),
     }),
   createRazorpayOrder: (courseId: string) =>
-    apiRequest<{ orderId: string; amount: number }>(
-      "/payments/create-razorpay-order",
-      { method: "POST", body: JSON.stringify({ courseId }) }
-    ),
+    apiRequest<{
+      orderId: string;
+      amount: number;
+      currency: string;
+      keyId: string;
+      courseTitle: string;
+    }>("/payments/create-razorpay-order", {
+      method: "POST",
+      body: JSON.stringify({ courseId }),
+    }),
   verifyRazorpay: (data: Record<string, string>) =>
     apiRequest<Payment>("/payments/verify-razorpay", {
       method: "POST",
@@ -349,6 +425,13 @@ export const sessionsApi = {
 export const attendanceApi = {
   getSession: (sessionId: string) =>
     apiRequest<AttendanceResponse>(`/attendance/session/${sessionId}`),
+  getMy: (courseId: string) =>
+    apiRequest<{
+      hasSessionToday: boolean;
+      isMarkedPresent: boolean;
+      sessionId?: string;
+      message: string;
+    }>(`/attendance/my/${courseId}`),
   mark: (sessionId: string, userId: string, status: "present" | "absent") =>
     apiRequest<{ message: string }>(
       `/attendance/session/${sessionId}/user/${userId}`,
@@ -359,6 +442,8 @@ export const attendanceApi = {
       method: "PUT",
       body: JSON.stringify({ attendances }),
     }),
+  export: (sessionId: string) =>
+    apiRequest<string>(`/attendance/export/${sessionId}`),
 };
 
 // Analytics API
@@ -428,6 +513,13 @@ export const setAuthToken = async (token: string): Promise<void> => {
     tokenCache = token;
 
     if (isNative) {
+      // Ensure Preferences is configured with the same group
+      try {
+        await Preferences.configure({ group: PREFERENCES_GROUP });
+      } catch (e) {
+        // Ignore if configure is not supported
+      }
+
       // Native: Use Capacitor Preferences
       console.log("[Auth] Saving to Capacitor Preferences...");
       await Preferences.set({ key: TOKEN_KEY, value: token });
@@ -436,7 +528,9 @@ export const setAuthToken = async (token: string): Promise<void> => {
       const verify = await Preferences.get({ key: TOKEN_KEY });
       console.log(
         "[Auth] Token saved to Preferences - verified:",
-        verify.value ? "YES" : "NO"
+        verify.value ? "YES" : "NO",
+        "Token preview:",
+        verify.value ? verify.value.substring(0, 20) + "..." : "none"
       );
 
       // Also save to localStorage as backup (Android WebView supports it)
@@ -451,6 +545,8 @@ export const setAuthToken = async (token: string): Promise<void> => {
       localStorage.setItem(TOKEN_KEY, token);
       console.log("[Auth] Token saved to localStorage");
     }
+
+    console.log("[Auth] Token save complete. Cache updated:", !!tokenCache);
   } catch (error) {
     console.error("[Auth] Failed to save token:", error);
     throw error;
@@ -467,6 +563,13 @@ export const removeAuthToken = async (): Promise<void> => {
     tokenCache = null;
 
     if (isNative) {
+      // Ensure Preferences is configured with the same group
+      try {
+        await Preferences.configure({ group: PREFERENCES_GROUP });
+      } catch (e) {
+        // Ignore if configure is not supported
+      }
+
       // Native: Use Capacitor Preferences
       await Preferences.remove({ key: TOKEN_KEY });
       console.log("[Auth] Token removed from Preferences");
@@ -482,6 +585,8 @@ export const removeAuthToken = async (): Promise<void> => {
       localStorage.removeItem(TOKEN_KEY);
       console.log("[Auth] Token removed from localStorage");
     }
+
+    console.log("[Auth] Token removal complete. Cache cleared:", !tokenCache);
   } catch (error) {
     console.error("[Auth] Failed to remove token:", error);
     throw error;

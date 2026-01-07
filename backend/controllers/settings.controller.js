@@ -1,14 +1,23 @@
 const pool = require('../config/db.js');
 
-// Get all settings (admin only)
+// Get all settings (admin only) — secrets are withheld from the response
 const getSettings = async (req, res) => {
     try {
         const result = await pool.query('SELECT setting_key, setting_value FROM admin_settings');
 
         const settings = {};
         result.rows.forEach(row => {
+            if (row.setting_key === 'razorpay_secret_key') return; // do not expose secret
             settings[row.setting_key] = row.setting_value;
         });
+
+        // If env overrides are present, surface non-secret values so admins see current effective config
+        if (process.env.RAZORPAY_KEY_ID) {
+            settings['razorpay_key_id'] = process.env.RAZORPAY_KEY_ID;
+        }
+        if (process.env.RAZORPAY_TEST_MODE) {
+            settings['razorpay_test_mode'] = process.env.RAZORPAY_TEST_MODE;
+        }
 
         res.json({ settings });
     } catch (error) {
@@ -76,6 +85,11 @@ const updateSettings = async (req, res) => {
 // Get Razorpay public key (accessible to learners)
 const getRazorpayKey = async (req, res) => {
     try {
+        const keyFromEnv = process.env.RAZORPAY_KEY_ID;
+        if (keyFromEnv) {
+            return res.json({ keyId: keyFromEnv });
+        }
+
         const result = await pool.query(
             'SELECT setting_value FROM admin_settings WHERE setting_key = $1',
             ['razorpay_key_id']
@@ -92,9 +106,19 @@ const getRazorpayKey = async (req, res) => {
     }
 };
 
-// Helper function to get setting value
+// Helper function to get setting value with env override for secrets/keys
 const getSetting = async (key) => {
     try {
+        const overrides = {
+            razorpay_secret_key: process.env.RAZORPAY_SECRET_KEY,
+            razorpay_key_id: process.env.RAZORPAY_KEY_ID,
+            razorpay_test_mode: process.env.RAZORPAY_TEST_MODE,
+        };
+
+        if (overrides[key] !== undefined && overrides[key] !== null) {
+            return overrides[key];
+        }
+
         const result = await pool.query(
             'SELECT setting_value FROM admin_settings WHERE setting_key = $1',
             [key]

@@ -61,7 +61,6 @@ export const mockLessons: Lesson[] = [
     status: 'completed',
     order: 1,
     maxPauses: 3,
-    pausesUsed: 1,
   },
   {
     id: 'l2',
@@ -70,6 +69,7 @@ export const mockLessons: Lesson[] = [
     description: 'Learn the foundation of deep breathing techniques',
     duration: '20 min',
     durationSeconds: 1200,
+      {
     status: 'completed',
     order: 2,
     maxPauses: 3,
@@ -148,7 +148,7 @@ export const mockUsers: User[] = [
     id: 'u3',
     name: 'Dr. Emily Watson',
     email: 'e.watson@therapy.org',
-    role: 'subadmin',
+    role: 'sub_admin',
     createdAt: new Date('2023-11-10'),
     lastActive: new Date('2024-12-27'),
     isActive: true,

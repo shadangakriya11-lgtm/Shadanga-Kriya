@@ -2,7 +2,7 @@
 
 -- Create enum types
 DO $$ BEGIN
-  CREATE TYPE user_role AS ENUM ('admin', 'facilitator', 'learner');
+  CREATE TYPE user_role AS ENUM ('admin', 'facilitator', 'sub_admin', 'learner');
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS courses (
   type course_type DEFAULT 'self',
   status course_status NOT NULL DEFAULT 'active',
   category VARCHAR(100),
+  prerequisites TEXT,
+  prerequisite_course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -152,7 +154,7 @@ CREATE TABLE IF NOT EXISTS payments (
   user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
   course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
   amount DECIMAL(10, 2) NOT NULL,
-  currency VARCHAR(3) DEFAULT 'USD',
+  currency VARCHAR(3) DEFAULT 'INR',
   status payment_status NOT NULL DEFAULT 'pending',
   payment_method VARCHAR(50),
   transaction_id VARCHAR(255),
@@ -197,6 +199,38 @@ CREATE TABLE IF NOT EXISTS sub_admin_permissions (
   UNIQUE(user_id, permission)
 );
 
+-- Password reset tokens table
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  token VARCHAR(255) UNIQUE NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  used BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Session bookings table (for learners to book facilitator-led sessions)
+CREATE TABLE IF NOT EXISTS session_bookings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID REFERENCES sessions(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  status VARCHAR(20) DEFAULT 'booked',
+  booked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  cancelled_at TIMESTAMP WITH TIME ZONE,
+  UNIQUE(session_id, user_id)
+);
+
+-- Certificates table
+CREATE TABLE IF NOT EXISTS certificates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  course_id UUID REFERENCES courses(id) ON DELETE CASCADE NOT NULL,
+  certificate_number VARCHAR(100) UNIQUE NOT NULL,
+  issued_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  pdf_url TEXT,
+  UNIQUE(user_id, course_id)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
@@ -212,6 +246,42 @@ CREATE INDEX IF NOT EXISTS idx_lesson_progress_lesson_id ON lesson_progress(less
 CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_facilitator_id ON sessions(facilitator_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_session_id ON attendance(session_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_session_bookings_user_id ON session_bookings(user_id);
+CREATE INDEX IF NOT EXISTS idx_session_bookings_session_id ON session_bookings(session_id);
+CREATE INDEX IF NOT EXISTS idx_certificates_user_id ON certificates(user_id);
+
+-- Offline downloads table (tracks encrypted audio downloads)
+CREATE TABLE IF NOT EXISTS offline_downloads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  lesson_id UUID REFERENCES lessons(id) ON DELETE CASCADE NOT NULL,
+  device_id VARCHAR(255) NOT NULL,
+  encryption_key_hash VARCHAR(255) NOT NULL,
+  file_size_bytes BIGINT DEFAULT 0,
+  downloaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_accessed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  expires_at TIMESTAMP WITH TIME ZONE,
+  status VARCHAR(20) DEFAULT 'active',
+  UNIQUE(user_id, lesson_id, device_id)
+);
+
+-- Device registrations table (for key derivation)
+CREATE TABLE IF NOT EXISTS user_devices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+  device_id VARCHAR(255) NOT NULL,
+  device_name VARCHAR(255),
+  platform VARCHAR(50),
+  registered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  last_active_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  is_active BOOLEAN DEFAULT true,
+  UNIQUE(user_id, device_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_offline_downloads_user_id ON offline_downloads(user_id);
+CREATE INDEX IF NOT EXISTS idx_offline_downloads_lesson_id ON offline_downloads(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (email, password_hash, first_name, last_name, user_id, role, status)

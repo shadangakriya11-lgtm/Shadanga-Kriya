@@ -273,7 +273,7 @@ export default function Auth() {
         />
 
         {/* Header */}
-        <header className="p-6 flex items-center justify-between">
+        <header className="sticky top-0 z-50 p-4 sm:p-6 flex items-center justify-between bg-background/80 backdrop-blur-md border-b border-border/50">
           <Button
             variant="ghost"
             size="sm"
@@ -281,7 +281,8 @@ export default function Auth() {
             className="hover:bg-primary/10 hover:text-primary"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
+            <span className="hidden sm:inline">Back to Home</span>
+            <span className="sm:hidden">Back</span>
           </Button>
           <ThemeToggle />
         </header>
@@ -414,6 +415,7 @@ export default function Auth() {
                 <div className="flex items-center justify-end">
                   <button
                     type="button"
+                    onClick={() => navigate("/forgot-password")}
                     className="text-sm text-primary hover:text-primary/80 hover:underline font-medium transition-colors"
                   >
                     Forgot password?

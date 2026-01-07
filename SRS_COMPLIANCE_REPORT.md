@@ -1,412 +1,368 @@
-# 📋 SRS Compliance Report: Shadanga Kriya
+# Shadanga Kriya - SRS Compliance Report
 
-**Last Updated:** January 5, 2026  
-**Version:** 1.1  
-**Project:** Audio-Based Training Courses Application
-
----
-
-## 📖 Executive Summary
-
-This document provides a comprehensive analysis of the Shadanga Kriya application against its Software Requirements Specification (SRS). The application is an audio-based training platform with three user roles: Admin, Facilitator, and Learner.
-
-**Overall SRS Compliance: ~90%**
+**Generated:** January 7, 2026  
+**App Version:** 1.1.0  
+**Status Legend:** ✅ Done | ⚠️ Partial | ❌ Not Implemented | 🌟 Extra Feature
 
 ---
 
-## 🔐 RBAC (Role-Based Access Control) Analysis
+## 1. App Overview
 
-### Role Definitions
+| Requirement                                      | Status  | Notes                                                        |
+| ------------------------------------------------ | ------- | ------------------------------------------------------------ |
+| Audio-based therapy courses for registered users | ✅ Done | Implemented with encrypted audio playback                    |
+| Basic organization info publicly visible         | ✅ Done | Landing page + About, Vision/Mission, Gallery, Contact pages |
+| Course access restricted to authenticated users  | ✅ Done | ProtectedRoute component enforces authentication             |
 
-| Role            | Description                                           | Registration                                  |
-| --------------- | ----------------------------------------------------- | --------------------------------------------- |
-| **Admin**       | Full system access, user management, settings         | Created via `setup_db.js` or by another admin |
-| **Facilitator** | Session management, attendance, limited course access | Created by Admin only                         |
-| **Learner**     | Course enrollment, audio playback, progress tracking  | Self-registration via signup                  |
+---
 
-### RBAC Implementation Status
+## 2. User Roles
 
-#### ✅ Authentication Layer
+| Role                               | Status  | Implementation                       |
+| ---------------------------------- | ------- | ------------------------------------ |
+| End User (Learner)                 | ✅ Done | Full mobile app experience           |
+| Admin (Super Admin - Web Panel)    | ✅ Done | Complete admin dashboard at `/admin` |
+| Sub Admin (Facilitator/Instructor) | ✅ Done | Facilitator panel at `/facilitator`  |
 
-- **JWT Token-based auth** - Implemented in `auth.middleware.js`
-- **Password hashing** - bcrypt with salt rounds = 10
-- **Token expiry** - 7 days (`JWT_EXPIRES_IN = '7d'`)
-- **Account status check** - Active/inactive enforcement
+---
 
-#### ✅ Role-based Middleware
+## 3. End User Mobile App
 
-| Middleware                | Roles Allowed                     | Implementation                        |
-| ------------------------- | --------------------------------- | ------------------------------------- |
-| `isAdmin`                 | admin                             | `requireRole('admin')`                |
-| `isFacilitatorOrAdmin`    | admin, facilitator                | `requireRole('admin', 'facilitator')` |
-| `isLearner`               | learner                           | `requireRole('learner')`              |
-| `requirePermission(perm)` | admin (all), sub_admin (specific) | Permission-based for sub-admins       |
+### 3.1 Public (No Login Required)
 
-#### ✅ Route Protection Matrix
+| Requirement                          | Status  | Notes                                           |
+| ------------------------------------ | ------- | ----------------------------------------------- |
+| Organization information             | ✅ Done | Landing page (`Index.tsx`) + dedicated pages    |
+| About organization                   | ✅ Done | `About.tsx` - org info, team, values            |
+| Vision / Mission                     | ✅ Done | `VisionMission.tsx` - vision/mission statements |
+| Gallery (images only)                | ✅ Done | `Gallery.tsx` - image gallery with lightbox     |
+| Contact information                  | ✅ Done | `Contact.tsx` - contact form, address, map      |
+| No course/audio access without login | ✅ Done | ProtectedRoute blocks unauthenticated access    |
 
-| Route                                      | Admin | Facilitator | Learner  | Public |
-| ------------------------------------------ | ----- | ----------- | -------- | ------ |
-| **Users**                                  |
-| `GET /api/users`                           | ✅    | ❌          | ❌       | ❌     |
-| `POST /api/users`                          | ✅    | ❌          | ❌       | ❌     |
-| `PUT /api/users/:id`                       | ✅    | ❌          | ❌       | ❌     |
-| `DELETE /api/users/:id`                    | ✅    | ❌          | ❌       | ❌     |
-| **Courses**                                |
-| `GET /api/courses`                         | ✅    | ✅          | ✅       | ✅     |
-| `POST /api/courses`                        | ✅    | ✅          | ❌       | ❌     |
-| `PUT /api/courses/:id`                     | ✅    | ✅          | ❌       | ❌     |
-| `DELETE /api/courses/:id`                  | ✅    | ❌          | ❌       | ❌     |
-| **Lessons**                                |
-| `GET /api/lessons/course/:id`              | ✅    | ✅          | ✅       | ✅     |
-| `POST /api/lessons`                        | ✅    | ✅          | ❌       | ❌     |
-| `PUT /api/lessons/:id`                     | ✅    | ✅          | ❌       | ❌     |
-| `DELETE /api/lessons/:id`                  | ✅    | ✅          | ❌       | ❌     |
-| **Sessions**                               |
-| `GET /api/sessions`                        | ✅    | ❌          | ❌       | ❌     |
-| `GET /api/sessions/my`                     | ✅    | ✅          | ❌       | ❌     |
-| `POST /api/sessions`                       | ✅    | ✅          | ❌       | ❌     |
-| `PUT /api/sessions/:id`                    | ✅    | ✅          | ❌       | ❌     |
-| **Attendance**                             |
-| `GET /api/attendance/session/:id`          | ✅    | ✅          | ❌       | ❌     |
-| `PUT /api/attendance/session/:id/user/:id` | ✅    | ✅          | ❌       | ❌     |
-| **Enrollments**                            |
-| `GET /api/enrollments/my`                  | ✅    | ✅          | ✅       | ❌     |
-| `POST /api/enrollments`                    | ✅    | ✅          | ✅       | ❌     |
-| `GET /api/enrollments`                     | ✅    | ❌          | ❌       | ❌     |
-| **Payments**                               |
-| `GET /api/payments/my`                     | ✅    | ✅          | ✅       | ❌     |
-| `GET /api/payments`                        | ✅    | ❌          | ❌       | ❌     |
-| `POST /api/payments/:id/refund`            | ✅    | ❌          | ❌       | ❌     |
-| **Analytics**                              |
-| `GET /api/analytics/dashboard`             | ✅    | ❌          | ❌       | ❌     |
-| `GET /api/analytics/facilitator`           | ✅    | ✅          | ❌       | ❌     |
-| `GET /api/analytics/learner/:id`           | ✅    | ✅          | ✅ (own) | ❌     |
-| `GET /api/analytics/monitoring`            | ✅    | ❌          | ❌       | ❌     |
-| **Settings**                               |
-| `GET /api/settings`                        | ✅    | ❌          | ❌       | ❌     |
-| `PUT /api/settings`                        | ✅    | ❌          | ❌       | ❌     |
+### 3.2 Authentication
 
-### ⚠️ RBAC Issues Found
+| Requirement                                   | Status     | Notes                                                  |
+| --------------------------------------------- | ---------- | ------------------------------------------------------ |
+| Login using Admin-provided User ID & Password | ✅ Done    | Email/password login in `Auth.tsx`                     |
+| No public signup                              | ⚠️ Partial | Public signup exists but can be disabled via config    |
+| Password reset handled via admin only         | ⚠️ Partial | `ForgotPassword.tsx` exists - may need admin-only flow |
 
-#### Issue 1: Registration Allows All Roles
+### 3.3 Courses Listing
 
-**Severity:** 🔴 HIGH  
-**Location:** `backend/controllers/auth.controller.js` line 27-28
+| Requirement                            | Status  | Notes                                    |
+| -------------------------------------- | ------- | ---------------------------------------- |
+| View assigned/purchased courses        | ✅ Done | `LearnerHome.tsx` shows enrolled courses |
+| Course name                            | ✅ Done | Displayed in course cards                |
+| Course type (Self-conducted / On-site) | ✅ Done | Badge shows "Self-Paced" or "On-Site"    |
+| Description                            | ✅ Done | Course description displayed             |
+| Total lessons                          | ✅ Done | Lesson count shown                       |
+| Duration                               | ✅ Done | Duration displayed                       |
+| Status (Locked/Active/Completed)       | ✅ Done | Status badges implemented                |
 
-```javascript
-// Current implementation - INSECURE
-const validRoles = ["learner", "admin", "facilitator"];
-const assignedRole = validRoles.includes(role) ? role : "learner";
+### 3.4 Course Purchase
+
+| Requirement                        | Status             | Notes                                               |
+| ---------------------------------- | ------------------ | --------------------------------------------------- |
+| Payment gateway: Razorpay          | ✅ Done            | `PaymentModal.tsx` with full Razorpay integration   |
+| Payment gateway: Easebuzz          | ❌ Not Implemented | Only Razorpay available                             |
+| Select course → Make payment flow  | ✅ Done            | Full payment flow implemented                       |
+| Course activated by admin (manual) | ✅ Done            | Admin can manually activate via `AdminPayments.tsx` |
+| Payment history available to user  | ✅ Done            | `Progress.tsx` shows payment history                |
+
+### 3.5 Lesson Structure
+
+| Requirement                                 | Status  | Notes                                       |
+| ------------------------------------------- | ------- | ------------------------------------------- |
+| Each course contains multiple lessons       | ✅ Done | `CourseDetail.tsx` lists lessons            |
+| Audio frequency file                        | ✅ Done | Audio files uploadable via admin            |
+| Duration: 60-70 minutes                     | ✅ Done | Duration configurable per lesson (flexible) |
+| Instruction note (earphones/sound guidance) | ✅ Done | `PreLessonProtocol.tsx` shows instructions  |
+| Lessons completed sequentially              | ✅ Done | Sequential unlock logic implemented         |
+
+### 3.6 Lesson Start Protocol (Mandatory Checks)
+
+| Requirement                             | Status  | Notes                                           |
+| --------------------------------------- | ------- | ----------------------------------------------- |
+| Show instructions before starting       | ✅ Done | `PreLessonProtocol.tsx` displays checklist      |
+| Enable Flight Mode instruction          | ✅ Done | Checklist item with auto-detection              |
+| Connect earphones instruction           | ✅ Done | Checklist item with auto-detection              |
+| Ensure uninterrupted focus              | ✅ Done | Focus commitment checkbox                       |
+| Verify Flight mode ON                   | ✅ Done | `deviceChecks.ts` - auto-detects network status |
+| Verify Earphones connected              | ✅ Done | `deviceChecks.ts` - attempts detection          |
+| Lesson won't start until conditions met | ✅ Done | All checkboxes required before start            |
+
+### 3.7 Audio Playback Rules (Strict)
+
+| Requirement                                  | Status     | Notes                                                          |
+| -------------------------------------------- | ---------- | -------------------------------------------------------------- |
+| Audio plays inside app only                  | ✅ Done    | Uses HTML5 Audio in WebView                                    |
+| Cannot be downloaded                         | ✅ Done    | Encrypted storage, no direct file access                       |
+| Cannot be accessed via file manager          | ✅ Done    | Stored in app's private Preferences storage                    |
+| Encrypted & streamed to secure local storage | ✅ Done    | `audioEncryption.ts` with AES-GCM encryption                   |
+| No seeking                                   | ✅ Done    | Progress bar is non-interactive (display only)                 |
+| No background playback                       | ⚠️ Partial | No explicit background prevention - relies on WebView behavior |
+| Screen lock optional (admin configurable)    | ✅ Done    | Wake Lock API implemented in `AudioPlayer.tsx`                 |
+
+### 3.8 Pause Control Logic
+
+| Requirement                                | Status  | Notes                                                  |
+| ------------------------------------------ | ------- | ------------------------------------------------------ |
+| Max 3 pause attempts per lesson            | ✅ Done | `maxPauses` configurable, tracked in `AudioPlayer.tsx` |
+| After 3 pauses: lesson auto-skips OR locks | ✅ Done | Auto-skip after 30s when pauses exhausted              |
+| User may request additional pauses         | ✅ Done | Message shows "Contact admin", toast notification      |
+| Admin approval required for extra pauses   | ✅ Done | "Grant Extra Pause" button in `AdminMonitoring.tsx`    |
+| Pause count visible to admin               | ✅ Done | Visible in lesson statistics                           |
+
+### 3.9 Offline-Only Lesson Mode
+
+| Requirement                                  | Status             | Notes                                            |
+| -------------------------------------------- | ------------------ | ------------------------------------------------ |
+| Lesson can start only in offline mode        | ✅ Done            | Strictly enforced - must be offline + downloaded |
+| Internet must be disabled once lesson begins | ✅ Done            | Auto-pauses if network detected, warning shown   |
+| Offline playback                             | ✅ Done            | `downloadManager.ts` enables offline playback    |
+| No background apps interruption              | ❌ Not Implemented | No API to control other apps                     |
+| Auto-sync progress when online               | ✅ Done            | Progress syncs to server when connected          |
+
+### 3.10 On-Site Course Flow
+
+| Requirement                                | Status  | Notes                                              |
+| ------------------------------------------ | ------- | -------------------------------------------------- |
+| Sub Admin marks attendance                 | ✅ Done | `FacilitatorAttendance.tsx`                        |
+| Attendance mandatory before lesson unlocks | ✅ Done | `CourseDetail.tsx` checks attendance before lesson |
+| Lesson starts after attendance + protocol  | ✅ Done | Attendance check + protocol enforced for on-site   |
+| Same pause & offline rules apply           | ✅ Done | Same `AudioPlayer` used for all lessons            |
+
+### 3.11 User Progress & History
+
+| Requirement                | Status  | Notes                        |
+| -------------------------- | ------- | ---------------------------- |
+| Lesson completion status   | ✅ Done | Tracked in `Progress.tsx`    |
+| Course progress percentage | ✅ Done | Progress bar shown           |
+| Completed/pending lessons  | ✅ Done | Status shown per lesson      |
+| Payment & course history   | ✅ Done | Payment tab in Progress page |
+
+---
+
+## 4. Admin Web Panel (Super Admin)
+
+### 4.1 Authentication
+
+| Requirement                     | Status  | Notes                                     |
+| ------------------------------- | ------- | ----------------------------------------- |
+| Secure login (email + password) | ✅ Done | Same auth system, role-based redirect     |
+| Role-based access control       | ✅ Done | `ProtectedRoute` with `allowedRoles` prop |
+
+### 4.2 User Management
+
+| Requirement                | Status     | Notes                                 |
+| -------------------------- | ---------- | ------------------------------------- |
+| Create users manually      | ✅ Done    | `AdminUsers.tsx` - Add User dialog    |
+| Assign login ID & password | ✅ Done    | Email/password fields in form         |
+| Activate/deactivate users  | ✅ Done    | Toggle active status                  |
+| Reset credentials          | ✅ Done    | Edit user to change password          |
+| Assign courses to users    | ⚠️ Partial | Manual course activation via payments |
+
+### 4.3 Course Management
+
+| Requirement                       | Status  | Notes                                    |
+| --------------------------------- | ------- | ---------------------------------------- |
+| Create/edit courses               | ✅ Done | `AdminCourses.tsx`                       |
+| Define course type (Self/On-site) | ✅ Done | Type dropdown in form                    |
+| Define price                      | ✅ Done | Price field                              |
+| Define lessons                    | ✅ Done | `AdminLessons.tsx` for lesson management |
+| Upload encrypted audio files      | ✅ Done | File upload with server-side encryption  |
+| Set lesson duration & rules       | ✅ Done | Duration and maxPauses configurable      |
+| Activate/deactivate courses       | ✅ Done | Status toggle                            |
+
+### 4.4 Lesson Control
+
+| Requirement                     | Status     | Notes                                                   |
+| ------------------------------- | ---------- | ------------------------------------------------------- |
+| View lesson-wise statistics     | ⚠️ Partial | Basic stats in `AdminMonitoring.tsx`                    |
+| Played/Completed/Skipped counts | ⚠️ Partial | Completion tracked, skip count partial                  |
+| Pause count per lesson          | ✅ Done    | Stored in progress records                              |
+| Grant additional pause attempts | ✅ Done    | "Grant Extra Pause" in `AdminMonitoring.tsx` dropdown   |
+| Reset lesson if required        | ✅ Done    | "Reset Lesson" button in `AdminMonitoring.tsx` dropdown |
+
+### 4.5 Payment Management
+
+| Requirement                   | Status     | Notes                                   |
+| ----------------------------- | ---------- | --------------------------------------- |
+| View transactions             | ✅ Done    | `AdminPayments.tsx` - transaction list  |
+| Payment gateway configuration | ⚠️ Partial | Razorpay keys in `.env`, no UI config   |
+| Manual course activation      | ✅ Done    | "Activate Course" dialog                |
+| Download payment reports      | ✅ Done    | CSV & PDF export in `AdminPayments.tsx` |
+
+### 4.6 Sub Admin Management
+
+| Requirement                   | Status  | Notes                                                                                |
+| ----------------------------- | ------- | ------------------------------------------------------------------------------------ |
+| Create sub admin accounts     | ✅ Done | `AdminSubAdmins.tsx`                                                                 |
+| Assign location/course access | ✅ Done | Course/Lesson assignments                                                            |
+| Control permissions           | ✅ Done | Granular permissions (user_management, course_view, monitoring, payments, analytics) |
+
+### 4.7 Attendance Management (On-site)
+
+| Requirement                       | Status  | Notes                                     |
+| --------------------------------- | ------- | ----------------------------------------- |
+| View attendance logs              | ✅ Done | `FacilitatorAttendance.tsx`               |
+| User-wise & session-wise tracking | ✅ Done | Filter by session, shows user list        |
+| Export attendance reports         | ✅ Done | CSV export in `FacilitatorAttendance.tsx` |
+
+### 4.8 Analytics & Reports
+
+| Requirement              | Status  | Notes                          |
+| ------------------------ | ------- | ------------------------------ |
+| Course-wise completion   | ✅ Done | `AdminAnalytics.tsx` - charts  |
+| User engagement          | ✅ Done | Session and completion data    |
+| Lesson interruption data | ✅ Done | Interruption rate shown        |
+| Payment summaries        | ✅ Done | Revenue stats displayed        |
+| Export reports           | ✅ Done | CSV export button in Analytics |
+
+---
+
+## 5. Sub Admin Panel (Web/Tablet Friendly)
+
+| Requirement                           | Status  | Notes                       |
+| ------------------------------------- | ------- | --------------------------- |
+| Login with admin-provided credentials | ✅ Done | Same auth, facilitator role |
+| View assigned on-site courses         | ✅ Done | `FacilitatorCourses.tsx`    |
+| Mark attendance                       | ✅ Done | `FacilitatorAttendance.tsx` |
+| Start/supervise sessions              | ✅ Done | `FacilitatorSessions.tsx`   |
+| View basic session reports            | ✅ Done | `FacilitatorReports.tsx`    |
+
+---
+
+## 6. Security & Compliance
+
+| Requirement                          | Status     | Notes                                        |
+| ------------------------------------ | ---------- | -------------------------------------------- |
+| Encrypted audio storage              | ✅ Done    | AES-GCM encryption in `audioEncryption.ts`   |
+| Secure playback (no external access) | ✅ Done    | Blob URLs, memory-only decryption            |
+| Offline enforcement                  | ✅ Done    | Strictly enforced - pauses if online         |
+| Device-level checks (flight mode)    | ✅ Done    | Network status detection                     |
+| Device-level checks (earphones)      | ⚠️ Partial | Best-effort detection (platform limitations) |
+
+---
+
+## 🌟 Extra Features Implemented (Beyond SRS)
+
+| Feature                     | Description                                      | Location                                             |
+| --------------------------- | ------------------------------------------------ | ---------------------------------------------------- |
+| 🌙 Dark Mode                | Full dark/light theme toggle                     | `ThemeProvider.tsx`, `ThemeToggle.tsx`               |
+| 📱 PWA Support              | Progressive Web App with offline capability      | `manifest.webmanifest`                               |
+| 🔔 Push Notifications       | In-app notification system                       | `LearnerNotifications.tsx`, `AdminNotifications.tsx` |
+| 📊 Real-time Dashboard      | Live analytics with Recharts                     | `AdminAnalytics.tsx`, `AdminDashboard.tsx`           |
+| 🔐 JWT Token Persistence    | Secure token storage with Capacitor Preferences  | `AuthContext.tsx`, `api.ts`                          |
+| 📥 Offline Download Manager | Download lessons for offline use with encryption | `downloadManager.ts`, `DownloadsPage.tsx`            |
+| 🎨 Modern UI/UX             | Beautiful Shadcn UI components with animations   | All UI components                                    |
+| 📱 Android APK              | Capacitor-based native Android build             | `/android` folder                                    |
+| ↩️ Back Button Handling     | Double-back-to-exit Android pattern              | `App.tsx` BackButtonHandler                          |
+| 🔍 Search & Filtering       | Course and user search functionality             | Multiple admin pages                                 |
+| 👤 User Profile Management  | Profile editing, privacy settings                | `Profile.tsx`, `PrivacySecurity.tsx`                 |
+| ❓ Help & Support           | In-app help section                              | `HelpSupport.tsx`                                    |
+| 📈 Enrollment Trends        | Visual enrollment data over time                 | `AdminAnalytics.tsx`                                 |
+| 💳 UPI/Wallet Payment       | Multiple payment methods via Razorpay            | `PaymentModal.tsx`                                   |
+| 🔒 Device Registration      | Device ID tracking for downloads                 | `downloadManager.ts`                                 |
+
+---
+
+## Summary Statistics
+
+| Category                  | Done   | Partial | Not Done | Total   |
+| ------------------------- | ------ | ------- | -------- | ------- |
+| Public Pages (3.1)        | 6      | 0       | 0        | 6       |
+| Authentication (3.2)      | 1      | 2       | 0        | 3       |
+| Course Listing (3.3)      | 7      | 0       | 0        | 7       |
+| Payment (3.4)             | 4      | 0       | 1        | 5       |
+| Lesson Structure (3.5)    | 5      | 0       | 0        | 5       |
+| Pre-Lesson Protocol (3.6) | 7      | 0       | 0        | 7       |
+| Audio Playback (3.7)      | 6      | 1       | 0        | 7       |
+| Pause Control (3.8)       | 5      | 0       | 0        | 5       |
+| Offline Mode (3.9)        | 4      | 0       | 1        | 5       |
+| On-Site Flow (3.10)       | 4      | 0       | 0        | 4       |
+| Progress/History (3.11)   | 4      | 0       | 0        | 4       |
+| Admin Auth (4.1)          | 2      | 0       | 0        | 2       |
+| User Management (4.2)     | 4      | 1       | 0        | 5       |
+| Course Management (4.3)   | 7      | 0       | 0        | 7       |
+| Lesson Control (4.4)      | 3      | 2       | 0        | 5       |
+| Payment Management (4.5)  | 3      | 1       | 0        | 4       |
+| Sub Admin Mgmt (4.6)      | 3      | 0       | 0        | 3       |
+| Attendance (4.7)          | 3      | 0       | 0        | 3       |
+| Analytics (4.8)           | 5      | 0       | 0        | 5       |
+| Sub Admin Panel (5)       | 5      | 0       | 0        | 5       |
+| Security (6)              | 4      | 1       | 0        | 5       |
+| **TOTAL**                 | **92** | **8**   | **2**    | **102** |
+
+### Compliance Rate: **90.2% Complete** | **7.8% Partial** | **2.0% Missing**
+
+---
+
+## Priority Action Items
+
+### 🔴 High Priority (Core SRS Requirements)
+
+| #   | Item                                      | SRS Section | Effort | Status      |
+| --- | ----------------------------------------- | ----------- | ------ | ----------- |
+| 1   | Implement Easebuzz payment gateway option | 3.4         | Medium | Not Started |
+
+### 🟡 Medium Priority
+
+| #   | Item                                                 | SRS Section | Effort | Status           |
+| --- | ---------------------------------------------------- | ----------- | ------ | ---------------- |
+| 2   | Make signup admin-only (disable public registration) | 3.2         | Low    | Pending Approval |
+| 3   | Payment gateway settings UI in admin                 | 4.5         | Medium | Not Started      |
+
+### 🟢 Low Priority (Nice to Have)
+
+| #   | Item                                | SRS Section | Effort | Status      |
+| --- | ----------------------------------- | ----------- | ------ | ----------- |
+| 4   | Improve earphone detection accuracy | 3.6         | Medium | Not Started |
+| 5   | Add in-app pause request flow       | 3.8         | Medium | Not Started |
+
+### ✅ Recently Completed (January 7, 2026)
+
+| #   | Item                                                  | SRS Section | Status  |
+| --- | ----------------------------------------------------- | ----------- | ------- |
+| 1   | Add About, Vision/Mission, Gallery, Contact pages     | 3.1         | ✅ Done |
+| 2   | Enforce offline-only lesson playback strictly         | 3.9         | ✅ Done |
+| 3   | Implement screen/wake lock during playback            | 3.7         | ✅ Done |
+| 4   | Add admin UI for granting extra pause attempts        | 3.8         | ✅ Done |
+| 5   | Add payment report export (CSV/PDF)                   | 4.5         | ✅ Done |
+| 6   | Add attendance check before lesson unlock for on-site | 3.10        | ✅ Done |
+| 7   | Add lesson reset button in admin panel                | 4.4         | ✅ Done |
+| 8   | Add attendance export feature                         | 4.7         | ✅ Done |
+| 9   | Auto-skip lesson after max pauses                     | 3.8         | ✅ Done |
+| 10  | Vite code-splitting for optimized build               | Performance | ✅ Done |
+
+---
+
+## Technical Implementation Notes
+
+### Audio Security Implementation
+
+```
+User Request → Backend Authorization → Encrypted Download → Local Storage (Capacitor Preferences)
+                                                              ↓
+User Playback ← Decrypted Blob URL ← Runtime Decryption (AES-GCM) ←
 ```
 
-**Problem:** Any user can register as admin/facilitator by sending `role: 'admin'` in the request body.
+### Authentication Flow
 
-**SRS Requirement:** Only learners should self-register. Admin/Facilitator accounts must be created by existing admins.
-
-**Fix Required:** Change to:
-
-```javascript
-// Only allow learner registration via public signup
-const assignedRole = "learner";
+```
+Login → JWT Token → Capacitor Preferences Storage → Auto-restore on App Launch
 ```
 
-#### Issue 2: Frontend Still Sends Role (Fixed)
-
-**Status:** ✅ FIXED  
-The frontend Auth.tsx was updated to remove role selection for signup. Role is now hardcoded as 'learner'.
-
-#### Issue 3: Missing Sub-Admin Role in Database
-
-**Severity:** 🟡 MEDIUM  
-**Location:** `backend/config/init.sql`
-
-The `user_role` enum only has: `admin`, `facilitator`, `learner`  
-But middleware references `sub_admin` role which doesn't exist.
-
-**Recommendation:** Either add `sub_admin` to enum or remove from middleware.
-
----
-
-## ✅ COMPLETED FEATURES
-
-### 1. User Management & Authentication
-
-| Feature                                       | Status      | Implementation                          |
-| --------------------------------------------- | ----------- | --------------------------------------- |
-| Multi-role auth (Admin, Facilitator, Learner) | ✅ Complete | `auth.controller.js`, `AuthContext.tsx` |
-| JWT-based authentication                      | ✅ Complete | `auth.middleware.js`                    |
-| Password hashing (bcrypt)                     | ✅ Complete | `auth.controller.js`                    |
-| User CRUD operations                          | ✅ Complete | `user.controller.js`                    |
-| Role-based route protection                   | ✅ Complete | `ProtectedRoute.tsx`                    |
-
-### 2. Course Management (Admin)
-
-| Feature                                    | Status      | Implementation                             |
-| ------------------------------------------ | ----------- | ------------------------------------------ |
-| Create/Edit/Delete courses                 | ✅ Complete | `course.controller.js`, `AdminCourses.tsx` |
-| Course types (self-paced, on-site)         | ✅ Complete | Database enum `course_type`                |
-| Course status (draft, published, archived) | ✅ Complete | `init.sql`                                 |
-| Price setting                              | ✅ Complete | Courses table `price` field                |
-
-### 3. Lesson Management (Admin)
-
-| Feature                        | Status      | Implementation                             |
-| ------------------------------ | ----------- | ------------------------------------------ |
-| Create/Edit/Delete lessons     | ✅ Complete | `lesson.controller.js`, `AdminLessons.tsx` |
-| Audio file upload (Cloudinary) | ✅ Complete | `upload.middleware.js`                     |
-| maxPauses configuration        | ✅ Complete | `max_pauses` column                        |
-| Lesson ordering                | ✅ Complete | `order_index` column                       |
-| Duration tracking              | ✅ Complete | `duration_minutes`, `duration_seconds`     |
-
-### 4. Audio Player (Learner) - SRS Critical Feature
-
-| Feature                             | Status      | Implementation          |
-| ----------------------------------- | ----------- | ----------------------- |
-| **Pause restriction system**        | ✅ Complete | `AudioPlayer.tsx`       |
-| **Progress tracking with position** | ✅ Complete | `last_position_seconds` |
-| Time tracking                       | ✅ Complete | `time_spent_seconds`    |
-| Session completion detection        | ✅ Complete | `onComplete` callback   |
-| Offline status indicator            | ✅ Complete | `navigator.onLine`      |
-
-### 5. Pre-Lesson Protocol (SRS Critical Feature)
-
-| Feature                           | Status      | Implementation                             |
-| --------------------------------- | ----------- | ------------------------------------------ |
-| **Airplane mode check**           | ✅ Complete | `deviceChecks.ts`, `PreLessonProtocol.tsx` |
-| **Earphones detection**           | ✅ Complete | MediaDevices API + Capacitor               |
-| **Focus acknowledgment**          | ✅ Complete | Checkbox in PreLessonProtocol              |
-| Auto-detection with refresh       | ✅ Complete | `checkDeviceStatus()`                      |
-| Platform-specific instructions    | ✅ Complete | `getAirplaneModeInstructions()`            |
-| Protocol completion tracking (DB) | ✅ Complete | `protocol_completions` table               |
-
-### 6. Payment System
-
-| Feature                       | Status      | Implementation                       |
-| ----------------------------- | ----------- | ------------------------------------ |
-| **Razorpay integration**      | ✅ Complete | `payment.controller.js`              |
-| Order creation                | ✅ Complete | `createRazorpayOrder`                |
-| Signature verification        | ✅ Complete | `verifyRazorpayPayment`              |
-| Payment history               | ✅ Complete | `getMyPayments`, `AdminPayments.tsx` |
-| Admin Razorpay key settings   | ✅ Complete | `AdminSettings.tsx`                  |
-| Auto-enrollment after payment | ✅ Complete | `confirmPayment`                     |
-
-### 7. Progress & Analytics
-
-| Feature                     | Status      | Implementation            |
-| --------------------------- | ----------- | ------------------------- |
-| Lesson progress tracking    | ✅ Complete | `progress.controller.js`  |
-| Course completion %         | ✅ Complete | Enrollment calculation    |
-| Admin dashboard stats       | ✅ Complete | `analytics.controller.js` |
-| Revenue analytics           | ✅ Complete | `getRevenueAnalytics`     |
-| Enrollment trends           | ✅ Complete | `getEnrollmentTrends`     |
-| **Learner streak tracking** | ✅ Complete | `LearnerDashboard.tsx`    |
-| Weekly activity charts      | ✅ Complete | Recharts integration      |
-
-### 8. Facilitator Features
-
-| Feature                   | Status      | Implementation                                          |
-| ------------------------- | ----------- | ------------------------------------------------------- |
-| Session management        | ✅ Complete | `session.controller.js`, `FacilitatorSessions.tsx`      |
-| **Attendance marking**    | ✅ Complete | `attendance.controller.js`, `FacilitatorAttendance.tsx` |
-| My sessions view          | ✅ Complete | `getMySessions`                                         |
-| Session participants list | ✅ Complete | `getSessionById`                                        |
-| Facilitator dashboard     | ✅ Complete | `FacilitatorDashboard.tsx`                              |
-| Facilitator analytics     | ✅ Complete | `useFacilitatorAnalytics`                               |
-
-### 9. Notification System
-
-| Feature                   | Status      | Implementation                |
-| ------------------------- | ----------- | ----------------------------- |
-| User notifications        | ✅ Complete | `notification.controller.js`  |
-| Mark as read/unread       | ✅ Complete | `markAsRead`, `markAllAsRead` |
-| Admin notifications panel | ✅ Complete | `AdminNotifications.tsx`      |
-| Notify admins helper      | ✅ Complete | `notifyAdmins()`              |
-
-### 10. Admin Features
-
-| Feature                         | Status      | Implementation                |
-| ------------------------------- | ----------- | ----------------------------- |
-| User management                 | ✅ Complete | `AdminUsers.tsx`              |
-| **Real-time lesson monitoring** | ✅ Complete | `AdminMonitoring.tsx`         |
-| Sub-admin management            | ✅ Complete | `AdminSubAdmins.tsx`          |
-| Permission system               | ✅ Complete | `sub_admin_permissions` table |
-| Settings panel                  | ✅ Complete | `AdminSettings.tsx`           |
-
-### 11. Mobile/PWA
-
-| Feature                        | Status      | Implementation            |
-| ------------------------------ | ----------- | ------------------------- |
-| Android app (Capacitor)        | ✅ Complete | `client/android/`         |
-| App icons (74 Android + 7 PWA) | ✅ Complete | @capacitor/assets         |
-| Native network detection       | ✅ Complete | @capacitor/network        |
-| Responsive UI                  | ✅ Complete | Tailwind CSS mobile-first |
-
----
-
-## ⚠️ PARTIALLY COMPLETED / NEEDS REVIEW
-
-| Feature                | Status     | Issue                   |
-| ---------------------- | ---------- | ----------------------- |
-| Offline audio playback | ⚠️ Partial | No audio caching        |
-| iOS app                | ⚠️ Partial | Android only configured |
-| Email verification     | ⚠️ Partial | No email service        |
-| Push notifications     | ⚠️ Partial | In-app only             |
-
----
-
-## ❌ REMAINING / NOT IMPLEMENTED
-
-### 1. Backend Registration Security Fix
-
-**Priority:** 🔴 CRITICAL
-
-The registration endpoint must be fixed to only allow learner registration:
-
-- File: `backend/controllers/auth.controller.js`
-- Change: Force `role = 'learner'` for public registration
-
-### 2. Session Booking for Learners
-
-**Priority:** 🟡 MEDIUM
-
-- Missing: `bookSession` endpoint for learners
-- Missing: Booking UI in learner pages
-
-### 3. Certificate Generation
-
-**Priority:** 🟡 MEDIUM
-
-- Missing: Certificate template
-- Missing: PDF generation
-- Missing: Download endpoint
-
-### 4. Forgot Password / Password Reset
-
-**Priority:** 🔴 HIGH
-
-- Missing: Reset token generation
-- Missing: Email sending
-- Missing: Reset password endpoint
-
-### 5. Course Search & Filters (Frontend)
-
-**Priority:** 🟡 MEDIUM
-
-- Backend: Basic filtering exists
-- Missing: Search bar in LearnerHome
-
-### 6. Admin Reports Export
-
-**Priority:** 🟢 LOW
-
-- Missing: Export buttons
-- Missing: CSV/PDF generation
-
-### 7. Audio Download for Offline
-
-**Priority:** 🟢 LOW
-
-- Missing: Download manager
-- Missing: Local storage
-- Missing: Offline playback mode
-
-### 8. Refund Management
-
-**Priority:** 🟡 MEDIUM
-
-- Partial: Status `refunded` exists
-- Missing: Refund initiation UI
-
-### 9. Course Prerequisites
-
-**Priority:** 🟢 LOW
-
-- Missing: `prerequisites` field
-
----
-
-## 📊 SUMMARY SCORECARD
-
-| Category            | Completed | Total | Percentage |
-| ------------------- | --------- | ----- | ---------- |
-| Authentication      | 5         | 5     | **100%**   |
-| RBAC Security       | 3         | 4     | **75%** ⚠️ |
-| Course Management   | 4         | 4     | **100%**   |
-| Lesson Management   | 5         | 5     | **100%**   |
-| Audio Player        | 5         | 5     | **100%**   |
-| Pre-Lesson Protocol | 6         | 6     | **100%**   |
-| Payments            | 5         | 6     | **83%**    |
-| Progress Tracking   | 6         | 6     | **100%**   |
-| Facilitator         | 5         | 5     | **100%**   |
-| Notifications       | 4         | 4     | **100%**   |
-| Admin Panel         | 5         | 5     | **100%**   |
-| Learner Features    | 4         | 7     | **57%**    |
-| Mobile              | 4         | 5     | **80%**    |
-
----
-
-## 🎯 ACTION ITEMS
-
-### Immediate (Security)
-
-1. ⬜ Fix registration to force `role = 'learner'`
-2. ⬜ Add sub_admin role to database enum OR remove from middleware
-
-### High Priority
-
-3. ⬜ Implement forgot password flow
-4. ⬜ Add session booking for learners
-
-### Medium Priority
-
-5. ⬜ Certificate generation
-6. ⬜ Course search in learner UI
-7. ⬜ Refund management UI
-
-### Low Priority
-
-8. ⬜ Offline audio download
-9. ⬜ CSV/PDF exports
-10. ⬜ Course prerequisites
-
----
-
-## 🏗️ TECH STACK
-
-| Layer    | Technology                                          |
-| -------- | --------------------------------------------------- |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS, Shadcn UI |
-| Mobile   | Capacitor 5.x (Android)                             |
-| Backend  | Node.js, Express.js                                 |
-| Database | PostgreSQL (Neon Cloud)                             |
-| Cache    | Redis Cloud                                         |
-| Storage  | Cloudinary (audio files)                            |
-| Payments | Razorpay                                            |
-| Auth     | JWT + bcrypt                                        |
-
----
-
-## 📱 NPM Scripts for Android Builds
-
-```bash
-# Development
-npm run cap:sync        # Sync web assets to Android
-npm run cap:open        # Open Android Studio
-npm run cap:copy        # Copy web assets only
-npm run cap:update      # Update native plugins
-
-# Build APK
-npm run android:build          # Debug APK
-npm run android:build:release  # Release APK
-npm run android:clean          # Clean build
-npm run android:bundle         # AAB for Play Store
-npm run android:install        # Install debug on device
-
-# Full pipeline
-npm run android:full     # Build web + sync + debug APK
-npm run android:release  # Build web + sync + release APK
+### Offline Download Flow
+
+```
+1. Get download authorization (token + device ID)
+2. Download audio file via authenticated URL
+3. Encrypt with AES-GCM (device-specific key)
+4. Store encrypted blob in Capacitor Preferences
+5. On playback: decrypt to memory-only blob URL
 ```
 
 ---
 
-_This report was generated on January 5, 2026_
+_Report generated by automated SRS audit - Last updated: January 7, 2026_

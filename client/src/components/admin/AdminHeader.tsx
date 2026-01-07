@@ -13,7 +13,7 @@ interface AdminHeaderProps {
 
 export function AdminHeader({ title, subtitle }: AdminHeaderProps) {
   return (
-    <header className="sticky top-0 z-50 h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6 pt-[calc(env(safe-area-inset-top)+0.75rem)] md:pt-[env(safe-area-inset-top)]">
+    <header className="sticky top-0 z-50 h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6">
       <div className="flex items-center gap-3">
         <AdminMobileSidebar />
         <div>

@@ -1,9 +1,27 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Lesson, PlaybackState } from '@/types';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Play, Pause, ChevronLeft, WifiOff, Volume2, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Lesson, PlaybackState } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Play,
+  Pause,
+  ChevronLeft,
+  WifiOff,
+  Wifi,
+  Volume2,
+  CheckCircle2,
+  Download,
+  Loader2,
+  AlertTriangle,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { getCachedToken } from "@/lib/api";
+import {
+  isLessonDownloaded,
+  loadEncryptedAudio,
+  revokeAudioBlobUrl,
+} from "@/lib/downloadManager";
+import { useToast } from "@/hooks/use-toast";
 
 interface AudioPlayerProps {
   lesson: Lesson;
@@ -12,7 +30,12 @@ interface AudioPlayerProps {
 }
 
 export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
+  const token = getCachedToken();
+  const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioBlobUrlRef = useRef<string | null>(null);
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+  const autoSkipTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [playback, setPlayback] = useState<PlaybackState>({
     isPlaying: false,
     currentTime: 0,
@@ -23,96 +46,292 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [isComplete, setIsComplete] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [isLoadingAudio, setIsLoadingAudio] = useState(true);
+  const [audioSource, setAudioSource] = useState<"online" | "offline" | null>(
+    null
+  );
+  const [offlineEnforcementError, setOfflineEnforcementError] = useState<
+    string | null
+  >(null);
+  const [isDownloaded, setIsDownloaded] = useState(false);
 
-  // Monitor online status
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+  // Request wake lock to prevent screen from sleeping during playback
+  const requestWakeLock = useCallback(async () => {
+    if ("wakeLock" in navigator) {
+      try {
+        wakeLockRef.current = await navigator.wakeLock.request("screen");
+        console.log("Wake lock acquired");
+      } catch (err) {
+        console.warn("Wake lock request failed:", err);
+      }
+    }
   }, []);
 
-  // Initialize audio
-  useEffect(() => {
-    if (!lesson.audioUrl) {
-      setAudioError("No audio file available");
-      return;
+  // Release wake lock
+  const releaseWakeLock = useCallback(() => {
+    if (wakeLockRef.current) {
+      wakeLockRef.current
+        .release()
+        .then(() => {
+          wakeLockRef.current = null;
+          console.log("Wake lock released");
+        })
+        .catch(console.warn);
+    }
+  }, []);
+
+  // Auto-skip lesson when max pauses exhausted while paused
+  const startAutoSkipTimer = useCallback(() => {
+    // Clear any existing timer
+    if (autoSkipTimerRef.current) {
+      clearTimeout(autoSkipTimerRef.current);
     }
 
-    const audio = new Audio(lesson.audioUrl);
-    audioRef.current = audio;
-
-    audio.addEventListener('loadedmetadata', () => {
-      // Update duration from actual audio file
-      if (audio.duration && audio.duration !== Infinity) {
-        setPlayback(p => ({ ...p, duration: audio.duration }));
-      }
-    });
-
-    audio.addEventListener('timeupdate', () => {
-      setPlayback(prev => ({
-        ...prev,
-        currentTime: audio.currentTime,
-        // Sync duration if not set correctly yet
-        duration: audio.duration || prev.duration
-      }));
-    });
-
-    audio.addEventListener('ended', () => {
+    // Set 30-second timer to auto-complete the lesson
+    autoSkipTimerRef.current = setTimeout(() => {
+      toast({
+        title: "Lesson Auto-Completed",
+        description:
+          "Maximum pauses exhausted. The lesson has been marked as complete.",
+        variant: "default",
+      });
       setIsComplete(true);
-      setPlayback(prev => ({ ...prev, isPlaying: false, currentTime: audio.duration }));
-    });
+      setPlayback((prev) => ({
+        ...prev,
+        isPlaying: false,
+      }));
+      releaseWakeLock();
+    }, 30000); // 30 seconds
 
-    audio.addEventListener('error', (e) => {
-      console.error("Audio playback error:", e);
-      setAudioError("Failed to load audio. Please check your connection.");
+    toast({
+      title: "No Pauses Remaining",
+      description:
+        "Lesson will auto-complete in 30 seconds. Contact admin for additional pauses.",
+      variant: "destructive",
     });
+  }, [toast, releaseWakeLock]);
+
+  // Monitor online status and enforce offline-only playback
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOffline(false);
+      // If playing and went online, pause and show warning
+      if (playback.isPlaying && audioRef.current) {
+        audioRef.current.pause();
+        setPlayback((prev) => ({ ...prev, isPlaying: false }));
+        setOfflineEnforcementError(
+          "Internet connection detected. Please disconnect to continue playback."
+        );
+        releaseWakeLock();
+      }
+    };
+    const handleOffline = () => {
+      setIsOffline(true);
+      // Clear offline enforcement error when going offline
+      setOfflineEnforcementError(null);
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [playback.isPlaying, releaseWakeLock]);
+
+  // Cleanup wake lock and auto-skip timer on unmount
+  useEffect(() => {
+    return () => {
+      releaseWakeLock();
+      if (autoSkipTimerRef.current) {
+        clearTimeout(autoSkipTimerRef.current);
+      }
+    };
+  }, [releaseWakeLock]);
+
+  // Initialize audio - OFFLINE-ONLY: Require downloaded audio
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeAudio = async () => {
+      setIsLoadingAudio(true);
+      setAudioError(null);
+      setOfflineEnforcementError(null);
+
+      try {
+        // Check if lesson is downloaded for offline use
+        const downloaded = await isLessonDownloaded(lesson.id);
+        setIsDownloaded(downloaded);
+
+        // OFFLINE-ONLY ENFORCEMENT: Must have downloaded audio
+        if (!downloaded) {
+          throw new Error(
+            "This lesson must be downloaded before playback. Please download the lesson first."
+          );
+        }
+
+        // Check if online - warn user to go offline
+        if (!isOffline) {
+          setOfflineEnforcementError(
+            "Please disconnect from the internet (airplane mode) before playing this lesson."
+          );
+        }
+
+        let audioUrl: string;
+
+        // Load encrypted audio from local storage (offline-only)
+        try {
+          audioUrl = await loadEncryptedAudio(lesson.id, token!);
+          audioBlobUrlRef.current = audioUrl;
+          if (isMounted) setAudioSource("offline");
+        } catch (err) {
+          console.error("Failed to load offline audio:", err);
+          throw new Error(
+            "Failed to decrypt offline audio. Please re-download the lesson."
+          );
+        }
+
+        if (!isMounted) return;
+
+        const audio = new Audio(audioUrl);
+        audioRef.current = audio;
+
+        audio.addEventListener("loadedmetadata", () => {
+          // Update duration from actual audio file
+          if (audio.duration && audio.duration !== Infinity) {
+            setPlayback((p) => ({ ...p, duration: audio.duration }));
+          }
+          setIsLoadingAudio(false);
+        });
+
+        audio.addEventListener("timeupdate", () => {
+          setPlayback((prev) => ({
+            ...prev,
+            currentTime: audio.currentTime,
+            duration: audio.duration || prev.duration,
+          }));
+        });
+
+        audio.addEventListener("ended", () => {
+          setIsComplete(true);
+          setPlayback((prev) => ({
+            ...prev,
+            isPlaying: false,
+            currentTime: audio.duration,
+          }));
+        });
+
+        audio.addEventListener("error", (e) => {
+          console.error("Audio playback error:", e);
+          setAudioError("Failed to load audio. Please check your connection.");
+          setIsLoadingAudio(false);
+        });
+      } catch (err) {
+        if (isMounted) {
+          const message =
+            err instanceof Error ? err.message : "Failed to initialize audio";
+          setAudioError(message);
+          setIsLoadingAudio(false);
+        }
+      }
+    };
+
+    initializeAudio();
 
     return () => {
-      audio.pause();
-      audio.src = '';
-      audioRef.current = null;
+      isMounted = false;
+      // Cleanup audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = "";
+        audioRef.current = null;
+      }
+      // Revoke blob URL if we created one
+      if (audioBlobUrlRef.current) {
+        revokeAudioBlobUrl(audioBlobUrlRef.current);
+        audioBlobUrlRef.current = null;
+      }
     };
-  }, [lesson.audioUrl]);
+  }, [lesson.id, token, isOffline]);
 
   const togglePlayback = useCallback(() => {
     if (isComplete || !audioRef.current || audioError) return;
+
+    // Check offline enforcement before playing
+    if (!playback.isPlaying && !isOffline) {
+      setOfflineEnforcementError(
+        "Please disconnect from the internet (airplane mode) before playing."
+      );
+      return;
+    }
+
+    // Clear auto-skip timer when user resumes
+    if (autoSkipTimerRef.current) {
+      clearTimeout(autoSkipTimerRef.current);
+      autoSkipTimerRef.current = null;
+    }
 
     if (playback.isPlaying) {
       // Pausing
       if (playback.pausesRemaining > 0) {
         audioRef.current.pause();
+        releaseWakeLock();
+        const newPausesRemaining = playback.pausesRemaining - 1;
         setPlayback((prev) => ({
           ...prev,
           isPlaying: false,
           isPaused: true,
-          pausesRemaining: prev.pausesRemaining - 1,
+          pausesRemaining: newPausesRemaining,
         }));
+
+        // If this was the last pause, start auto-skip timer
+        if (newPausesRemaining === 0) {
+          startAutoSkipTimer();
+        }
+      } else {
+        // No pauses left - start auto-skip timer
+        audioRef.current.pause();
+        releaseWakeLock();
+        setPlayback((prev) => ({
+          ...prev,
+          isPlaying: false,
+          isPaused: true,
+        }));
+        startAutoSkipTimer();
       }
     } else {
-      // Playing
-      audioRef.current.play().catch(err => console.error("Play error:", err));
+      // Playing - request wake lock
+      requestWakeLock();
+      audioRef.current.play().catch((err) => {
+        console.error("Play error:", err);
+        releaseWakeLock();
+      });
       setPlayback((prev) => ({
         ...prev,
         isPlaying: true,
         isPaused: false,
       }));
     }
-  }, [playback.isPlaying, playback.pausesRemaining, isComplete, audioError]);
+  }, [
+    playback.isPlaying,
+    playback.pausesRemaining,
+    isComplete,
+    audioError,
+    isOffline,
+    requestWakeLock,
+    releaseWakeLock,
+    startAutoSkipTimer,
+  ]);
 
   const formatTime = (seconds: number) => {
     if (!seconds && seconds !== 0) return "0:00";
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const currentDuration = playback.duration || (audioRef.current?.duration || 0);
-  const progress = currentDuration > 0 ? (playback.currentTime / currentDuration) * 100 : 0;
+  const currentDuration = playback.duration || audioRef.current?.duration || 0;
+  const progress =
+    currentDuration > 0 ? (playback.currentTime / currentDuration) * 100 : 0;
   const remainingTime = Math.max(0, currentDuration - playback.currentTime);
 
   if (isComplete) {
@@ -125,8 +344,12 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Session Complete</p>
-              <h1 className="font-serif text-lg font-semibold truncate">{lesson.title}</h1>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Session Complete
+              </p>
+              <h1 className="font-serif text-lg font-semibold truncate">
+                {lesson.title}
+              </h1>
             </div>
           </div>
         </header>
@@ -141,9 +364,15 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
               Session Complete
             </h2>
             <p className="text-muted-foreground mb-8">
-              You have successfully completed this lesson. Take a moment to reflect on your experience before continuing.
+              You have successfully completed this lesson. Take a moment to
+              reflect on your experience before continuing.
             </p>
-            <Button variant="therapy" size="xl" className="w-full" onClick={onComplete}>
+            <Button
+              variant="therapy"
+              size="xl"
+              className="w-full"
+              onClick={onComplete}
+            >
               Continue to Course
             </Button>
           </div>
@@ -162,15 +391,28 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Now Playing</p>
-              <h1 className="font-serif text-lg font-semibold truncate max-w-48">{lesson.title}</h1>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Now Playing
+              </p>
+              <h1 className="font-serif text-lg font-semibold truncate max-w-48">
+                {lesson.title}
+              </h1>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {isOffline && (
-              <Badge variant="pending" className="flex items-center gap-1">
+            {audioSource === "offline" && isOffline && (
+              <Badge
+                variant="secondary"
+                className="flex items-center gap-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
+              >
                 <WifiOff className="h-3 w-3" />
-                Offline
+                Offline Ready
+              </Badge>
+            )}
+            {!isOffline && (
+              <Badge variant="destructive" className="flex items-center gap-1">
+                <Wifi className="h-3 w-3" />
+                Online - Go Offline
               </Badge>
             )}
           </div>
@@ -179,6 +421,14 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+        {/* Offline Enforcement Warning */}
+        {offlineEnforcementError && (
+          <div className="mb-6 flex items-center gap-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg max-w-md text-center">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+            <span className="text-sm">{offlineEnforcementError}</span>
+          </div>
+        )}
+
         {/* Visualization */}
         <div className="relative mb-12">
           <div
@@ -208,7 +458,9 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
                 <Volume2
                   className={cn(
                     "h-12 w-12 transition-colors",
-                    playback.isPlaying ? "text-primary-foreground" : "text-muted-foreground"
+                    playback.isPlaying
+                      ? "text-primary-foreground"
+                      : "text-muted-foreground"
                   )}
                 />
               </div>
@@ -220,6 +472,14 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         {audioError && (
           <div className="mb-4 text-destructive font-medium bg-destructive/10 px-4 py-2 rounded-lg">
             {audioError}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoadingAudio && !audioError && (
+          <div className="mb-4 flex items-center gap-2 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Loading audio...</span>
           </div>
         )}
 
@@ -252,9 +512,18 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
             size="icon-xl"
             className="rounded-full"
             onClick={togglePlayback}
-            disabled={(!playback.isPlaying && playback.pausesRemaining === 0) || !!audioError}
+            disabled={
+              (!playback.isPlaying &&
+                playback.pausesRemaining === 0 &&
+                !autoSkipTimerRef.current) ||
+              !!audioError ||
+              isLoadingAudio ||
+              (!playback.isPlaying && !isOffline) // Disable play when online
+            }
           >
-            {playback.isPlaying ? (
+            {isLoadingAudio ? (
+              <Loader2 className="h-8 w-8 animate-spin" />
+            ) : playback.isPlaying ? (
               <Pause className="h-8 w-8" />
             ) : (
               <Play className="h-8 w-8 ml-1" />
@@ -267,11 +536,13 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
               variant={playback.pausesRemaining > 0 ? "secondary" : "locked"}
               className="px-4 py-1.5"
             >
-              {playback.pausesRemaining} pause{playback.pausesRemaining !== 1 ? 's' : ''} remaining
+              {playback.pausesRemaining} pause
+              {playback.pausesRemaining !== 1 ? "s" : ""} remaining
             </Badge>
             {playback.pausesRemaining === 0 && !playback.isPlaying && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Contact admin for additional pauses
+              <p className="text-xs text-destructive mt-2 font-medium">
+                Auto-completing in 30 seconds. Contact admin for additional
+                pauses.
               </p>
             )}
           </div>

@@ -82,7 +82,7 @@ const createPayment = async (req, res) => {
       `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [req.user.id, courseId, course.price, 'USD', 'pending', paymentMethod || 'mock', transactionId]
+      [req.user.id, courseId, course.price, 'INR', 'pending', paymentMethod || 'mock', transactionId]
     );
 
     const payment = result.rows[0];
