@@ -5,6 +5,7 @@
 
 import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
+import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
 import {
   createEncryptedPackage,
   decryptPackage,
@@ -18,6 +19,52 @@ const STORAGE_PREFIX = "sk_audio_";
 const KEY_STORAGE_PREFIX = "sk_key_";
 const DEVICE_ID_KEY = "sk_device_id";
 const DOWNLOADS_INDEX_KEY = "sk_downloads_index";
+
+/**
+ * Secure key storage helpers - uses native secure storage on mobile, falls back to Preferences on web
+ */
+const saveSecureKey = async (key: string, value: string): Promise<void> => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await SecureStoragePlugin.set({ key, value });
+    } catch (error) {
+      // Fallback to Preferences if secure storage fails
+      console.warn("Secure storage failed, using fallback:", error);
+      await Preferences.set({ key, value });
+    }
+  } else {
+    // Web fallback - use regular preferences
+    await Preferences.set({ key, value });
+  }
+};
+
+const getSecureKey = async (key: string): Promise<string | null> => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { value } = await SecureStoragePlugin.get({ key });
+      return value;
+    } catch (error) {
+      // Try fallback preferences
+      const { value } = await Preferences.get({ key });
+      return value;
+    }
+  } else {
+    const { value } = await Preferences.get({ key });
+    return value;
+  }
+};
+
+const removeSecureKey = async (key: string): Promise<void> => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await SecureStoragePlugin.remove({ key });
+    } catch (error) {
+      // Ignore errors for remove
+    }
+  }
+  // Also remove from preferences (fallback cleanup)
+  await Preferences.remove({ key });
+};
 
 export interface DownloadedLesson {
   lessonId: string;
@@ -280,12 +327,9 @@ export const downloadLesson = async (
       value: JSON.stringify(encryptedPackage),
     });
 
-    // 4.5. Save encryption key for offline playback
+    // 4.5. Save encryption key for offline playback (using secure storage)
     const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
-    await Preferences.set({
-      key: keyStorageKey,
-      value: encryptionKey,
-    });
+    await saveSecureKey(keyStorageKey, encryptionKey);
 
     // 5. Update downloads index
     const index = await getDownloadsIndex();
@@ -361,9 +405,9 @@ export const loadEncryptedAudio = async (
   // 2. Get decryption key - first try cached key, then fallback to server
   let decryptionKey: string;
 
-  // Try to get cached key first (for true offline playback)
+  // Try to get cached key first (for true offline playback) - uses secure storage on mobile
   const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
-  const { value: cachedKey } = await Preferences.get({ key: keyStorageKey });
+  const cachedKey = await getSecureKey(keyStorageKey);
 
   if (cachedKey) {
     // Use cached key for offline playback
@@ -372,8 +416,8 @@ export const loadEncryptedAudio = async (
     // Fallback to server request (for backward compatibility)
     try {
       decryptionKey = await getDecryptionKey(lessonId, token);
-      // Cache the key for future offline use
-      await Preferences.set({ key: keyStorageKey, value: decryptionKey });
+      // Cache the key for future offline use (using secure storage)
+      await saveSecureKey(keyStorageKey, decryptionKey);
     } catch (error) {
       throw new Error("Failed to get decryption key. Please re-download the lesson while online.");
     }
@@ -397,9 +441,9 @@ export const deleteDownloadedLesson = async (
   const storageKey = `${STORAGE_PREFIX}${lessonId}`;
   await Preferences.remove({ key: storageKey });
 
-  // Remove cached encryption key
+  // Remove cached encryption key (from secure storage)
   const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
-  await Preferences.remove({ key: keyStorageKey });
+  await removeSecureKey(keyStorageKey);
 
   // Update index
   const index = await getDownloadsIndex();
