@@ -321,6 +321,18 @@ export const enrollmentsApi = {
     }),
   getAll: () => apiRequest<EnrollmentsResponse>("/enrollments"),
   getStats: () => apiRequest<StatsResponse>("/enrollments/stats"),
+  // Admin functions
+  getByCourse: (courseId: string) =>
+    apiRequest<EnrollmentsResponse>(`/enrollments/course/${courseId}`),
+  adminEnroll: (userId: string, courseId: string) =>
+    apiRequest<Enrollment>("/enrollments/admin", {
+      method: "POST",
+      body: JSON.stringify({ userId, courseId }),
+    }),
+  adminUnenroll: (userId: string, courseId: string) =>
+    apiRequest<{ message: string }>(`/enrollments/admin/${userId}/${courseId}`, {
+      method: "DELETE",
+    }),
 };
 
 // Progress API

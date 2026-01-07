@@ -222,6 +222,55 @@ export function useUnenroll() {
   });
 }
 
+// Admin enrollment hooks
+export function useEnrollmentsByCourse(courseId: string) {
+  return useQuery({
+    queryKey: ["courseEnrollments", courseId],
+    queryFn: () => enrollmentsApi.getByCourse(courseId),
+    enabled: !!courseId,
+  });
+}
+
+export function useAdminEnroll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, courseId }: { userId: string; courseId: string }) =>
+      enrollmentsApi.adminEnroll(userId, courseId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["courseEnrollments", variables.courseId] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: "User enrolled successfully!" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to enroll user",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useAdminUnenroll() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, courseId }: { userId: string; courseId: string }) =>
+      enrollmentsApi.adminUnenroll(userId, courseId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["courseEnrollments", variables.courseId] });
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      toast({ title: "User unenrolled successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to unenroll user",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 // Progress hooks
 export function useMyProgress() {
   return useQuery({

@@ -15,6 +15,7 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
 const STORAGE_PREFIX = "sk_audio_";
+const KEY_STORAGE_PREFIX = "sk_key_";
 const DEVICE_ID_KEY = "sk_device_id";
 const DOWNLOADS_INDEX_KEY = "sk_downloads_index";
 
@@ -31,12 +32,12 @@ export interface DownloadedLesson {
 export interface DownloadProgress {
   lessonId: string;
   status:
-    | "pending"
-    | "downloading"
-    | "encrypting"
-    | "saving"
-    | "completed"
-    | "error";
+  | "pending"
+  | "downloading"
+  | "encrypting"
+  | "saving"
+  | "completed"
+  | "error";
   progress: number;
   error?: string;
 }
@@ -67,9 +68,8 @@ export const getDeviceId = async (): Promise<string> => {
 export const registerDevice = async (token: string): Promise<void> => {
   const deviceId = await getDeviceId();
   const platform = Capacitor.getPlatform();
-  const deviceName = `${
-    platform.charAt(0).toUpperCase() + platform.slice(1)
-  } Device`;
+  const deviceName = `${platform.charAt(0).toUpperCase() + platform.slice(1)
+    } Device`;
 
   const response = await fetch(`${API_BASE}/downloads/devices`, {
     method: "POST",
@@ -273,11 +273,18 @@ export const downloadLesson = async (
 
     updateProgress("saving", 80);
 
-    // 4. Save to local storage
+    // 4. Save encrypted audio to local storage
     const storageKey = `${STORAGE_PREFIX}${lessonId}`;
     await Preferences.set({
       key: storageKey,
       value: JSON.stringify(encryptedPackage),
+    });
+
+    // 4.5. Save encryption key for offline playback
+    const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
+    await Preferences.set({
+      key: keyStorageKey,
+      value: encryptionKey,
     });
 
     // 5. Update downloads index
@@ -335,6 +342,7 @@ export const getDownloadedLessonsForCourse = async (
 
 /**
  * Load and decrypt audio for playback
+ * Uses cached encryption key for truly offline playback
  */
 export const loadEncryptedAudio = async (
   lessonId: string,
@@ -350,8 +358,26 @@ export const loadEncryptedAudio = async (
 
   const encryptedPackage: EncryptedAudioPackage = JSON.parse(value);
 
-  // 2. Get decryption key from backend (verifies user still has access)
-  const decryptionKey = await getDecryptionKey(lessonId, token);
+  // 2. Get decryption key - first try cached key, then fallback to server
+  let decryptionKey: string;
+
+  // Try to get cached key first (for true offline playback)
+  const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
+  const { value: cachedKey } = await Preferences.get({ key: keyStorageKey });
+
+  if (cachedKey) {
+    // Use cached key for offline playback
+    decryptionKey = cachedKey;
+  } else {
+    // Fallback to server request (for backward compatibility)
+    try {
+      decryptionKey = await getDecryptionKey(lessonId, token);
+      // Cache the key for future offline use
+      await Preferences.set({ key: keyStorageKey, value: decryptionKey });
+    } catch (error) {
+      throw new Error("Failed to get decryption key. Please re-download the lesson while online.");
+    }
+  }
 
   // 3. Decrypt the audio
   const decryptedData = await decryptPackage(encryptedPackage, decryptionKey);
@@ -367,9 +393,13 @@ export const deleteDownloadedLesson = async (
   lessonId: string,
   token?: string
 ): Promise<void> => {
-  // Remove from local storage
+  // Remove encrypted audio from local storage
   const storageKey = `${STORAGE_PREFIX}${lessonId}`;
   await Preferences.remove({ key: storageKey });
+
+  // Remove cached encryption key
+  const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
+  await Preferences.remove({ key: keyStorageKey });
 
   // Update index
   const index = await getDownloadsIndex();

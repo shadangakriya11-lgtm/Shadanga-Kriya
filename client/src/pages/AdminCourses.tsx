@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Filter, MoreHorizontal, BookOpen, Users } from 'lucide-react';
+import { Plus, Search, Filter, MoreHorizontal, BookOpen, Users, Shield } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -31,11 +32,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCourses, useCourseStats, useCreateCourse, useUpdateCourse, useDeleteCourse } from '@/hooks/useApi';
+import { CoursePermissionDialog } from '@/components/admin/CoursePermissionDialog';
 
 export default function AdminCourses() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<any | null>(null);
+  const [permissionCourse, setPermissionCourse] = useState<any | null>(null);
   const [newCourse, setNewCourse] = useState({
     title: '',
     description: '',
@@ -55,14 +58,14 @@ export default function AdminCourses() {
   const courses = (coursesData?.courses || []).filter((course: any) =>
     course.title?.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  const stats = statsData || { total: 0, active: 0, selfPaced: 0, onsite: 0 };
+  const stats = statsData as { total?: number; active?: number; selfPaced?: number; onsite?: number } || { total: 0, active: 0, selfPaced: 0, onsite: 0 };
 
   const handleCreateOrUpdateCourse = async () => {
     try {
       if (editingCourse) {
         await updateCourse.mutateAsync({ id: editingCourse.id, data: newCourse });
       } else {
-        await createCourse.mutateAsync(newCourse);
+        await createCourse.mutateAsync(newCourse as any);
       }
       setIsCreateOpen(false);
       setEditingCourse(null);
@@ -159,8 +162,18 @@ export default function AdminCourses() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEditDialog(course)}>Edit Course</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate(`/admin/lessons`)}>Manage Lessons</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openEditDialog(course)}>
+              Edit Course
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate(`/admin/lessons`)}>
+              Manage Lessons
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setPermissionCourse(course)}>
+              <Shield className="h-4 w-4 mr-2" />
+              Give Permission
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteCourse(course.id)}>
               Delete
             </DropdownMenuItem>
@@ -317,19 +330,19 @@ export default function AdminCourses() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Total Courses</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.total}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.total ?? 0}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Active</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{stats.active}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{stats.active ?? 0}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Self-Paced</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.selfPaced}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.selfPaced ?? 0}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">On-Site</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.onsite}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.onsite ?? 0}</p>
             </div>
           </div>
 
@@ -337,6 +350,16 @@ export default function AdminCourses() {
           <div className="overflow-x-auto">
             <DataTable columns={courseColumns} data={courses} />
           </div>
+
+          {/* Permission Dialog */}
+          {permissionCourse && (
+            <CoursePermissionDialog
+              courseId={permissionCourse.id}
+              courseTitle={permissionCourse.title}
+              open={!!permissionCourse}
+              onOpenChange={(open) => !open && setPermissionCourse(null)}
+            />
+          )}
         </main>
       </div>
     </div>

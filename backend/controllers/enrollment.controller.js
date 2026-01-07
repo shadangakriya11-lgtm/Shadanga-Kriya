@@ -199,10 +199,127 @@ const getEnrollmentStats = async (req, res) => {
   }
 };
 
+// Get enrollments for a specific course (admin)
+const getEnrollmentsByCourse = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+
+    const result = await pool.query(
+      `SELECT e.*, 
+              u.first_name, u.last_name, u.email
+       FROM enrollments e
+       JOIN users u ON e.user_id = u.id
+       WHERE e.course_id = $1
+       ORDER BY e.enrolled_at DESC`,
+      [courseId]
+    );
+
+    const enrollments = result.rows.map(e => ({
+      id: e.id,
+      userId: e.user_id,
+      courseId: e.course_id,
+      userName: `${e.first_name} ${e.last_name}`,
+      userEmail: e.email,
+      enrolledAt: e.enrolled_at,
+      completedAt: e.completed_at,
+      progressPercent: e.progress_percent
+    }));
+
+    res.json({ enrollments });
+  } catch (error) {
+    console.error('Get enrollments by course error:', error);
+    res.status(500).json({ error: 'Failed to get enrollments' });
+  }
+};
+
+// Admin enroll a user in a course
+const adminEnrollUser = async (req, res) => {
+  try {
+    const { userId, courseId } = req.body;
+
+    // Check if course exists
+    const courseCheck = await pool.query(
+      'SELECT id, title FROM courses WHERE id = $1',
+      [courseId]
+    );
+
+    if (courseCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    // Check if user exists and is a learner
+    const userCheck = await pool.query(
+      'SELECT id, first_name, last_name FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if already enrolled
+    const existingEnrollment = await pool.query(
+      'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [userId, courseId]
+    );
+
+    if (existingEnrollment.rows.length > 0) {
+      return res.status(400).json({ error: 'User already enrolled in this course' });
+    }
+
+    // Create enrollment
+    const result = await pool.query(
+      `INSERT INTO enrollments (user_id, course_id, status)
+       VALUES ($1, $2, 'active')
+       RETURNING *`,
+      [userId, courseId]
+    );
+
+    res.status(201).json({
+      message: 'User enrolled successfully',
+      enrollment: {
+        id: result.rows[0].id,
+        userId: result.rows[0].user_id,
+        courseId: result.rows[0].course_id,
+        userName: `${userCheck.rows[0].first_name} ${userCheck.rows[0].last_name}`,
+        courseTitle: courseCheck.rows[0].title,
+        enrolledAt: result.rows[0].enrolled_at
+      }
+    });
+  } catch (error) {
+    console.error('Admin enroll user error:', error);
+    res.status(500).json({ error: 'Failed to enroll user' });
+  }
+};
+
+// Admin unenroll a user from a course
+const adminUnenrollUser = async (req, res) => {
+  try {
+    const { userId, courseId } = req.params;
+
+    const result = await pool.query(
+      'DELETE FROM enrollments WHERE user_id = $1 AND course_id = $2 RETURNING id',
+      [userId, courseId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Enrollment not found' });
+    }
+
+    res.json({ message: 'User unenrolled successfully' });
+  } catch (error) {
+    console.error('Admin unenroll user error:', error);
+    res.status(500).json({ error: 'Failed to unenroll user' });
+  }
+};
+
 module.exports = {
   getMyEnrollments,
   enrollInCourse,
   getAllEnrollments,
   unenrollFromCourse,
-  getEnrollmentStats
+  getEnrollmentStats,
+  getEnrollmentsByCourse,
+  adminEnrollUser,
+  adminUnenrollUser
 };
