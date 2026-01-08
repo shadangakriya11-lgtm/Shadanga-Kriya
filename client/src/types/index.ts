@@ -39,6 +39,11 @@ export interface Lesson {
   maxPauses: number;
   pausesUsed: number;
   audioUrl?: string;
+  // Access Code fields
+  accessCodeEnabled?: boolean;
+  hasAccessCode?: boolean;
+  accessCodeType?: "permanent" | "temporary";
+  accessCodeExpired?: boolean;
 }
 
 export interface PlaybackState {

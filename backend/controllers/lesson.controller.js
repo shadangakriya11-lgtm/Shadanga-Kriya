@@ -24,7 +24,12 @@ const getLessonsByCourse = async (req, res) => {
       orderIndex: l.order_index,
       maxPauses: l.max_pauses,
       isLocked: l.is_locked,
-      createdAt: l.created_at
+      createdAt: l.created_at,
+      // Access Code fields
+      accessCodeEnabled: l.access_code_enabled,
+      hasAccessCode: !!l.access_code,
+      accessCodeType: l.access_code_type,
+      accessCodeExpired: l.access_code_type === 'temporary' && l.access_code_expires_at && new Date(l.access_code_expires_at) < new Date()
     }));
 
     res.json({ lessons });
@@ -267,11 +272,229 @@ const reorderLessons = async (req, res) => {
   }
 };
 
+// ==================== ACCESS CODE FUNCTIONS ====================
+
+// Generate random 6-digit access code
+const generateCode = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// Generate or update lesson access code (admin)
+const generateAccessCode = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const { codeType, expiresInMinutes } = req.body;
+
+    if (!['permanent', 'temporary'].includes(codeType)) {
+      return res.status(400).json({ error: 'Invalid code type. Must be "permanent" or "temporary".' });
+    }
+
+    if (codeType === 'temporary' && (!expiresInMinutes || expiresInMinutes < 1)) {
+      return res.status(400).json({ error: 'Expiration time required for temporary access code.' });
+    }
+
+    // Check if lesson exists
+    const lessonCheck = await pool.query('SELECT id, title FROM lessons WHERE id = $1', [lessonId]);
+    if (lessonCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    const code = generateCode();
+    const now = new Date();
+    const expiresAt = codeType === 'temporary'
+      ? new Date(now.getTime() + expiresInMinutes * 60000)
+      : null;
+
+    const result = await pool.query(
+      `UPDATE lessons 
+       SET access_code = $1, access_code_type = $2, access_code_expires_at = $3, access_code_generated_at = $4, access_code_enabled = true
+       WHERE id = $5
+       RETURNING id, title, access_code, access_code_type, access_code_expires_at, access_code_generated_at, access_code_enabled`,
+      [code, codeType, expiresAt, now, lessonId]
+    );
+
+    const lesson = result.rows[0];
+    res.json({
+      message: 'Access code generated successfully',
+      accessCode: {
+        code: lesson.access_code,
+        type: lesson.access_code_type,
+        expiresAt: lesson.access_code_expires_at,
+        generatedAt: lesson.access_code_generated_at,
+        isEnabled: lesson.access_code_enabled
+      }
+    });
+  } catch (error) {
+    console.error('Generate access code error:', error);
+    res.status(500).json({ error: 'Failed to generate access code' });
+  }
+};
+
+// Toggle access code requirement for a lesson (admin)
+const toggleAccessCode = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const { enabled } = req.body;
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+
+    const result = await pool.query(
+      `UPDATE lessons 
+       SET access_code_enabled = $1
+       WHERE id = $2
+       RETURNING id, title, access_code_enabled, access_code, access_code_type, access_code_expires_at`,
+      [enabled, lessonId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    const lesson = result.rows[0];
+    res.json({
+      message: `Access code requirement ${enabled ? 'enabled' : 'disabled'}`,
+      lesson: {
+        id: lesson.id,
+        title: lesson.title,
+        accessCodeEnabled: lesson.access_code_enabled,
+        hasAccessCode: !!lesson.access_code
+      }
+    });
+  } catch (error) {
+    console.error('Toggle access code error:', error);
+    res.status(500).json({ error: 'Failed to toggle access code' });
+  }
+};
+
+// Get lesson access code info (admin only)
+const getAccessCodeInfo = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+
+    const result = await pool.query(
+      `SELECT id, title, access_code_enabled, access_code, access_code_type, access_code_expires_at, access_code_generated_at
+       FROM lessons WHERE id = $1`,
+      [lessonId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    const lesson = result.rows[0];
+    const isExpired = lesson.access_code_type === 'temporary' &&
+      lesson.access_code_expires_at &&
+      new Date(lesson.access_code_expires_at) < new Date();
+
+    res.json({
+      lessonId: lesson.id,
+      lessonTitle: lesson.title,
+      accessCodeEnabled: lesson.access_code_enabled,
+      hasAccessCode: !!lesson.access_code,
+      accessCode: lesson.access_code ? {
+        code: lesson.access_code,
+        type: lesson.access_code_type,
+        expiresAt: lesson.access_code_expires_at,
+        generatedAt: lesson.access_code_generated_at,
+        isExpired
+      } : null
+    });
+  } catch (error) {
+    console.error('Get access code info error:', error);
+    res.status(500).json({ error: 'Failed to get access code info' });
+  }
+};
+
+// Verify access code for a lesson (learner)
+const verifyAccessCode = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Access code is required' });
+    }
+
+    const result = await pool.query(
+      `SELECT id, title, access_code_enabled, access_code, access_code_type, access_code_expires_at
+       FROM lessons WHERE id = $1`,
+      [lessonId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    const lesson = result.rows[0];
+
+    // Check if access code is required
+    if (!lesson.access_code_enabled) {
+      return res.json({ valid: true, message: 'Lesson does not require access code' });
+    }
+
+    // Check if access code exists
+    if (!lesson.access_code) {
+      return res.status(400).json({ error: 'No access code set for this lesson. Contact admin.' });
+    }
+
+    // Check if access code is expired
+    if (lesson.access_code_type === 'temporary' && lesson.access_code_expires_at) {
+      if (new Date(lesson.access_code_expires_at) < new Date()) {
+        return res.status(403).json({
+          valid: false,
+          error: 'Access code has expired. Please contact admin for a new code.'
+        });
+      }
+    }
+
+    // Verify access code
+    if (lesson.access_code !== code.toString().trim()) {
+      return res.status(403).json({ valid: false, error: 'Invalid access code' });
+    }
+
+    res.json({ valid: true, message: 'Access code verified successfully' });
+  } catch (error) {
+    console.error('Verify access code error:', error);
+    res.status(500).json({ error: 'Failed to verify access code' });
+  }
+};
+
+// Clear/remove access code from a lesson (admin)
+const clearAccessCode = async (req, res) => {
+  try {
+    const { lessonId } = req.params;
+
+    const result = await pool.query(
+      `UPDATE lessons 
+       SET access_code = NULL, access_code_type = 'permanent', access_code_expires_at = NULL, access_code_generated_at = NULL
+       WHERE id = $1
+       RETURNING id, title`,
+      [lessonId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    res.json({ message: 'Access code cleared successfully', lessonId: result.rows[0].id });
+  } catch (error) {
+    console.error('Clear access code error:', error);
+    res.status(500).json({ error: 'Failed to clear access code' });
+  }
+};
+
 module.exports = {
   getLessonsByCourse,
   getLessonById,
   createLesson,
   updateLesson,
   deleteLesson,
-  reorderLessons
+  reorderLessons,
+  generateAccessCode,
+  toggleAccessCode,
+  getAccessCodeInfo,
+  verifyAccessCode,
+  clearAccessCode
 };

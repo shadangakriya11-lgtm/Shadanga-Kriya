@@ -305,6 +305,58 @@ export const lessonsApi = {
   },
   delete: (id: string) =>
     apiRequest<{ message: string }>(`/lessons/${id}`, { method: "DELETE" }),
+  // Access Code Management
+  getAccessCodeInfo: (lessonId: string) =>
+    apiRequest<{
+      lessonId: string;
+      lessonTitle: string;
+      accessCodeEnabled: boolean;
+      hasAccessCode: boolean;
+      accessCode: {
+        code: string;
+        type: "permanent" | "temporary";
+        expiresAt: string | null;
+        generatedAt: string;
+        isExpired: boolean;
+      } | null;
+    }>(`/lessons/${lessonId}/access-code`),
+  generateAccessCode: (
+    lessonId: string,
+    codeType: "permanent" | "temporary",
+    expiresInMinutes?: number
+  ) =>
+    apiRequest<{
+      message: string;
+      accessCode: {
+        code: string;
+        type: string;
+        expiresAt: string | null;
+        generatedAt: string;
+      };
+    }>(`/lessons/${lessonId}/access-code`, {
+      method: "POST",
+      body: JSON.stringify({ codeType, expiresInMinutes }),
+    }),
+  toggleAccessCode: (lessonId: string, enabled: boolean) =>
+    apiRequest<{ message: string; lesson: { id: string; accessCodeEnabled: boolean } }>(
+      `/lessons/${lessonId}/access-code/toggle`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ enabled }),
+      }
+    ),
+  clearAccessCode: (lessonId: string) =>
+    apiRequest<{ message: string }>(`/lessons/${lessonId}/access-code`, {
+      method: "DELETE",
+    }),
+  verifyAccessCode: (lessonId: string, code: string) =>
+    apiRequest<{ valid: boolean; message?: string; error?: string }>(
+      `/lessons/${lessonId}/verify-access-code`,
+      {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      }
+    ),
 };
 
 // Enrollments API

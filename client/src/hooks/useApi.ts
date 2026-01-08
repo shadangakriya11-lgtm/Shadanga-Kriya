@@ -163,6 +163,98 @@ export function useDeleteLesson() {
   });
 }
 
+// Access Code hooks
+export function useAccessCodeInfo(lessonId: string) {
+  return useQuery({
+    queryKey: ["accessCode", lessonId],
+    queryFn: () => lessonsApi.getAccessCodeInfo(lessonId),
+    enabled: !!lessonId,
+  });
+}
+
+export function useGenerateAccessCode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      lessonId,
+      codeType,
+      expiresInMinutes,
+    }: {
+      lessonId: string;
+      codeType: "permanent" | "temporary";
+      expiresInMinutes?: number;
+    }) => lessonsApi.generateAccessCode(lessonId, codeType, expiresInMinutes),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["accessCode", variables.lessonId] });
+      queryClient.invalidateQueries({ queryKey: ["lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["allLessons"] });
+      toast({ title: "Access code generated successfully!" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to generate access code",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useToggleAccessCode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ lessonId, enabled }: { lessonId: string; enabled: boolean }) =>
+      lessonsApi.toggleAccessCode(lessonId, enabled),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["accessCode", variables.lessonId] });
+      queryClient.invalidateQueries({ queryKey: ["lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["allLessons"] });
+      toast({ title: `Access code ${variables.enabled ? "enabled" : "disabled"}` });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to toggle access code",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useClearAccessCode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (lessonId: string) => lessonsApi.clearAccessCode(lessonId),
+    onSuccess: (_, lessonId) => {
+      queryClient.invalidateQueries({ queryKey: ["accessCode", lessonId] });
+      queryClient.invalidateQueries({ queryKey: ["lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["allLessons"] });
+      toast({ title: "Access code cleared" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to clear access code",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useVerifyAccessCode() {
+  return useMutation({
+    mutationFn: ({ lessonId, code }: { lessonId: string; code: string }) =>
+      lessonsApi.verifyAccessCode(lessonId, code),
+    onError: (error: Error) => {
+      toast({
+        title: "Verification Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 // Enrollments hooks
 export function useMyEnrollments() {
   return useQuery({

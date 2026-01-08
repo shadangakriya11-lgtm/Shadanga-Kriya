@@ -25,6 +25,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { AccessCodeInputDialog } from "@/components/learner/AccessCodeInputDialog";
 
 type ViewState = "details" | "protocol" | "player";
 
@@ -35,6 +36,8 @@ export default function CourseDetail() {
   const { toast } = useToast();
   const [view, setView] = useState<ViewState>("details");
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [isAccessCodeOpen, setIsAccessCodeOpen] = useState(false);
+  const [pendingLesson, setPendingLesson] = useState<Lesson | null>(null);
 
   const { data: courseData, isLoading: courseLoading } = useCourse(id || "");
   const { data: lessonsData, isLoading: lessonsLoading } = useLessonsByCourse(
@@ -54,14 +57,14 @@ export default function CourseDetail() {
   const course = courseData;
   const lessons: Lesson[] = (lessonsData?.lessons || []).map(
     (l: any, index: number) => {
-      const lessonProgress = progressData?.lessons?.find(
+      const lessonProgress = (progressData as any)?.lessons?.find(
         (p: any) => p.id === l.id
       );
       const prevLessonProgress =
         index > 0
-          ? progressData?.lessons?.find(
-              (p: any) => p.id === lessonsData?.lessons[index - 1]?.id
-            )
+          ? (progressData as any)?.lessons?.find(
+            (p: any) => p.id === lessonsData?.lessons[index - 1]?.id
+          )
           : null;
 
       return {
@@ -78,8 +81,13 @@ export default function CourseDetail() {
         status: lessonProgress?.completed
           ? "completed"
           : index === 0 || prevLessonProgress?.completed
-          ? "active"
-          : "locked",
+            ? "active"
+            : "locked",
+        // Access Code fields
+        accessCodeEnabled: l.accessCodeEnabled,
+        hasAccessCode: l.hasAccessCode,
+        accessCodeType: l.accessCodeType,
+        accessCodeExpired: l.accessCodeExpired,
       };
     }
   );
@@ -142,8 +150,35 @@ export default function CourseDetail() {
           return;
         }
       }
+
+      // Check for Access Code requirement
+      if (lesson.accessCodeEnabled) {
+        if (lesson.hasAccessCode) {
+          // Has code - open dialog to enter it
+          setPendingLesson(lesson);
+          setIsAccessCodeOpen(true);
+          return;
+        } else {
+          // No code set by admin yet - block access
+          toast({
+            title: "Access Code Required",
+            description: "This lesson requires an access code. Please contact your facilitator.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       setSelectedLesson(lesson);
       setView("protocol");
+    }
+  };
+
+  const handleAccessCodeVerified = () => {
+    if (pendingLesson) {
+      setSelectedLesson(pendingLesson);
+      setView("protocol");
+      setPendingLesson(null);
     }
   };
 
@@ -191,8 +226,8 @@ export default function CourseDetail() {
     );
   }
 
-  const progress = progressData?.progressPercent || 0;
-  const completedLessons = progressData?.completedLessons || 0;
+  const progress = (progressData as any)?.progressPercent || 0;
+  const completedLessons = (progressData as any)?.completedLessons || 0;
   const totalLessons = lessons.length;
   const isEnrolled = !!progressData;
 
@@ -251,14 +286,14 @@ export default function CourseDetail() {
                 isEnrolled
                   ? "active"
                   : course.status === "active"
-                  ? "active"
-                  : "locked"
+                    ? "active"
+                    : "locked"
               }
             >
               {isEnrolled
                 ? "Enrolled"
                 : course.status?.charAt(0).toUpperCase() +
-                  course.status?.slice(1)}
+                course.status?.slice(1)}
             </Badge>
           </div>
 
@@ -334,6 +369,17 @@ export default function CourseDetail() {
           </div>
         </section>
       </main>
+
+      {/* Access Code Input Dialog */}
+      {pendingLesson && (
+        <AccessCodeInputDialog
+          lessonId={pendingLesson.id}
+          lessonTitle={pendingLesson.title}
+          open={isAccessCodeOpen}
+          onOpenChange={setIsAccessCodeOpen}
+          onVerified={handleAccessCodeVerified}
+        />
+      )}
     </div>
   );
 }

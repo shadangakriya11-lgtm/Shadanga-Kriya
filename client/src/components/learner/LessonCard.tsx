@@ -1,7 +1,7 @@
 import { Lesson } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, Lock, CheckCircle2, Play, Pause } from "lucide-react";
+import { Clock, Lock, CheckCircle2, Play, Pause, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadButton } from "./DownloadButton";
 
@@ -40,7 +40,7 @@ export function LessonCard({
       className={cn(
         "group flex items-center gap-4 bg-card rounded-xl border border-border/50 p-4 transition-all duration-200",
         status.canPlay &&
-          "hover:shadow-soft hover:border-border cursor-pointer",
+        "hover:shadow-soft hover:border-border cursor-pointer",
         lesson.status === "locked" && "opacity-60",
         className
       )}
@@ -108,15 +108,33 @@ export function LessonCard({
           </div>
         )}
 
-      {/* Play Action */}
+      {/* Play/Access Code Action */}
       {status.canPlay && (
-        <Button
-          variant="therapy"
-          size="icon"
-          className="shrink-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-        >
-          <Play className="h-5 w-5" />
-        </Button>
+        <>
+          {/* Case 1: Access code disabled - show Play icon */}
+          {!lesson.accessCodeEnabled && (
+            <Button
+              variant="therapy"
+              size="icon"
+              className="shrink-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Play className="h-5 w-5" />
+            </Button>
+          )}
+
+          {/* Case 2: Access code enabled AND has code - show Key icon */}
+          {lesson.accessCodeEnabled && lesson.hasAccessCode && (
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0 rounded-full opacity-100 border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+            >
+              <KeyRound className="h-5 w-5" />
+            </Button>
+          )}
+
+          {/* Case 3: Access code enabled but NO code - show nothing (admin needs to set code) */}
+        </>
       )}
     </div>
   );

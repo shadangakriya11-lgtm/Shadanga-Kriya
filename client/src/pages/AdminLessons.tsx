@@ -6,11 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, MoreHorizontal, Upload, Clock, Pause } from 'lucide-react';
+import { Plus, Search, MoreHorizontal, Upload, Clock, Pause, KeyRound } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -32,6 +33,7 @@ import {
 import { useCourses, useCreateLesson, useUpdateLesson, useDeleteLesson } from '@/hooks/useApi';
 import { useQuery } from '@tanstack/react-query';
 import { lessonsApi } from '@/lib/api';
+import { AccessCodeDialog } from '@/components/admin/AccessCodeDialog';
 
 export default function AdminLessons() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,6 +47,7 @@ export default function AdminLessons() {
   });
   const [editingLesson, setEditingLesson] = useState<any | null>(null);
   const [previewLesson, setPreviewLesson] = useState<any | null>(null);
+  const [accessCodeLesson, setAccessCodeLesson] = useState<any | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -199,6 +202,22 @@ export default function AdminLessons() {
       ),
     },
     {
+      key: 'accessCode',
+      header: 'Access Code',
+      render: (lesson: any) => (
+        <div className="flex items-center gap-2">
+          {lesson.accessCodeEnabled ? (
+            <Badge variant={lesson.hasAccessCode ? (lesson.accessCodeExpired ? 'destructive' : 'default') : 'secondary'}>
+              <KeyRound className="h-3 w-3 mr-1" />
+              {lesson.hasAccessCode ? (lesson.accessCodeExpired ? 'Expired' : 'Active') : 'No Code'}
+            </Badge>
+          ) : (
+            <Badge variant="outline">Disabled</Badge>
+          )}
+        </div>
+      ),
+    },
+    {
       key: 'actions',
       header: '',
       render: (lesson: any) => (
@@ -218,6 +237,12 @@ export default function AdminLessons() {
             <DropdownMenuItem onClick={() => openPreview(lesson)} disabled={!lesson.audioUrl}>
               Preview
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setAccessCodeLesson(lesson)}>
+              <KeyRound className="h-4 w-4 mr-2" />
+              Manage Access Code
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteLesson(lesson.id)}>
               Delete
             </DropdownMenuItem>
@@ -423,6 +448,16 @@ export default function AdminLessons() {
           <div className="overflow-x-auto">
             <DataTable columns={lessonColumns} data={lessons} />
           </div>
+
+          {/* Access Code Management Dialog */}
+          {accessCodeLesson && (
+            <AccessCodeDialog
+              lessonId={accessCodeLesson.id}
+              lessonTitle={accessCodeLesson.title}
+              open={!!accessCodeLesson}
+              onOpenChange={(open) => !open && setAccessCodeLesson(null)}
+            />
+          )}
         </main>
       </div>
     </div>
