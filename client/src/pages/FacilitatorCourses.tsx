@@ -76,7 +76,7 @@ export default function FacilitatorCourses() {
                                             </span>
                                             <span className="flex items-center gap-1">
                                                 <Users className="h-3.5 w-3.5" />
-                                                {course.enrollment_count || 0} Learners
+                                                {course.enrollmentCount || 0} Learners
                                             </span>
                                         </div>
 

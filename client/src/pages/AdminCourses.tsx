@@ -147,7 +147,7 @@ export default function AdminCourses() {
       render: (course: any) => (
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">{course.enrollment_count || 0}</span>
+          <span className="text-muted-foreground">{course.enrollmentCount || 0}</span>
         </div>
       ),
     },
