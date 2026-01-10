@@ -3,7 +3,6 @@ package com.shadangakriya.app;
 import android.content.Context;
 import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
-import android.os.Build;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -23,41 +22,30 @@ public class HeadphonePlugin extends Plugin {
             boolean isConnected = false;
             String deviceType = "none";
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Android 6.0+ - Use AudioDeviceInfo
-                AudioDeviceInfo[] devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
-                for (AudioDeviceInfo device : devices) {
-                    int type = device.getType();
-                    if (type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES) {
-                        isConnected = true;
-                        deviceType = "wired_headphones";
-                        break;
-                    } else if (type == AudioDeviceInfo.TYPE_WIRED_HEADSET) {
-                        isConnected = true;
-                        deviceType = "wired_headset";
-                        break;
-                    } else if (type == AudioDeviceInfo.TYPE_USB_HEADSET) {
-                        isConnected = true;
-                        deviceType = "usb_headset";
-                        break;
-                    } else if (type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) {
-                        isConnected = true;
-                        deviceType = "bluetooth_a2dp";
-                        break;
-                    } else if (type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
-                        isConnected = true;
-                        deviceType = "bluetooth_sco";
-                        break;
-                    }
-                }
-            } else {
-                // Fallback for older Android versions
-                if (audioManager.isWiredHeadsetOn()) {
+            // minSdkVersion is 24, so AudioDeviceInfo API is always available
+            AudioDeviceInfo[] devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+            for (AudioDeviceInfo device : devices) {
+                int type = device.getType();
+                if (type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES) {
                     isConnected = true;
-                    deviceType = "wired";
-                } else if (audioManager.isBluetoothA2dpOn()) {
+                    deviceType = "wired_headphones";
+                    break;
+                } else if (type == AudioDeviceInfo.TYPE_WIRED_HEADSET) {
                     isConnected = true;
-                    deviceType = "bluetooth";
+                    deviceType = "wired_headset";
+                    break;
+                } else if (type == AudioDeviceInfo.TYPE_USB_HEADSET) {
+                    isConnected = true;
+                    deviceType = "usb_headset";
+                    break;
+                } else if (type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) {
+                    isConnected = true;
+                    deviceType = "bluetooth_a2dp";
+                    break;
+                } else if (type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
+                    isConnected = true;
+                    deviceType = "bluetooth_sco";
+                    break;
                 }
             }
 
