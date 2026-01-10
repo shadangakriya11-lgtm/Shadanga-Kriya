@@ -127,7 +127,7 @@ const getAllEnrollments = async (req, res) => {
     const total = parseInt(countResult.rows[0].count);
 
     query += ` ORDER BY e.enrolled_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(limit, offset);
+    params.push(parseInt(limit), parseInt(offset));
 
     const result = await pool.query(query, params);
 
@@ -247,7 +247,7 @@ const adminEnrollUser = async (req, res) => {
       return res.status(404).json({ error: 'Course not found' });
     }
 
-    // Check if user exists and is a learner
+    // Check if user exists
     const userCheck = await pool.query(
       'SELECT id, first_name, last_name FROM users WHERE id = $1',
       [userId]

@@ -1,0 +1,10 @@
+# Security Policy for Shadanga Kriya App
+# https://securitytxt.org/
+
+Contact: mailto:security@shadangakriya.com
+Expires: 2027-01-11T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://shadangakriya.com/.well-known/security.txt
+
+# We take security seriously. If you discover a vulnerability,
+# please report it responsibly to the contact above.

@@ -22,6 +22,7 @@ import {
   revokeAudioBlobUrl,
 } from "@/lib/downloadManager";
 import { useToast } from "@/hooks/use-toast";
+import { usePlaybackSettings } from "@/hooks/useApi";
 
 interface AudioPlayerProps {
   lesson: Lesson;
@@ -32,10 +33,18 @@ interface AudioPlayerProps {
 export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
   const token = getCachedToken();
   const { toast } = useToast();
+  const { data: playbackSettings } = usePlaybackSettings();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioBlobUrlRef = useRef<string | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
   const autoSkipTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Get settings with defaults
+  const offlineModeRequired = playbackSettings?.offlineModeRequired ?? true;
+  const autoSkipOnMaxPauses = playbackSettings?.autoSkipOnMaxPauses ?? true;
+  const autoSkipDelaySeconds = playbackSettings?.autoSkipDelaySeconds ?? 30;
+  const screenLockEnabled = playbackSettings?.screenLockEnabled ?? true;
+
   const [playback, setPlayback] = useState<PlaybackState>({
     isPlaying: false,
     currentTime: 0,
@@ -57,6 +66,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
 
   // Request wake lock to prevent screen from sleeping during playback
   const requestWakeLock = useCallback(async () => {
+    if (!screenLockEnabled) return;
     if ("wakeLock" in navigator) {
       try {
         wakeLockRef.current = await navigator.wakeLock.request("screen");
@@ -65,7 +75,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         console.warn("Wake lock request failed:", err);
       }
     }
-  }, []);
+  }, [screenLockEnabled]);
 
   // Release wake lock
   const releaseWakeLock = useCallback(() => {
@@ -82,12 +92,14 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
 
   // Auto-skip lesson when max pauses exhausted while paused
   const startAutoSkipTimer = useCallback(() => {
+    if (!autoSkipOnMaxPauses) return;
+
     // Clear any existing timer
     if (autoSkipTimerRef.current) {
       clearTimeout(autoSkipTimerRef.current);
     }
 
-    // Set 30-second timer to auto-complete the lesson
+    // Set timer to auto-complete the lesson based on settings
     autoSkipTimerRef.current = setTimeout(() => {
       toast({
         title: "Lesson Auto-Completed",
@@ -101,22 +113,21 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         isPlaying: false,
       }));
       releaseWakeLock();
-    }, 30000); // 30 seconds
+    }, autoSkipDelaySeconds * 1000);
 
     toast({
       title: "No Pauses Remaining",
-      description:
-        "Lesson will auto-complete in 30 seconds. Contact admin for additional pauses.",
+      description: `Lesson will auto-complete in ${autoSkipDelaySeconds} seconds. Contact admin for additional pauses.`,
       variant: "destructive",
     });
-  }, [toast, releaseWakeLock]);
+  }, [toast, releaseWakeLock, autoSkipOnMaxPauses, autoSkipDelaySeconds]);
 
   // Monitor online status and enforce offline-only playback
   useEffect(() => {
     const handleOnline = () => {
       setIsOffline(false);
-      // If playing and went online, pause and show warning
-      if (playback.isPlaying && audioRef.current) {
+      // If playing and went online, pause and show warning (only if offline mode required)
+      if (offlineModeRequired && playback.isPlaying && audioRef.current) {
         audioRef.current.pause();
         setPlayback((prev) => ({ ...prev, isPlaying: false }));
         setOfflineEnforcementError(
@@ -136,7 +147,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [playback.isPlaying, releaseWakeLock]);
+  }, [playback.isPlaying, releaseWakeLock, offlineModeRequired]);
 
   // Cleanup wake lock and auto-skip timer on unmount
   useEffect(() => {
@@ -169,8 +180,8 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
           );
         }
 
-        // Check if online - warn user to go offline
-        if (!isOffline) {
+        // Check if online - warn user to go offline (only if offline mode required)
+        if (offlineModeRequired && !isOffline) {
           setOfflineEnforcementError(
             "Please disconnect from the internet (airplane mode) before playing this lesson."
           );
@@ -251,13 +262,13 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         audioBlobUrlRef.current = null;
       }
     };
-  }, [lesson.id, token, isOffline]);
+  }, [lesson.id, token, isOffline, offlineModeRequired]);
 
   const togglePlayback = useCallback(() => {
     if (isComplete || !audioRef.current || audioError) return;
 
-    // Check offline enforcement before playing
-    if (!playback.isPlaying && !isOffline) {
+    // Check offline enforcement before playing (only if offline mode required)
+    if (offlineModeRequired && !playback.isPlaying && !isOffline) {
       setOfflineEnforcementError(
         "Please disconnect from the internet (airplane mode) before playing."
       );
@@ -284,7 +295,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         }));
 
         // If this was the last pause, start auto-skip timer
-        if (newPausesRemaining === 0) {
+        if (newPausesRemaining === 0 && autoSkipOnMaxPauses) {
           startAutoSkipTimer();
         }
       } else {
@@ -296,7 +307,9 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
           isPlaying: false,
           isPaused: true,
         }));
-        startAutoSkipTimer();
+        if (autoSkipOnMaxPauses) {
+          startAutoSkipTimer();
+        }
       }
     } else {
       // Playing - request wake lock
@@ -317,6 +330,8 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     isComplete,
     audioError,
     isOffline,
+    offlineModeRequired,
+    autoSkipOnMaxPauses,
     requestWakeLock,
     releaseWakeLock,
     startAutoSkipTimer,
@@ -518,7 +533,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
                 !autoSkipTimerRef.current) ||
               !!audioError ||
               isLoadingAudio ||
-              (!playback.isPlaying && !isOffline) // Disable play when online
+              (offlineModeRequired && !playback.isPlaying && !isOffline) // Disable play when online (if required)
             }
           >
             {isLoadingAudio ? (
@@ -539,12 +554,14 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
               {playback.pausesRemaining} pause
               {playback.pausesRemaining !== 1 ? "s" : ""} remaining
             </Badge>
-            {playback.pausesRemaining === 0 && !playback.isPlaying && (
-              <p className="text-xs text-destructive mt-2 font-medium">
-                Auto-completing in 30 seconds. Contact admin for additional
-                pauses.
-              </p>
-            )}
+            {playback.pausesRemaining === 0 &&
+              !playback.isPlaying &&
+              autoSkipOnMaxPauses && (
+                <p className="text-xs text-destructive mt-2 font-medium">
+                  Auto-completing in {autoSkipDelaySeconds} seconds. Contact
+                  admin for additional pauses.
+                </p>
+              )}
           </div>
         </div>
       </main>

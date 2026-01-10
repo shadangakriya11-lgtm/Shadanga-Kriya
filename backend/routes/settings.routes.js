@@ -12,4 +12,7 @@ router.put('/', verifyToken, isAdmin, settingsController.updateSettings);
 // Get Razorpay public key (accessible to all authenticated users)
 router.get('/razorpay-key', verifyToken, settingsController.getRazorpayKey);
 
+// Get playback settings (accessible to all authenticated users)
+router.get('/playback', verifyToken, settingsController.getPlaybackSettings);
+
 module.exports = router;

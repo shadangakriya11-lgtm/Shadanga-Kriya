@@ -43,9 +43,11 @@ export default function CourseDetail() {
   const { data: lessonsData, isLoading: lessonsLoading } = useLessonsByCourse(
     id || ""
   );
-  const { data: progressData, refetch: refetchProgress } = useCourseProgress(
-    id || ""
-  );
+  const {
+    data: progressData,
+    refetch: refetchProgress,
+    error: progressError,
+  } = useCourseProgress(id || "");
   const updateProgress = useUpdateLessonProgress();
 
   // Check attendance for on-site courses
@@ -63,8 +65,8 @@ export default function CourseDetail() {
       const prevLessonProgress =
         index > 0
           ? (progressData as any)?.lessons?.find(
-            (p: any) => p.id === lessonsData?.lessons[index - 1]?.id
-          )
+              (p: any) => p.id === lessonsData?.lessons[index - 1]?.id
+            )
           : null;
 
       return {
@@ -81,8 +83,8 @@ export default function CourseDetail() {
         status: lessonProgress?.completed
           ? "completed"
           : index === 0 || prevLessonProgress?.completed
-            ? "active"
-            : "locked",
+          ? "active"
+          : "locked",
         // Access Code fields
         accessCodeEnabled: l.accessCodeEnabled,
         hasAccessCode: l.hasAccessCode,
@@ -162,7 +164,8 @@ export default function CourseDetail() {
           // No code set by admin yet - block access
           toast({
             title: "Access Code Required",
-            description: "This lesson requires an access code. Please contact your facilitator.",
+            description:
+              "This lesson requires an access code. Please contact your facilitator.",
             variant: "destructive",
           });
           return;
@@ -229,7 +232,8 @@ export default function CourseDetail() {
   const progress = (progressData as any)?.progressPercent || 0;
   const completedLessons = (progressData as any)?.completedLessons || 0;
   const totalLessons = lessons.length;
-  const isEnrolled = !!progressData;
+  // User is enrolled if we have progress data AND no 403 error
+  const isEnrolled = !!progressData && !progressError;
 
   return (
     <div className="min-h-screen bg-background">
@@ -286,14 +290,14 @@ export default function CourseDetail() {
                 isEnrolled
                   ? "active"
                   : course.status === "active"
-                    ? "active"
-                    : "locked"
+                  ? "active"
+                  : "locked"
               }
             >
               {isEnrolled
                 ? "Enrolled"
                 : course.status?.charAt(0).toUpperCase() +
-                course.status?.slice(1)}
+                  course.status?.slice(1)}
             </Badge>
           </div>
 

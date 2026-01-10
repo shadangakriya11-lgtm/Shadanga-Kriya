@@ -5,6 +5,16 @@ const getCourseProgress = async (req, res) => {
   try {
     const { courseId } = req.params;
 
+    // SECURITY: Check if user is enrolled in this course
+    const enrollmentCheck = await pool.query(
+      'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [req.user.id, courseId]
+    );
+
+    if (enrollmentCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Not enrolled in this course' });
+    }
+
     // Get all lessons for the course with user's progress
     const result = await pool.query(
       `SELECT l.id, l.title, l.order_index, l.duration_minutes,

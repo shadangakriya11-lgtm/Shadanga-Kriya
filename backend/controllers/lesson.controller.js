@@ -5,6 +5,16 @@ const getLessonsByCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
 
+    // Check if user is enrolled (to determine if we should expose audioUrl)
+    let isEnrolled = false;
+    if (req.user) {
+      const enrollmentCheck = await pool.query(
+        'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2 AND status = $3',
+        [req.user.id, courseId, 'active']
+      );
+      isEnrolled = enrollmentCheck.rows.length > 0;
+    }
+
     const result = await pool.query(
       `SELECT * FROM lessons WHERE course_id = $1 ORDER BY order_index`,
       [courseId]
@@ -16,8 +26,9 @@ const getLessonsByCourse = async (req, res) => {
       title: l.title,
       description: l.description,
       content: l.content,
-      audioUrl: l.audio_url,
-      videoUrl: l.video_url,
+      // SECURITY: Only expose audioUrl to enrolled users
+      audioUrl: isEnrolled ? l.audio_url : null,
+      videoUrl: isEnrolled ? l.video_url : null,
       duration: l.duration,
       durationSeconds: l.duration_seconds,
       durationMinutes: l.duration_minutes,
@@ -58,6 +69,16 @@ const getLessonById = async (req, res) => {
 
     const l = result.rows[0];
 
+    // SECURITY: Check if user is enrolled to expose audio/video URLs
+    let isEnrolled = false;
+    if (req.user) {
+      const enrollmentCheck = await pool.query(
+        'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2 AND status = $3',
+        [req.user.id, l.course_id, 'active']
+      );
+      isEnrolled = enrollmentCheck.rows.length > 0;
+    }
+
     // Get user's progress if authenticated
     let progress = null;
     if (req.user) {
@@ -78,8 +99,9 @@ const getLessonById = async (req, res) => {
       title: l.title,
       description: l.description,
       content: l.content,
-      audioUrl: l.audio_url,
-      videoUrl: l.video_url,
+      // SECURITY: Only expose audioUrl/videoUrl to enrolled users
+      audioUrl: isEnrolled ? l.audio_url : null,
+      videoUrl: isEnrolled ? l.video_url : null,
       duration: l.duration,
       durationSeconds: l.duration_seconds,
       durationMinutes: l.duration_minutes,

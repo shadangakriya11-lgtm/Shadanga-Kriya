@@ -22,6 +22,7 @@ import {
   Globe,
   Save,
   Loader2,
+  Play,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { settingsApi } from "@/lib/api";
@@ -37,9 +38,20 @@ export default function AdminSettings() {
     razorpayTestMode: false,
     autoActivate: true,
   });
+  const [playbackSettings, setPlaybackSettings] = useState({
+    screenLockEnabled: true,
+    offlineModeRequired: true,
+    maxDefaultPauses: 3,
+    autoSkipOnMaxPauses: true,
+    autoSkipDelaySeconds: 30,
+    earphoneCheckEnabled: true,
+    flightModeCheckEnabled: true,
+  });
+  const [isSavingPlayback, setIsSavingPlayback] = useState(false);
 
   useEffect(() => {
     fetchSettings();
+    fetchPlaybackSettings();
   }, []);
 
   const fetchSettings = async () => {
@@ -63,6 +75,23 @@ export default function AdminSettings() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchPlaybackSettings = async () => {
+    try {
+      const data = await settingsApi.getPlaybackSettings();
+      setPlaybackSettings({
+        screenLockEnabled: data.screenLockEnabled ?? true,
+        offlineModeRequired: data.offlineModeRequired ?? true,
+        maxDefaultPauses: data.maxDefaultPauses ?? 3,
+        autoSkipOnMaxPauses: data.autoSkipOnMaxPauses ?? true,
+        autoSkipDelaySeconds: data.autoSkipDelaySeconds ?? 30,
+        earphoneCheckEnabled: data.earphoneCheckEnabled ?? true,
+        flightModeCheckEnabled: data.flightModeCheckEnabled ?? true,
+      });
+    } catch (error) {
+      console.error("Fetch playback settings error:", error);
     }
   };
 
@@ -90,6 +119,34 @@ export default function AdminSettings() {
     }
   };
 
+  const handleSavePlayback = async () => {
+    setIsSavingPlayback(true);
+    try {
+      await settingsApi.updateSettings({
+        screenLockEnabled: playbackSettings.screenLockEnabled,
+        offlineModeRequired: playbackSettings.offlineModeRequired,
+        maxDefaultPauses: playbackSettings.maxDefaultPauses,
+        autoSkipOnMaxPauses: playbackSettings.autoSkipOnMaxPauses,
+        autoSkipDelaySeconds: playbackSettings.autoSkipDelaySeconds,
+        earphoneCheckEnabled: playbackSettings.earphoneCheckEnabled,
+        flightModeCheckEnabled: playbackSettings.flightModeCheckEnabled,
+      });
+      toast({
+        title: "Settings Saved",
+        description: "Playback settings have been updated successfully",
+      });
+    } catch (error) {
+      console.error("Save playback settings error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save playback settings",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingPlayback(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
@@ -107,6 +164,10 @@ export default function AdminSettings() {
               <TabsTrigger value="notifications" className="gap-2">
                 <Bell className="h-4 w-4" />
                 Notifications
+              </TabsTrigger>
+              <TabsTrigger value="playback" className="gap-2">
+                <Play className="h-4 w-4" />
+                Playback
               </TabsTrigger>
               <TabsTrigger value="security" className="gap-2">
                 <Shield className="h-4 w-4" />
@@ -273,6 +334,184 @@ export default function AdminSettings() {
                   <Button variant="premium">Save Preferences</Button>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="playback">
+              <div className="grid gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-serif">
+                      Pre-Lesson Protocol
+                    </CardTitle>
+                    <CardDescription>
+                      Configure checks required before lesson playback
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between py-3 border-b border-border">
+                      <div>
+                        <p className="font-medium">Flight Mode Check</p>
+                        <p className="text-sm text-muted-foreground">
+                          Require users to enable airplane mode before playback
+                        </p>
+                      </div>
+                      <Switch
+                        checked={playbackSettings.flightModeCheckEnabled}
+                        onCheckedChange={(checked) =>
+                          setPlaybackSettings({
+                            ...playbackSettings,
+                            flightModeCheckEnabled: checked,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-3 border-b border-border">
+                      <div>
+                        <p className="font-medium">Earphone Check</p>
+                        <p className="text-sm text-muted-foreground">
+                          Require earphones/headphones to be connected
+                        </p>
+                      </div>
+                      <Switch
+                        checked={playbackSettings.earphoneCheckEnabled}
+                        onCheckedChange={(checked) =>
+                          setPlaybackSettings({
+                            ...playbackSettings,
+                            earphoneCheckEnabled: checked,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="font-medium">Offline Mode Required</p>
+                        <p className="text-sm text-muted-foreground">
+                          Enforce offline playback for downloaded lessons
+                        </p>
+                      </div>
+                      <Switch
+                        checked={playbackSettings.offlineModeRequired}
+                        onCheckedChange={(checked) =>
+                          setPlaybackSettings({
+                            ...playbackSettings,
+                            offlineModeRequired: checked,
+                          })
+                        }
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-serif">
+                      Playback Controls
+                    </CardTitle>
+                    <CardDescription>
+                      Configure pause limits and auto-skip behavior
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between py-3 border-b border-border">
+                      <div>
+                        <p className="font-medium">Default Max Pauses</p>
+                        <p className="text-sm text-muted-foreground">
+                          Maximum pauses allowed per lesson (can be overridden
+                          per lesson)
+                        </p>
+                      </div>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={10}
+                        value={playbackSettings.maxDefaultPauses}
+                        onChange={(e) =>
+                          setPlaybackSettings({
+                            ...playbackSettings,
+                            maxDefaultPauses: parseInt(e.target.value) || 0,
+                          })
+                        }
+                        className="w-20"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-3 border-b border-border">
+                      <div>
+                        <p className="font-medium">Auto-Skip on Max Pauses</p>
+                        <p className="text-sm text-muted-foreground">
+                          Automatically complete lesson when max pauses
+                          exhausted
+                        </p>
+                      </div>
+                      <Switch
+                        checked={playbackSettings.autoSkipOnMaxPauses}
+                        onCheckedChange={(checked) =>
+                          setPlaybackSettings({
+                            ...playbackSettings,
+                            autoSkipOnMaxPauses: checked,
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-3 border-b border-border">
+                      <div>
+                        <p className="font-medium">Auto-Skip Delay (seconds)</p>
+                        <p className="text-sm text-muted-foreground">
+                          Time before auto-completing after max pauses
+                        </p>
+                      </div>
+                      <Input
+                        type="number"
+                        min={10}
+                        max={120}
+                        value={playbackSettings.autoSkipDelaySeconds}
+                        onChange={(e) =>
+                          setPlaybackSettings({
+                            ...playbackSettings,
+                            autoSkipDelaySeconds:
+                              parseInt(e.target.value) || 30,
+                          })
+                        }
+                        className="w-20"
+                        disabled={!playbackSettings.autoSkipOnMaxPauses}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between py-3">
+                      <div>
+                        <p className="font-medium">Screen Lock Prevention</p>
+                        <p className="text-sm text-muted-foreground">
+                          Keep screen awake during playback (wake lock)
+                        </p>
+                      </div>
+                      <Switch
+                        checked={playbackSettings.screenLockEnabled}
+                        onCheckedChange={(checked) =>
+                          setPlaybackSettings({
+                            ...playbackSettings,
+                            screenLockEnabled: checked,
+                          })
+                        }
+                      />
+                    </div>
+                    <Button
+                      variant="premium"
+                      onClick={handleSavePlayback}
+                      disabled={isSavingPlayback}
+                    >
+                      {isSavingPlayback ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Playback Settings
+                        </>
+                      )}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="security">

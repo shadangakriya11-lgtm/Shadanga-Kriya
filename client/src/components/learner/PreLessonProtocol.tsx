@@ -21,6 +21,7 @@ import {
   getAirplaneModeInstructions,
 } from "@/lib/deviceChecks";
 import { useToast } from "@/hooks/use-toast";
+import { usePlaybackSettings } from "@/hooks/useApi";
 
 interface PreLessonProtocolProps {
   lesson: Lesson;
@@ -58,9 +59,16 @@ export function PreLessonProtocol({
   onStart,
 }: PreLessonProtocolProps) {
   const { toast } = useToast();
+  const { data: playbackSettings } = usePlaybackSettings();
+
+  // Get settings with defaults
+  const flightModeCheckEnabled =
+    playbackSettings?.flightModeCheckEnabled ?? true;
+  const earphoneCheckEnabled = playbackSettings?.earphoneCheckEnabled ?? true;
+
   const [checklist, setChecklist] = useState<PreLessonChecklist>({
-    flightModeEnabled: false,
-    earbudsConnected: false,
+    flightModeEnabled: !flightModeCheckEnabled, // Auto-check if disabled
+    earbudsConnected: !earphoneCheckEnabled, // Auto-check if disabled
     focusAcknowledged: false,
   });
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
@@ -74,11 +82,24 @@ export function PreLessonProtocol({
 
   const allChecked = Object.values(checklist).every(Boolean);
 
+  // Update checklist when settings change
+  useEffect(() => {
+    setChecklist((prev) => ({
+      ...prev,
+      flightModeEnabled: !flightModeCheckEnabled
+        ? true
+        : prev.flightModeEnabled,
+      earbudsConnected: !earphoneCheckEnabled ? true : prev.earbudsConnected,
+    }));
+  }, [flightModeCheckEnabled, earphoneCheckEnabled]);
+
   // Auto-check device status on mount
   useEffect(() => {
     checkDeviceStatus();
 
-    // Monitor network status for airplane mode changes
+    // Monitor network status for airplane mode changes (only if flight mode check enabled)
+    if (!flightModeCheckEnabled) return;
+
     const cleanup = onNetworkStatusChange((isConnected) => {
       setAutoCheckResults((prev) => ({
         ...prev,
@@ -102,19 +123,21 @@ export function PreLessonProtocol({
     });
 
     return cleanup;
-  }, [toast]);
+  }, [toast, flightModeCheckEnabled]);
 
   const checkDeviceStatus = async () => {
     setIsCheckingDevices(true);
     try {
       const [airplaneMode, earphones] = await Promise.all([
-        isAirplaneModeEnabled(),
-        areEarphonesConnected(),
+        flightModeCheckEnabled
+          ? isAirplaneModeEnabled()
+          : Promise.resolve(true),
+        earphoneCheckEnabled ? areEarphonesConnected() : Promise.resolve(true),
       ]);
 
       setAutoCheckResults({
-        airplaneMode,
-        earphones,
+        airplaneMode: flightModeCheckEnabled ? airplaneMode : null,
+        earphones: earphoneCheckEnabled ? earphones : null,
       });
 
       // Auto-check items if conditions are met
@@ -124,10 +147,12 @@ export function PreLessonProtocol({
 
       if (earphones) {
         setChecklist((prev) => ({ ...prev, earbudsConnected: true }));
-        toast({
-          title: "Earphones detected",
-          description: "Audio device is connected",
-        });
+        if (earphoneCheckEnabled) {
+          toast({
+            title: "Earphones detected",
+            description: "Audio device is connected",
+          });
+        }
       }
     } catch (error) {
       console.error("Error checking device status:", error);
@@ -206,82 +231,91 @@ export function PreLessonProtocol({
 
         {/* Checklist */}
         <div className="space-y-4 mb-10">
-          {checklistItems.map((item, index) => {
-            const Icon = item.icon;
-            const isChecked = checklist[item.id];
-            const autoCheckStatus =
-              item.id === "flightModeEnabled"
-                ? autoCheckResults.airplaneMode
-                : item.id === "earbudsConnected"
-                ? autoCheckResults.earphones
-                : null;
+          {checklistItems
+            .filter((item) => {
+              // Filter out disabled checks
+              if (item.id === "flightModeEnabled" && !flightModeCheckEnabled)
+                return false;
+              if (item.id === "earbudsConnected" && !earphoneCheckEnabled)
+                return false;
+              return true;
+            })
+            .map((item, index) => {
+              const Icon = item.icon;
+              const isChecked = checklist[item.id];
+              const autoCheckStatus =
+                item.id === "flightModeEnabled"
+                  ? autoCheckResults.airplaneMode
+                  : item.id === "earbudsConnected"
+                  ? autoCheckResults.earphones
+                  : null;
 
-            return (
-              <div
-                key={item.id}
-                className={cn(
-                  "flex items-start gap-4 p-5 rounded-xl border transition-all duration-300 cursor-pointer animate-fade-in relative",
-                  isChecked
-                    ? "bg-success/5 border-success/30"
-                    : "bg-card border-border/50 hover:border-border"
-                )}
-                style={{ animationDelay: `${index * 100}ms` }}
-                onClick={() => toggleItem(item.id)}
-              >
+              return (
                 <div
+                  key={item.id}
                   className={cn(
-                    "flex items-center justify-center h-12 w-12 rounded-full transition-colors shrink-0",
+                    "flex items-start gap-4 p-5 rounded-xl border transition-all duration-300 cursor-pointer animate-fade-in relative",
                     isChecked
-                      ? "bg-success/15 text-success"
-                      : "bg-muted text-muted-foreground"
+                      ? "bg-success/5 border-success/30"
+                      : "bg-card border-border/50 hover:border-border"
                   )}
+                  style={{ animationDelay: `${index * 100}ms` }}
+                  onClick={() => toggleItem(item.id)}
                 >
-                  <Icon className="h-6 w-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-medium text-foreground">
-                      {item.title}
-                    </h3>
-                    {autoCheckStatus !== null && (
-                      <span
-                        className={cn(
-                          "text-xs px-2 py-0.5 rounded-full",
-                          autoCheckStatus
-                            ? "bg-success/20 text-success"
-                            : "bg-destructive/20 text-destructive"
-                        )}
+                  <div
+                    className={cn(
+                      "flex items-center justify-center h-12 w-12 rounded-full transition-colors shrink-0",
+                      isChecked
+                        ? "bg-success/15 text-success"
+                        : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    <Icon className="h-6 w-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-foreground">
+                        {item.title}
+                      </h3>
+                      {autoCheckStatus !== null && (
+                        <span
+                          className={cn(
+                            "text-xs px-2 py-0.5 rounded-full",
+                            autoCheckStatus
+                              ? "bg-success/20 text-success"
+                              : "bg-destructive/20 text-destructive"
+                          )}
+                        >
+                          {autoCheckStatus ? "✓ Detected" : "✗ Not detected"}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {item.description}
+                    </p>
+                    {item.id === "flightModeEnabled" && !isChecked && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 h-7 text-xs gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAirplaneModeHelp();
+                        }}
                       >
-                        {autoCheckStatus ? "✓ Detected" : "✗ Not detected"}
-                      </span>
+                        <Settings className="h-3 w-3" />
+                        How to enable
+                      </Button>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                  {item.id === "flightModeEnabled" && !isChecked && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 h-7 text-xs gap-1"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAirplaneModeHelp();
-                      }}
-                    >
-                      <Settings className="h-3 w-3" />
-                      How to enable
-                    </Button>
-                  )}
+                  <Checkbox
+                    checked={isChecked}
+                    onCheckedChange={() => toggleItem(item.id)}
+                    className="mt-1 h-6 w-6 rounded-md"
+                  />
                 </div>
-                <Checkbox
-                  checked={isChecked}
-                  onCheckedChange={() => toggleItem(item.id)}
-                  className="mt-1 h-6 w-6 rounded-md"
-                />
-              </div>
-            );
-          })}
+              );
+            })}
         </div>
 
         {/* Session Info */}

@@ -3,8 +3,26 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db.js');
 const { notifyAdmins } = require('./notification.controller.js');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRES_IN = '7d';
+
+// SECURITY: Enforce JWT secret requirement
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set!');
+  process.exit(1);
+}
+
+// SECURITY: Audit logging helper
+const logSecurityEvent = (event, details, req) => {
+  const logEntry = {
+    timestamp: new Date().toISOString(),
+    event,
+    ip: req?.ip || req?.connection?.remoteAddress || 'unknown',
+    userAgent: req?.get?.('user-agent') || 'unknown',
+    ...details
+  };
+  console.log('[SECURITY]', JSON.stringify(logEntry));
+};
 
 // Register new user
 const register = async (req, res) => {
@@ -71,11 +89,30 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const identifier = email.toLowerCase();
+
+    // SECURITY: Check for account lockout
+    const lockoutCheck = await pool.query(
+      `SELECT login_attempts, locked_until FROM users WHERE email = $1`,
+      [identifier]
+    );
+
+    if (lockoutCheck.rows.length > 0) {
+      const { login_attempts, locked_until } = lockoutCheck.rows[0];
+
+      if (locked_until && new Date(locked_until) > new Date()) {
+        const remainingTime = Math.ceil((new Date(locked_until) - new Date()) / 1000);
+        return res.status(429).json({
+          error: 'Account temporarily locked due to multiple failed login attempts',
+          retryAfter: remainingTime
+        });
+      }
+    }
 
     // Find user
     const result = await pool.query(
       'SELECT * FROM users WHERE email = $1',
-      [email.toLowerCase()]
+      [identifier]
     );
 
     if (result.rows.length === 0) {
@@ -92,14 +129,47 @@ const login = async (req, res) => {
     // Verify password
     const isValidPassword = await bcrypt.compare(password, user.password_hash);
     if (!isValidPassword) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      // SECURITY: Record failed login attempt
+      const newAttempts = (user.login_attempts || 0) + 1;
+      const lockoutTime = newAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
+
+      await pool.query(
+        `UPDATE users SET login_attempts = $1, locked_until = $2 WHERE id = $3`,
+        [newAttempts, lockoutTime, user.id]
+      );
+
+      // SECURITY: Log failed login attempt
+      logSecurityEvent('LOGIN_FAILED', {
+        email: identifier,
+        userId: user.id,
+        attempts: newAttempts,
+        locked: !!lockoutTime
+      }, req);
+
+      if (lockoutTime) {
+        return res.status(429).json({
+          error: 'Account locked due to multiple failed login attempts. Try again in 15 minutes.'
+        });
+      }
+
+      return res.status(401).json({
+        error: 'Invalid credentials',
+        attemptsRemaining: Math.max(0, 5 - newAttempts)
+      });
     }
 
-    // Update last active
+    // SECURITY: Reset login attempts on successful login
     await pool.query(
-      'UPDATE users SET last_active = NOW() WHERE id = $1',
+      'UPDATE users SET login_attempts = 0, locked_until = NULL, last_active = NOW() WHERE id = $1',
       [user.id]
     );
+
+    // SECURITY: Log successful login
+    logSecurityEvent('LOGIN_SUCCESS', {
+      email: identifier,
+      userId: user.id,
+      role: user.role
+    }, req);
 
     // Generate token
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
@@ -276,17 +346,14 @@ const forgotPassword = async (req, res) => {
     );
 
     // In production, send email with reset link
-    // For now, return the token in response (demo mode)
+    // For now, log it server-side only
     const resetLink = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password?token=${token}`;
 
-    console.log(`Password reset link for ${email}: ${resetLink}`);
+    console.log(`[PASSWORD_RESET] Reset link for ${email}: ${resetLink}`);
 
+    // SECURITY: Never expose tokens in API response
     res.json({
-      message: 'If this email exists, a reset link has been sent.',
-      // For demo/development purposes
-      demo_reset_link: resetLink,
-      demo_token: token,
-      expires_in: '1 hour'
+      message: 'If this email exists, a reset link has been sent to your email address.'
     });
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -303,8 +370,16 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ error: 'Token and new password are required' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
+
+    // SECURITY: Validate password strength
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({
+        error: 'Password must contain uppercase, lowercase, number, and special character'
+      });
     }
 
     // Find valid token

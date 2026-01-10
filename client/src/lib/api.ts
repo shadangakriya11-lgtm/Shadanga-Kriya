@@ -338,13 +338,13 @@ export const lessonsApi = {
       body: JSON.stringify({ codeType, expiresInMinutes }),
     }),
   toggleAccessCode: (lessonId: string, enabled: boolean) =>
-    apiRequest<{ message: string; lesson: { id: string; accessCodeEnabled: boolean } }>(
-      `/lessons/${lessonId}/access-code/toggle`,
-      {
-        method: "PATCH",
-        body: JSON.stringify({ enabled }),
-      }
-    ),
+    apiRequest<{
+      message: string;
+      lesson: { id: string; accessCodeEnabled: boolean };
+    }>(`/lessons/${lessonId}/access-code/toggle`, {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    }),
   clearAccessCode: (lessonId: string) =>
     apiRequest<{ message: string }>(`/lessons/${lessonId}/access-code`, {
       method: "DELETE",
@@ -382,9 +382,12 @@ export const enrollmentsApi = {
       body: JSON.stringify({ userId, courseId }),
     }),
   adminUnenroll: (userId: string, courseId: string) =>
-    apiRequest<{ message: string }>(`/enrollments/admin/${userId}/${courseId}`, {
-      method: "DELETE",
-    }),
+    apiRequest<{ message: string }>(
+      `/enrollments/admin/${userId}/${courseId}`,
+      {
+        method: "DELETE",
+      }
+    ),
 };
 
 // Progress API
@@ -551,6 +554,17 @@ export const notificationsApi = {
     }), // Admin only
 };
 
+// Playback settings response type
+export interface PlaybackSettingsResponse {
+  screenLockEnabled: boolean;
+  offlineModeRequired: boolean;
+  maxDefaultPauses: number;
+  autoSkipOnMaxPauses: boolean;
+  autoSkipDelaySeconds: number;
+  earphoneCheckEnabled: boolean;
+  flightModeCheckEnabled: boolean;
+}
+
 // Settings API
 export const settingsApi = {
   getSettings: () => apiRequest<SettingsResponse>("/settings"),
@@ -561,6 +575,8 @@ export const settingsApi = {
     }),
   getRazorpayKey: () =>
     apiRequest<RazorpayKeyResponse>("/settings/razorpay-key"),
+  getPlaybackSettings: () =>
+    apiRequest<PlaybackSettingsResponse>("/settings/playback"),
 };
 
 // Auth helpers - use localStorage which works on Android WebView

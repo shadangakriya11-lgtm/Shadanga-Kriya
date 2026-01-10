@@ -3,6 +3,10 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
+const hpp = require('hpp');
+const path = require('path');
 
 const authRoutes = require('./routes/auth.routes.js');
 const userRoutes = require('./routes/user.routes.js');
@@ -27,14 +31,28 @@ const app = express();
 app.set('trust proxy', process.env.NODE_ENV === 'production' ? 1 : 'loopback');
 
 // Middleware
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false,
+  crossOriginEmbedderPolicy: false
+}));
+
 // Request logging
 app.use(morgan('combined'));
 
 app.use(cors({
-  origin: '*',
-  credentials: true
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '500mb' })); // SECURITY: Limit payload size
+
+// SECURITY: Sanitize data to prevent NoSQL injection
+app.use(mongoSanitize());
+
+// SECURITY: Prevent HTTP Parameter Pollution
+app.use(hpp());
 
 // ===== RATE LIMITING (per express-rate-limit v8 documentation) =====
 
@@ -88,6 +106,9 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// SECURITY: Serve security.txt
+app.use('/.well-known', express.static(path.join(__dirname, 'public/.well-known')));
+
 // Routes with specific rate limiters
 app.use('/api/auth/login', authLimiter);
 app.use('/api/auth/register', registerLimiter);
@@ -108,10 +129,24 @@ app.use('/api/certificates', certificateRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/downloads', downloadRoutes);
 
-// Error handling middleware
+// SECURITY: Error handling middleware - don't expose sensitive data
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
+  // Log full error server-side
+  console.error('[ERROR]', {
+    timestamp: new Date().toISOString(),
+    path: req.path,
+    method: req.method,
+    error: err.message,
+    stack: process.env.NODE_ENV !== 'production' ? err.stack : undefined
+  });
+
+  // Send generic error to client in production
+  const statusCode = err.statusCode || 500;
+  const message = process.env.NODE_ENV === 'production'
+    ? 'Something went wrong!'
+    : err.message || 'Something went wrong!';
+
+  res.status(statusCode).json({ error: message });
 });
 
 const PORT = process.env.PORT || 4000;

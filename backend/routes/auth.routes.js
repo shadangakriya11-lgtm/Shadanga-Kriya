@@ -8,7 +8,10 @@ const authController = require('../controllers/auth.controller.js');
 // Register
 router.post('/register', [
   body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Password must contain uppercase, lowercase, number, and special character'),
   body('firstName').trim().notEmpty().withMessage('First name required'),
   body('lastName').trim().notEmpty().withMessage('Last name required')
 ], validate, authController.register);
@@ -32,7 +35,10 @@ router.put('/profile', verifyToken, [
 // Change password
 router.put('/password', verifyToken, [
   body('currentPassword').notEmpty().withMessage('Current password required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters')
+  body('newPassword')
+    .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Password must contain uppercase, lowercase, number, and special character')
 ], validate, authController.changePassword);
 
 // Forgot password (request reset link)
@@ -43,7 +49,10 @@ router.post('/forgot-password', [
 // Reset password (with token)
 router.post('/reset-password', [
   body('token').notEmpty().withMessage('Reset token required'),
-  body('newPassword').isLength({ min: 6 }).withMessage('Password must be at least 6 characters')
+  body('newPassword')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Password must contain uppercase, lowercase, number, and special character')
 ], validate, authController.resetPassword);
 
 module.exports = router;

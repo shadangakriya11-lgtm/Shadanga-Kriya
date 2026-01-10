@@ -1,7 +1,13 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db.js');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// SECURITY: Enforce JWT secret requirement
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable is not set!');
+  process.exit(1);
+}
 
 // Verify JWT token
 const verifyToken = async (req, res, next) => {

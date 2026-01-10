@@ -10,6 +10,8 @@ import {
   analyticsApi,
   usersApi,
   notificationsApi,
+  settingsApi,
+  PlaybackSettingsResponse,
 } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 
@@ -185,7 +187,9 @@ export function useGenerateAccessCode() {
       expiresInMinutes?: number;
     }) => lessonsApi.generateAccessCode(lessonId, codeType, expiresInMinutes),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["accessCode", variables.lessonId] });
+      queryClient.invalidateQueries({
+        queryKey: ["accessCode", variables.lessonId],
+      });
       queryClient.invalidateQueries({ queryKey: ["lessons"] });
       queryClient.invalidateQueries({ queryKey: ["allLessons"] });
       toast({ title: "Access code generated successfully!" });
@@ -203,13 +207,22 @@ export function useGenerateAccessCode() {
 export function useToggleAccessCode() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ lessonId, enabled }: { lessonId: string; enabled: boolean }) =>
-      lessonsApi.toggleAccessCode(lessonId, enabled),
+    mutationFn: ({
+      lessonId,
+      enabled,
+    }: {
+      lessonId: string;
+      enabled: boolean;
+    }) => lessonsApi.toggleAccessCode(lessonId, enabled),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["accessCode", variables.lessonId] });
+      queryClient.invalidateQueries({
+        queryKey: ["accessCode", variables.lessonId],
+      });
       queryClient.invalidateQueries({ queryKey: ["lessons"] });
       queryClient.invalidateQueries({ queryKey: ["allLessons"] });
-      toast({ title: `Access code ${variables.enabled ? "enabled" : "disabled"}` });
+      toast({
+        title: `Access code ${variables.enabled ? "enabled" : "disabled"}`,
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -329,7 +342,9 @@ export function useAdminEnroll() {
     mutationFn: ({ userId, courseId }: { userId: string; courseId: string }) =>
       enrollmentsApi.adminEnroll(userId, courseId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["courseEnrollments", variables.courseId] });
+      queryClient.invalidateQueries({
+        queryKey: ["courseEnrollments", variables.courseId],
+      });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       toast({ title: "User enrolled successfully!" });
     },
@@ -349,7 +364,9 @@ export function useAdminUnenroll() {
     mutationFn: ({ userId, courseId }: { userId: string; courseId: string }) =>
       enrollmentsApi.adminUnenroll(userId, courseId),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["courseEnrollments", variables.courseId] });
+      queryClient.invalidateQueries({
+        queryKey: ["courseEnrollments", variables.courseId],
+      });
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       toast({ title: "User unenrolled successfully" });
     },
@@ -806,5 +823,14 @@ export function useDeleteUser() {
         variant: "destructive",
       });
     },
+  });
+}
+
+// Playback Settings hook
+export function usePlaybackSettings() {
+  return useQuery<PlaybackSettingsResponse>({
+    queryKey: ["playbackSettings"],
+    queryFn: () => settingsApi.getPlaybackSettings(),
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }

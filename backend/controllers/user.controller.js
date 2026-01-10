@@ -132,8 +132,8 @@ const createUser = async (req, res) => {
       return res.status(400).json({ error: 'Email already registered' });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
+    // Hash password - SECURITY: Use 12 rounds for better security
+    const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(password, salt);
 
     const result = await client.query(

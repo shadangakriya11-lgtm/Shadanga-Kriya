@@ -22,9 +22,12 @@ router.get('/:id', [
 // Create user
 router.post('/', [
   body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-  body('firstName').trim().notEmpty().withMessage('First name required'),
-  body('lastName').trim().notEmpty().withMessage('Last name required'),
+  body('password')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .withMessage('Password must contain uppercase, lowercase, number, and special character'),
+  body('firstName').trim().notEmpty().escape().withMessage('First name required'),
+  body('lastName').trim().notEmpty().escape().withMessage('Last name required'),
   body('role').isIn(['admin', 'facilitator', 'learner', 'sub_admin']).withMessage('Valid role required')
 ], validate, userController.createUser);
 
