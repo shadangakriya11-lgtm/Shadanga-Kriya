@@ -56,15 +56,17 @@ app.use(hpp());
 
 // ===== RATE LIMITING (per express-rate-limit v8 documentation) =====
 
-// General API rate limiter - 100 requests per 15 minutes
+// General API rate limiter - 500 requests per 15 minutes (more reasonable for SPAs)
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  limit: 100, // Use 'limit' (v7+) instead of 'max'
+  limit: 500, // Increased for SPA with frequent polling
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: 'draft-8', // draft-8 is the latest standard (RateLimit header)
   legacyHeaders: false, // Disable X-RateLimit-* headers
   // Less aggressive IPv6 subnet handling
   ipv6Subnet: 60,
+  // Skip rate limiting in development
+  skip: () => process.env.NODE_ENV === 'development',
 });
 
 // Strict rate limiter for login endpoint - 5 attempts per 15 minutes
@@ -150,7 +152,24 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4000;
+const pool = require('./config/db.js');
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Check database connection before starting server
+async function startServer() {
+  try {
+    // Test database connection
+    const result = await pool.query('SELECT NOW() as current_time');
+    console.log(`✓ Database connected successfully at ${result.rows[0].current_time}`);
+
+    // Start the server only after successful DB connection
+    app.listen(PORT, () => {
+      console.log(`✓ Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('✗ Failed to connect to database:', error.message);
+    console.error('Server startup aborted. Please check your DATABASE_URL configuration.');
+    process.exit(1);
+  }
+}
+
+startServer();

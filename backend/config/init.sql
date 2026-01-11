@@ -82,6 +82,11 @@ CREATE TABLE IF NOT EXISTS courses (
   prerequisites TEXT,
   prerequisite_course_id UUID REFERENCES courses(id) ON DELETE SET NULL,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  -- Offline/Download control settings
+  -- allow_offline_download BOOLEAN DEFAULT true,
+  -- enforce_flight_mode BOOLEAN DEFAULT true,
+  -- enforce_headphones BOOLEAN DEFAULT true,
+  -- max_devices_per_user INTEGER DEFAULT 2,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -101,6 +106,16 @@ CREATE TABLE IF NOT EXISTS lessons (
   order_index INTEGER DEFAULT 0,
   max_pauses INTEGER DEFAULT 3,
   is_locked BOOLEAN DEFAULT false,
+  -- Offline/Download control settings (NULL = inherit from course)
+  allow_offline_download BOOLEAN DEFAULT NULL,
+  enforce_flight_mode BOOLEAN DEFAULT NULL,
+  enforce_headphones BOOLEAN DEFAULT NULL,
+  -- Access code settings
+  access_code VARCHAR(10),
+  access_code_type VARCHAR(20) DEFAULT 'permanent',
+  access_code_expires_at TIMESTAMP WITH TIME ZONE,
+  access_code_generated_at TIMESTAMP WITH TIME ZONE,
+  access_code_enabled BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -158,6 +173,7 @@ CREATE TABLE IF NOT EXISTS payments (
   status payment_status NOT NULL DEFAULT 'pending',
   payment_method VARCHAR(50),
   transaction_id VARCHAR(255),
+  payment_id VARCHAR(255),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

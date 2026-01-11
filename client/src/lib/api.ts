@@ -303,6 +303,94 @@ export const lessonsApi = {
     const body = data instanceof FormData ? data : JSON.stringify(data);
     return apiRequest<Lesson>(`/lessons/${id}`, { method: "PUT", body });
   },
+  // Create/Update with progress tracking for file uploads
+  createWithProgress: (
+    data: FormData,
+    onProgress: (progress: number) => void
+  ): Promise<Lesson> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const token = getCachedToken();
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          onProgress(progress);
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            resolve(xhr.responseText as unknown as Lesson);
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText);
+            reject(new Error(error.error || error.message || "Upload failed"));
+          } catch {
+            reject(new Error("Upload failed"));
+          }
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Network error")));
+      xhr.addEventListener("abort", () =>
+        reject(new Error("Upload cancelled"))
+      );
+
+      xhr.open("POST", `${API_BASE_URL}/lessons`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
+      xhr.send(data);
+    });
+  },
+  updateWithProgress: (
+    id: string,
+    data: FormData,
+    onProgress: (progress: number) => void
+  ): Promise<Lesson> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const token = getCachedToken();
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          onProgress(progress);
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            resolve(xhr.responseText as unknown as Lesson);
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText);
+            reject(new Error(error.error || error.message || "Upload failed"));
+          } catch {
+            reject(new Error("Upload failed"));
+          }
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Network error")));
+      xhr.addEventListener("abort", () =>
+        reject(new Error("Upload cancelled"))
+      );
+
+      xhr.open("PUT", `${API_BASE_URL}/lessons/${id}`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
+      xhr.send(data);
+    });
+  },
   delete: (id: string) =>
     apiRequest<{ message: string }>(`/lessons/${id}`, { method: "DELETE" }),
   // Access Code Management

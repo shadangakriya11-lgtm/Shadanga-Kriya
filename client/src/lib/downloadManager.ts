@@ -5,6 +5,7 @@
 
 import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
 import {
   createEncryptedPackage,
@@ -19,6 +20,7 @@ const STORAGE_PREFIX = "sk_audio_";
 const KEY_STORAGE_PREFIX = "sk_key_";
 const DEVICE_ID_KEY = "sk_device_id";
 const DOWNLOADS_INDEX_KEY = "sk_downloads_index";
+const AUDIO_FOLDER = "sk_audio_files";
 
 /**
  * Secure key storage helpers - uses native secure storage on mobile, falls back to Preferences on web
@@ -66,6 +68,116 @@ const removeSecureKey = async (key: string): Promise<void> => {
   await Preferences.remove({ key });
 };
 
+/**
+ * Save encrypted audio to filesystem (for large files) or Preferences (for small files/web)
+ */
+const saveAudioData = async (
+  lessonId: string,
+  encryptedPackage: EncryptedAudioPackage
+): Promise<void> => {
+  const data = JSON.stringify(encryptedPackage);
+
+  if (Capacitor.isNativePlatform()) {
+    // Use Filesystem for native platforms (no size limit)
+    try {
+      // Ensure directory exists
+      try {
+        await Filesystem.mkdir({
+          path: AUDIO_FOLDER,
+          directory: Directory.Data,
+          recursive: true,
+        });
+      } catch (e) {
+        // Directory might already exist
+      }
+
+      await Filesystem.writeFile({
+        path: `${AUDIO_FOLDER}/${lessonId}.json`,
+        data: data,
+        directory: Directory.Data,
+        encoding: Encoding.UTF8,
+      });
+    } catch (error: any) {
+      console.error("Filesystem write failed:", error);
+      // Check for storage full errors
+      if (
+        error?.message?.includes("ENOSPC") ||
+        error?.message?.includes("No space")
+      ) {
+        throw new Error(
+          "Device storage is full. Please free up some space and try again."
+        );
+      }
+      throw new Error(
+        "Failed to save audio file. Please check your device storage."
+      );
+    }
+  } else {
+    // Web fallback - use Preferences (has size limits)
+    try {
+      const storageKey = `${STORAGE_PREFIX}${lessonId}`;
+      await Preferences.set({ key: storageKey, value: data });
+    } catch (error: any) {
+      console.error("Storage write failed:", error);
+      // Check for quota exceeded errors
+      if (
+        error?.message?.includes("QuotaExceeded") ||
+        error?.name === "QuotaExceededError"
+      ) {
+        throw new Error(
+          "Storage limit reached. Offline downloads are only available in the mobile app. Please install the app to download lessons for offline use."
+        );
+      }
+      throw new Error("Failed to save audio file. Storage may be full.");
+    }
+  }
+};
+
+/**
+ * Load encrypted audio from filesystem or Preferences
+ */
+const loadAudioData = async (
+  lessonId: string
+): Promise<EncryptedAudioPackage | null> => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const result = await Filesystem.readFile({
+        path: `${AUDIO_FOLDER}/${lessonId}.json`,
+        directory: Directory.Data,
+        encoding: Encoding.UTF8,
+      });
+      return JSON.parse(result.data as string);
+    } catch (error) {
+      // File doesn't exist or read failed
+      return null;
+    }
+  } else {
+    // Web fallback
+    const storageKey = `${STORAGE_PREFIX}${lessonId}`;
+    const { value } = await Preferences.get({ key: storageKey });
+    return value ? JSON.parse(value) : null;
+  }
+};
+
+/**
+ * Delete audio data from filesystem or Preferences
+ */
+const deleteAudioData = async (lessonId: string): Promise<void> => {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await Filesystem.deleteFile({
+        path: `${AUDIO_FOLDER}/${lessonId}.json`,
+        directory: Directory.Data,
+      });
+    } catch (error) {
+      // File might not exist
+    }
+  }
+  // Also clean up Preferences (for migration/fallback)
+  const storageKey = `${STORAGE_PREFIX}${lessonId}`;
+  await Preferences.remove({ key: storageKey });
+};
+
 export interface DownloadedLesson {
   lessonId: string;
   lessonTitle: string;
@@ -79,12 +191,12 @@ export interface DownloadedLesson {
 export interface DownloadProgress {
   lessonId: string;
   status:
-  | "pending"
-  | "downloading"
-  | "encrypting"
-  | "saving"
-  | "completed"
-  | "error";
+    | "pending"
+    | "downloading"
+    | "encrypting"
+    | "saving"
+    | "completed"
+    | "error";
   progress: number;
   error?: string;
 }
@@ -115,8 +227,9 @@ export const getDeviceId = async (): Promise<string> => {
 export const registerDevice = async (token: string): Promise<void> => {
   const deviceId = await getDeviceId();
   const platform = Capacitor.getPlatform();
-  const deviceName = `${platform.charAt(0).toUpperCase() + platform.slice(1)
-    } Device`;
+  const deviceName = `${
+    platform.charAt(0).toUpperCase() + platform.slice(1)
+  } Device`;
 
   const response = await fetch(`${API_BASE}/downloads/devices`, {
     method: "POST",
@@ -320,12 +433,8 @@ export const downloadLesson = async (
 
     updateProgress("saving", 80);
 
-    // 4. Save encrypted audio to local storage
-    const storageKey = `${STORAGE_PREFIX}${lessonId}`;
-    await Preferences.set({
-      key: storageKey,
-      value: JSON.stringify(encryptedPackage),
-    });
+    // 4. Save encrypted audio to storage (filesystem on native, preferences on web)
+    await saveAudioData(lessonId, encryptedPackage);
 
     // 4.5. Save encryption key for offline playback (using secure storage)
     const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
@@ -393,14 +502,11 @@ export const loadEncryptedAudio = async (
   token: string
 ): Promise<string> => {
   // 1. Load encrypted package from storage
-  const storageKey = `${STORAGE_PREFIX}${lessonId}`;
-  const { value } = await Preferences.get({ key: storageKey });
+  const encryptedPackage = await loadAudioData(lessonId);
 
-  if (!value) {
+  if (!encryptedPackage) {
     throw new Error("Audio not found. Please download the lesson first.");
   }
-
-  const encryptedPackage: EncryptedAudioPackage = JSON.parse(value);
 
   // 2. Get decryption key - first try cached key, then fallback to server
   let decryptionKey: string;
@@ -419,7 +525,9 @@ export const loadEncryptedAudio = async (
       // Cache the key for future offline use (using secure storage)
       await saveSecureKey(keyStorageKey, decryptionKey);
     } catch (error) {
-      throw new Error("Failed to get decryption key. Please re-download the lesson while online.");
+      throw new Error(
+        "Failed to get decryption key. Please re-download the lesson while online."
+      );
     }
   }
 
@@ -437,9 +545,8 @@ export const deleteDownloadedLesson = async (
   lessonId: string,
   token?: string
 ): Promise<void> => {
-  // Remove encrypted audio from local storage
-  const storageKey = `${STORAGE_PREFIX}${lessonId}`;
-  await Preferences.remove({ key: storageKey });
+  // Remove encrypted audio from storage
+  await deleteAudioData(lessonId);
 
   // Remove cached encryption key (from secure storage)
   const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
@@ -477,8 +584,7 @@ export const clearAllDownloads = async (token?: string): Promise<void> => {
 
   // Delete all encrypted files
   for (const lessonId of Object.keys(index)) {
-    const storageKey = `${STORAGE_PREFIX}${lessonId}`;
-    await Preferences.remove({ key: storageKey });
+    await deleteAudioData(lessonId);
   }
 
   // Clear index

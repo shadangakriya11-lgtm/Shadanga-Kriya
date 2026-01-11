@@ -191,7 +191,10 @@ export function useGenerateAccessCode() {
         queryKey: ["accessCode", variables.lessonId],
       });
       queryClient.invalidateQueries({ queryKey: ["lessons"] });
-      queryClient.invalidateQueries({ queryKey: ["allLessons"] });
+      // Use predicate to match allLessons queries with any course IDs
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === "allLessons",
+      });
       toast({ title: "Access code generated successfully!" });
     },
     onError: (error: Error) => {
@@ -219,7 +222,10 @@ export function useToggleAccessCode() {
         queryKey: ["accessCode", variables.lessonId],
       });
       queryClient.invalidateQueries({ queryKey: ["lessons"] });
-      queryClient.invalidateQueries({ queryKey: ["allLessons"] });
+      // Use predicate to match allLessons queries with any course IDs
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === "allLessons",
+      });
       toast({
         title: `Access code ${variables.enabled ? "enabled" : "disabled"}`,
       });
@@ -241,7 +247,10 @@ export function useClearAccessCode() {
     onSuccess: (_, lessonId) => {
       queryClient.invalidateQueries({ queryKey: ["accessCode", lessonId] });
       queryClient.invalidateQueries({ queryKey: ["lessons"] });
-      queryClient.invalidateQueries({ queryKey: ["allLessons"] });
+      // Use predicate to match allLessons queries with any course IDs
+      queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey[0] === "allLessons",
+      });
       toast({ title: "Access code cleared" });
     },
     onError: (error: Error) => {
@@ -716,7 +725,7 @@ export function useNotifications(unreadOnly?: boolean) {
   return useQuery({
     queryKey: ["notifications", unreadOnly],
     queryFn: () => notificationsApi.getAll(unreadOnly),
-    refetchInterval: 10000, // Poll every 10 seconds for real-time updates
+    refetchInterval: 30000, // Poll every 30 seconds (reduced from 10s to avoid rate limiting)
   });
 }
 

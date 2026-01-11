@@ -22,6 +22,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { paymentsApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
 
 declare global {
   interface Window {
@@ -57,6 +58,7 @@ export function PaymentModal({
   onSuccess,
 }: PaymentModalProps) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStep, setPaymentStep] = useState<
     "details" | "processing" | "success" | "error"
@@ -98,6 +100,13 @@ export function PaymentModal({
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
+
+            // Invalidate queries to refresh enrollment status
+            await queryClient.invalidateQueries({
+              queryKey: ["myEnrollments"],
+            });
+            await queryClient.invalidateQueries({ queryKey: ["courses"] });
+            await queryClient.invalidateQueries({ queryKey: ["myPayments"] });
 
             setPaymentStep("success");
 

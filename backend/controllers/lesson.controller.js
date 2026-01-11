@@ -5,14 +5,20 @@ const getLessonsByCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
 
-    // Check if user is enrolled (to determine if we should expose audioUrl)
-    let isEnrolled = false;
+    // Check if user is admin/facilitator or enrolled (to determine if we should expose audioUrl)
+    let canViewAudio = false;
     if (req.user) {
-      const enrollmentCheck = await pool.query(
-        'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2 AND status = $3',
-        [req.user.id, courseId, 'active']
-      );
-      isEnrolled = enrollmentCheck.rows.length > 0;
+      // Admin and facilitator can always see audio status
+      if (req.user.role === 'admin' || req.user.role === 'facilitator') {
+        canViewAudio = true;
+      } else {
+        // For learners, check enrollment
+        const enrollmentCheck = await pool.query(
+          'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2 AND status = $3',
+          [req.user.id, courseId, 'active']
+        );
+        canViewAudio = enrollmentCheck.rows.length > 0;
+      }
     }
 
     const result = await pool.query(
@@ -26,9 +32,9 @@ const getLessonsByCourse = async (req, res) => {
       title: l.title,
       description: l.description,
       content: l.content,
-      // SECURITY: Only expose audioUrl to enrolled users
-      audioUrl: isEnrolled ? l.audio_url : null,
-      videoUrl: isEnrolled ? l.video_url : null,
+      // SECURITY: Only expose audioUrl to admin/facilitator or enrolled users
+      audioUrl: canViewAudio ? l.audio_url : null,
+      videoUrl: canViewAudio ? l.video_url : null,
       duration: l.duration,
       durationSeconds: l.duration_seconds,
       durationMinutes: l.duration_minutes,
@@ -69,14 +75,18 @@ const getLessonById = async (req, res) => {
 
     const l = result.rows[0];
 
-    // SECURITY: Check if user is enrolled to expose audio/video URLs
-    let isEnrolled = false;
+    // SECURITY: Check if user is admin/facilitator or enrolled to expose audio/video URLs
+    let canViewAudio = false;
     if (req.user) {
-      const enrollmentCheck = await pool.query(
-        'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2 AND status = $3',
-        [req.user.id, l.course_id, 'active']
-      );
-      isEnrolled = enrollmentCheck.rows.length > 0;
+      if (req.user.role === 'admin' || req.user.role === 'facilitator') {
+        canViewAudio = true;
+      } else {
+        const enrollmentCheck = await pool.query(
+          'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2 AND status = $3',
+          [req.user.id, l.course_id, 'active']
+        );
+        canViewAudio = enrollmentCheck.rows.length > 0;
+      }
     }
 
     // Get user's progress if authenticated
@@ -99,9 +109,9 @@ const getLessonById = async (req, res) => {
       title: l.title,
       description: l.description,
       content: l.content,
-      // SECURITY: Only expose audioUrl/videoUrl to enrolled users
-      audioUrl: isEnrolled ? l.audio_url : null,
-      videoUrl: isEnrolled ? l.video_url : null,
+      // SECURITY: Only expose audioUrl/videoUrl to admin/facilitator or enrolled users
+      audioUrl: canViewAudio ? l.audio_url : null,
+      videoUrl: canViewAudio ? l.video_url : null,
       duration: l.duration,
       durationSeconds: l.duration_seconds,
       durationMinutes: l.duration_minutes,
@@ -126,8 +136,14 @@ const createLesson = async (req, res) => {
   try {
     const { courseId, title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses } = req.body;
 
+    // Debug: Log the uploaded file info
+    if (req.file) {
+      console.log('Uploaded file info:', JSON.stringify(req.file, null, 2));
+    }
+
     // Get audio URL from uploaded file or request body (fallback)
-    const audioUrl = req.file ? req.file.path : req.body.audioUrl;
+    // multer-storage-cloudinary stores URL in 'path' or 'secure_url'
+    const audioUrl = req.file ? (req.file.path || req.file.secure_url) : req.body.audioUrl;
 
     // Verify course exists
     const courseCheck = await pool.query('SELECT id FROM courses WHERE id = $1', [courseId]);
@@ -184,10 +200,16 @@ const createLesson = async (req, res) => {
 const updateLesson = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses } = req.body;
+    const { title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses, courseId } = req.body;
+
+    // Debug: Log the uploaded file info
+    if (req.file) {
+      console.log('Update - Uploaded file info:', JSON.stringify(req.file, null, 2));
+    }
 
     // Get audio URL from uploaded file or request body
-    const audioUrl = req.file ? req.file.path : req.body.audioUrl;
+    // multer-storage-cloudinary stores URL in 'path' or 'secure_url'
+    const audioUrl = req.file ? (req.file.path || req.file.secure_url) : req.body.audioUrl;
 
     // Calculate duration fields if durationMinutes is provided
     let durationStr = null;
@@ -211,10 +233,11 @@ const updateLesson = async (req, res) => {
            order_index = COALESCE($9, order_index),
            is_locked = COALESCE($10, is_locked),
            max_pauses = COALESCE($11, max_pauses),
+           course_id = COALESCE($12, course_id),
            updated_at = NOW()
-       WHERE id = $12
+       WHERE id = $13
        RETURNING *`,
-      [title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMinutes, orderIndex, isLocked, maxPauses, id]
+      [title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMinutes, orderIndex, isLocked, maxPauses, courseId, id]
     );
 
     if (result.rows.length === 0) {
@@ -232,7 +255,9 @@ const updateLesson = async (req, res) => {
         description: l.description,
         durationMinutes: l.duration_minutes,
         orderIndex: l.order_index,
+        maxPauses: l.max_pauses,
         isLocked: l.is_locked,
+        audioUrl: l.audio_url,
         updatedAt: l.updated_at
       }
     });
@@ -362,6 +387,52 @@ const toggleAccessCode = async (req, res) => {
       return res.status(400).json({ error: 'enabled must be a boolean' });
     }
 
+    // If enabling, check if code exists - if not, auto-generate a permanent one
+    if (enabled) {
+      const checkResult = await pool.query(
+        'SELECT access_code FROM lessons WHERE id = $1',
+        [lessonId]
+      );
+
+      if (checkResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Lesson not found' });
+      }
+
+      const hasExistingCode = !!checkResult.rows[0].access_code;
+
+      if (!hasExistingCode) {
+        // Auto-generate a permanent 6-digit code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const now = new Date().toISOString();
+
+        const result = await pool.query(
+          `UPDATE lessons 
+           SET access_code_enabled = true, access_code = $1, access_code_type = 'permanent', 
+               access_code_expires_at = NULL, access_code_generated_at = $2
+           WHERE id = $3
+           RETURNING id, title, access_code_enabled, access_code, access_code_type, access_code_expires_at`,
+          [code, now, lessonId]
+        );
+
+        const lesson = result.rows[0];
+        return res.json({
+          message: 'Access code requirement enabled with auto-generated permanent code',
+          lesson: {
+            id: lesson.id,
+            title: lesson.title,
+            accessCodeEnabled: lesson.access_code_enabled,
+            hasAccessCode: true
+          },
+          accessCode: {
+            code: lesson.access_code,
+            type: 'permanent',
+            expiresAt: null
+          }
+        });
+      }
+    }
+
+    // Normal toggle (disable or enable when code already exists)
     const result = await pool.query(
       `UPDATE lessons 
        SET access_code_enabled = $1
