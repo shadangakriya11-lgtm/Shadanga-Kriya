@@ -211,6 +211,11 @@ export function useDownloads(): UseDownloadsReturn {
 export function useLessonDownloadStatus(lessonId: string) {
   const [isDownloaded, setIsDownloaded] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refresh = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     const check = async () => {
@@ -226,7 +231,7 @@ export function useLessonDownloadStatus(lessonId: string) {
     };
 
     check();
-  }, [lessonId]);
+  }, [lessonId, refreshKey]);
 
-  return { isDownloaded, isChecking };
+  return { isDownloaded, isChecking, refresh };
 }

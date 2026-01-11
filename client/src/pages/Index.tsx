@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const testimonials = [
   {
@@ -122,8 +123,22 @@ const journeySteps = [
 
 export default function Index() {
   const navigate = useNavigate();
+  const { user, isLoggedIn, isLoading } = useAuth();
   const [scrollY, setScrollY] = useState(0);
   const [isScrolled, setIsScrolled] = useState(false);
+
+  // Auto-redirect if user is already logged in
+  useEffect(() => {
+    if (!isLoading && isLoggedIn && user) {
+      const redirectPath =
+        user.role === "admin" || user.role === "sub_admin"
+          ? "/admin"
+          : user.role === "facilitator"
+          ? "/facilitator"
+          : "/learner";
+      navigate(redirectPath, { replace: true });
+    }
+  }, [isLoading, isLoggedIn, user, navigate]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -133,6 +148,15 @@ export default function Index() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Show nothing while checking auth to prevent flash
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">

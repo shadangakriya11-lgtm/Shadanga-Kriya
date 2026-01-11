@@ -46,7 +46,8 @@ export function DownloadButton({
   onDownloadComplete,
 }: DownloadButtonProps) {
   const { toast } = useToast();
-  const { isDownloaded, isChecking } = useLessonDownloadStatus(lessonId);
+  const { isDownloaded, isChecking, refresh } =
+    useLessonDownloadStatus(lessonId);
   const { startDownload, downloadProgress, removeDownload } = useDownloads();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -62,9 +63,10 @@ export function DownloadButton({
   // Auto-refresh when download completes
   useEffect(() => {
     if (progress?.status === "completed") {
+      refresh(); // Refresh download status
       onDownloadComplete?.();
     }
-  }, [progress?.status, onDownloadComplete]);
+  }, [progress?.status, onDownloadComplete, refresh]);
 
   const handleDownload = async () => {
     try {
@@ -89,6 +91,7 @@ export function DownloadButton({
     try {
       await removeDownload(lessonId);
       setShowDeleteConfirm(false);
+      refresh(); // Refresh download status after delete
       toast({
         title: "Download Removed",
         description: "Lesson removed from offline storage",
