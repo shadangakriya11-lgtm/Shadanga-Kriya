@@ -20,6 +20,7 @@ import {
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { ConsentFormDialog } from "@/components/ConsentFormDialog";
 
 type UserRole = "learner" | "admin" | "facilitator";
 type AuthMode = "login" | "signup";
@@ -63,6 +64,7 @@ export default function Auth() {
   const selectedRole: UserRole = "learner";
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showConsentDialog, setShowConsentDialog] = useState(false);
 
   // Form fields
   const [email, setEmail] = useState("");
@@ -103,6 +105,24 @@ export default function Auth() {
       return;
     }
 
+    // For signup, show consent form first
+    if (mode === "signup") {
+      setShowConsentDialog(true);
+      return;
+    }
+
+    // For login, proceed directly
+    await performAuth();
+  };
+
+  // Handle consent acceptance
+  const handleConsentAccepted = async () => {
+    setShowConsentDialog(false);
+    await performAuth();
+  };
+
+  const performAuth = async () => {
+
     setIsLoading(true);
 
     try {
@@ -110,9 +130,8 @@ export default function Auth() {
         const loggedInUser = await login(email, password);
         toast({
           title: "Namaste! Welcome back 🙏",
-          description: `Signed in as ${
-            roleConfig[loggedInUser.role]?.title || loggedInUser.role
-          }`,
+          description: `Signed in as ${roleConfig[loggedInUser.role]?.title || loggedInUser.role
+            }`,
         });
         navigate(roleConfig[loggedInUser.role]?.redirectTo || "/home");
       } else {
@@ -303,21 +322,19 @@ export default function Auth() {
             <div className="flex rounded-2xl bg-muted/50 p-1.5 mb-8 backdrop-blur-sm border border-border/50">
               <button
                 onClick={() => setMode("login")}
-                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
-                  mode === "login"
-                    ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === "login"
+                  ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Sign In
               </button>
               <button
                 onClick={() => setMode("signup")}
-                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${
-                  mode === "signup"
-                    ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === "signup"
+                  ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
+                  : "text-muted-foreground hover:text-foreground"
+                  }`}
               >
                 Sign Up
               </button>
@@ -337,7 +354,7 @@ export default function Auth() {
                       placeholder="Enter your full name"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className="h-14 pl-12 rounded-xl border-2 border-border bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
+                      className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
                       required
                     />
                   </div>
@@ -356,7 +373,7 @@ export default function Auth() {
                     placeholder="Enter your email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="h-14 pl-12 rounded-xl border-2 border-border bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
+                    className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
                     required
                   />
                 </div>
@@ -374,7 +391,7 @@ export default function Auth() {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="h-14 pl-12 pr-12 rounded-xl border-2 border-border bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
+                    className="h-14 pl-12 pr-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
                     required
                   />
                   <button
@@ -404,7 +421,7 @@ export default function Auth() {
                       placeholder="Confirm your password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="h-14 pl-12 rounded-xl border-2 border-border bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
+                      className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
                       required
                     />
                   </div>
@@ -510,6 +527,13 @@ export default function Auth() {
           </p>
         </footer>
       </div>
+
+      {/* Consent Form Dialog for Registration */}
+      <ConsentFormDialog
+        open={showConsentDialog}
+        onClose={() => setShowConsentDialog(false)}
+        onAccept={handleConsentAccepted}
+      />
     </div>
   );
 }
