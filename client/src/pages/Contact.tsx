@@ -55,12 +55,12 @@ export default function Contact() {
       icon: MapPin,
       title: "Address",
       content:
-        "Flat No. 101, Plot No. 2, Navanirman Society, Ranapratap Nagar, Nagpur - 440 022 (MS), India",
+        "Flat No. 101, Plot No. 2, Navnirman Society, Ranapratap Nagar, Nagpur - 440 022 (MS), India",
     },
     {
       icon: Phone,
       title: "Phone",
-      content: "+91 XXXXX XXXXX",
+      content: "+91 895 639 1919 / +91 915 685 1919",
     },
     {
       icon: Mail,
@@ -70,7 +70,7 @@ export default function Contact() {
     {
       icon: Clock,
       title: "Working Hours",
-      content: "Mon - Sat: 9:00 AM - 6:00 PM IST",
+      content: "Mon - Fri: 9:00 AM - 5:00 PM | Sat: 10:00 AM - 6:00 PM",
     },
   ];
 
@@ -96,17 +96,21 @@ export default function Contact() {
 
       <main className="container mx-auto px-4 py-12 max-w-6xl">
         {/* Hero */}
-        <section className="text-center mb-12">
+        <section className="text-center mb-12 animate-fade-in-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
             <Sparkles className="h-4 w-4 text-primary" />
             <span className="text-sm font-medium text-primary">Contact Us</span>
           </div>
           <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-6">
-            Get In Touch
+            Connect with Us for Your
+            <span className="block gradient-text-brand">
+              Inner Transformation
+            </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Have questions about our courses or need assistance? We're here to
-            help you on your wellness journey.
+            Have questions about Shadanga Kriya or our scientific meditation
+            programs? Reach out to us and begin your journey toward clarity,
+            focus, and emotional balance.
           </p>
         </section>
 
