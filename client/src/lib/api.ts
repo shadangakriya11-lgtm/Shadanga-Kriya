@@ -643,6 +643,40 @@ export const notificationsApi = {
     }), // Admin only
 };
 
+// Referral API types for admin analytics
+export interface ReferralAnalyticsItem {
+  facilitatorId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: string;
+  totalReferredUsers: number;
+  paidUsers: number;
+  totalRevenue: number;
+  totalCodesCreated: number;
+  conversionRate: number;
+}
+
+export interface ReferralAnalyticsSummary {
+  totalFacilitators: number;
+  totalReferredUsers: number;
+  totalPaidUsers: number;
+  totalRevenue: number;
+  overallConversionRate: number;
+}
+
+export interface ReferredUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  registeredAt: string;
+  referralCode: number;
+  codeDescription: string;
+  totalPaid: number;
+  hasPaid: boolean;
+}
+
 // Referral API
 export const referralApi = {
   generate: (description: string) =>
@@ -655,6 +689,23 @@ export const referralApi = {
     apiRequest<{ isActive: boolean }>(`/referrals/${id}/toggle`, {
       method: "PATCH",
     }),
+  // Admin analytics endpoints
+  getAdminAnalytics: (params?: { startDate?: string; endDate?: string; facilitatorId?: string }) => {
+    const query = params ? "?" + new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined))
+    ).toString() : "";
+    return apiRequest<{ analytics: ReferralAnalyticsItem[]; summary: ReferralAnalyticsSummary }>(
+      `/referrals/admin/analytics${query}`
+    );
+  },
+  getReferredUsersByFacilitator: (facilitatorId: string, params?: { startDate?: string; endDate?: string }) => {
+    const query = params ? "?" + new URLSearchParams(
+      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined))
+    ).toString() : "";
+    return apiRequest<{ users: ReferredUser[] }>(
+      `/referrals/admin/facilitator/${facilitatorId}/users${query}`
+    );
+  },
 };
 
 // Playback settings response type

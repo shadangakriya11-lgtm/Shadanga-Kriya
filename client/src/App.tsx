@@ -36,6 +36,7 @@ import AdminSubAdmins from "./pages/AdminSubAdmins";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminNotifications from "./pages/AdminNotifications";
 import AdminSettings from "./pages/AdminSettings";
+import AdminReferralAnalytics from "./pages/AdminReferralAnalytics";
 import FacilitatorDashboard from "./pages/FacilitatorDashboard";
 import FacilitatorAttendance from "./pages/FacilitatorAttendance";
 import FacilitatorSessions from "./pages/FacilitatorSessions";
@@ -375,6 +376,14 @@ const AppContent = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin", "sub_admin"]}>
                     <AdminAnalytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/referrals"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminReferralAnalytics />
                   </ProtectedRoute>
                 }
               />

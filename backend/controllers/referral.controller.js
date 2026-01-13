@@ -125,8 +125,162 @@ const toggleCodeStatus = async (req, res) => {
     }
 };
 
+// Admin: Get referral analytics by facilitator/sub_admin
+const getAdminAnalytics = async (req, res) => {
+    try {
+        const { startDate, endDate, facilitatorId } = req.query;
+
+        // Build date filter for user registration (when they were referred)
+        let dateFilter = '';
+        const params = [];
+        let paramIndex = 1;
+
+        if (startDate) {
+            dateFilter += ` AND u.created_at >= $${paramIndex}`;
+            params.push(startDate);
+            paramIndex++;
+        }
+
+        if (endDate) {
+            dateFilter += ` AND u.created_at <= $${paramIndex}`;
+            params.push(endDate);
+            paramIndex++;
+        }
+
+        // Optional filter by specific facilitator
+        let facilitatorFilter = '';
+        if (facilitatorId) {
+            facilitatorFilter = ` AND rc.created_by = $${paramIndex}`;
+            params.push(facilitatorId);
+            paramIndex++;
+        }
+
+        // Query to get referral statistics grouped by facilitator/sub_admin
+        const analyticsQuery = `
+            SELECT 
+                f.id as facilitator_id,
+                f.first_name,
+                f.last_name,
+                f.email,
+                f.role,
+                COUNT(DISTINCT u.id) as total_referred_users,
+                COUNT(DISTINCT CASE WHEN p.status = 'completed' THEN u.id END) as paid_users,
+                COALESCE(SUM(CASE WHEN p.status = 'completed' THEN p.amount ELSE 0 END), 0) as total_revenue,
+                COUNT(DISTINCT rc.id) as total_codes_created
+            FROM users f
+            INNER JOIN referral_codes rc ON rc.created_by = f.id
+            LEFT JOIN users u ON u.referred_by_code_id = rc.id ${dateFilter}
+            LEFT JOIN payments p ON p.user_id = u.id AND p.status = 'completed'
+            WHERE f.role IN ('facilitator', 'sub_admin', 'admin')
+            ${facilitatorFilter}
+            GROUP BY f.id, f.first_name, f.last_name, f.email, f.role
+            ORDER BY total_referred_users DESC
+        `;
+
+        const result = await pool.query(analyticsQuery, params);
+
+        // Map to camelCase
+        const analytics = result.rows.map(row => ({
+            facilitatorId: row.facilitator_id,
+            firstName: row.first_name,
+            lastName: row.last_name,
+            email: row.email,
+            role: row.role,
+            totalReferredUsers: parseInt(row.total_referred_users, 10) || 0,
+            paidUsers: parseInt(row.paid_users, 10) || 0,
+            totalRevenue: parseFloat(row.total_revenue) || 0,
+            totalCodesCreated: parseInt(row.total_codes_created, 10) || 0,
+            conversionRate: row.total_referred_users > 0
+                ? Math.round((row.paid_users / row.total_referred_users) * 100)
+                : 0
+        }));
+
+        // Calculate summary totals
+        const summary = {
+            totalFacilitators: analytics.length,
+            totalReferredUsers: analytics.reduce((sum, a) => sum + a.totalReferredUsers, 0),
+            totalPaidUsers: analytics.reduce((sum, a) => sum + a.paidUsers, 0),
+            totalRevenue: analytics.reduce((sum, a) => sum + a.totalRevenue, 0),
+            overallConversionRate: analytics.reduce((sum, a) => sum + a.totalReferredUsers, 0) > 0
+                ? Math.round((analytics.reduce((sum, a) => sum + a.paidUsers, 0) /
+                    analytics.reduce((sum, a) => sum + a.totalReferredUsers, 0)) * 100)
+                : 0
+        };
+
+        res.json({ analytics, summary });
+    } catch (error) {
+        console.error('Get admin referral analytics error:', error);
+        res.status(500).json({ error: 'Failed to fetch referral analytics' });
+    }
+};
+
+// Admin: Get detailed referred users by a specific facilitator
+const getReferredUsersByFacilitator = async (req, res) => {
+    try {
+        const { facilitatorId } = req.params;
+        const { startDate, endDate } = req.query;
+
+        let dateFilter = '';
+        const params = [facilitatorId];
+        let paramIndex = 2;
+
+        if (startDate) {
+            dateFilter += ` AND u.created_at >= $${paramIndex}`;
+            params.push(startDate);
+            paramIndex++;
+        }
+
+        if (endDate) {
+            dateFilter += ` AND u.created_at <= $${paramIndex}`;
+            params.push(endDate);
+            paramIndex++;
+        }
+
+        const query = `
+            SELECT 
+                u.id,
+                u.first_name,
+                u.last_name,
+                u.email,
+                u.created_at as registered_at,
+                rc.code as referral_code,
+                rc.description as code_description,
+                COALESCE(
+                    (SELECT SUM(amount) FROM payments WHERE user_id = u.id AND status = 'completed'),
+                    0
+                ) as total_paid,
+                EXISTS(SELECT 1 FROM payments WHERE user_id = u.id AND status = 'completed') as has_paid
+            FROM users u
+            INNER JOIN referral_codes rc ON u.referred_by_code_id = rc.id
+            WHERE rc.created_by = $1 ${dateFilter}
+            ORDER BY u.created_at DESC
+        `;
+
+        const result = await pool.query(query, params);
+
+        const users = result.rows.map(row => ({
+            id: row.id,
+            firstName: row.first_name,
+            lastName: row.last_name,
+            email: row.email,
+            registeredAt: row.registered_at,
+            referralCode: row.referral_code,
+            codeDescription: row.code_description,
+            totalPaid: parseFloat(row.total_paid) || 0,
+            hasPaid: row.has_paid
+        }));
+
+        res.json({ users });
+    } catch (error) {
+        console.error('Get referred users error:', error);
+        res.status(500).json({ error: 'Failed to fetch referred users' });
+    }
+};
+
 module.exports = {
     createCode,
     getMyCodes,
-    toggleCodeStatus
+    toggleCodeStatus,
+    getAdminAnalytics,
+    getReferredUsersByFacilitator
 };

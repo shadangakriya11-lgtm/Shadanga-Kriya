@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Bell,
+  Ticket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -31,6 +32,7 @@ const navItems = [
   { icon: CreditCard, label: 'Payments', href: '/admin/payments' },
   { icon: UserCog, label: 'Sub-Admins', href: '/admin/subadmins' },
   { icon: BarChart3, label: 'Analytics', href: '/admin/analytics' },
+  { icon: Ticket, label: 'Referrals', href: '/admin/referrals' },
   { icon: Bell, label: 'Notifications', href: '/admin/notifications' },
 ];
 
