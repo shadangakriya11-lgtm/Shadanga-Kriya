@@ -23,6 +23,7 @@ const notificationRoutes = require('./routes/notification.routes.js');
 const certificateRoutes = require('./routes/certificate.routes.js');
 const exportRoutes = require('./routes/export.routes.js');
 const downloadRoutes = require('./routes/download.routes.js');
+const referralRoutes = require('./routes/referral.routes.js');
 
 const app = express();
 
@@ -130,6 +131,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/certificates', certificateRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/downloads', downloadRoutes);
+app.use('/api/referrals', referralRoutes);
 
 // SECURITY: Error handling middleware - don't expose sensitive data
 app.use((err, req, res, next) => {

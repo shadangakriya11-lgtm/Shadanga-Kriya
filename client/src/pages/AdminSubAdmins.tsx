@@ -50,6 +50,7 @@ const allPermissions = [
   { id: 'monitoring', label: 'Lesson Monitoring', description: 'Monitor user lesson progress' },
   { id: 'payments', label: 'Payments', description: 'View and manage transactions' },
   { id: 'analytics', label: 'Analytics', description: 'Access analytics and reports' },
+  { id: 'manage_referrals', label: 'Referrals', description: 'Create and manage referral codes' },
 ];
 
 export default function AdminSubAdmins() {

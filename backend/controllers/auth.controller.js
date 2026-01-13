@@ -27,7 +27,7 @@ const logSecurityEvent = (event, details, req) => {
 // Register new user
 const register = async (req, res) => {
   try {
-    const { email, password, firstName, lastName } = req.body;
+    const { email, password, firstName, lastName, referralCode } = req.body;
 
     // Check if user exists
     const existingUser = await pool.query(
@@ -37,6 +37,19 @@ const register = async (req, res) => {
 
     if (existingUser.rows.length > 0) {
       return res.status(400).json({ error: 'Email already registered' });
+    }
+
+    // Validate referral code if provided
+    let referralCodeId = null;
+    if (referralCode) {
+      const codeResult = await pool.query(
+        'SELECT id FROM referral_codes WHERE code = $1 AND is_active = true',
+        [parseInt(referralCode)]
+      );
+      if (codeResult.rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid or inactive referral code' });
+      }
+      referralCodeId = codeResult.rows[0].id;
     }
 
     // Hash password
@@ -49,10 +62,10 @@ const register = async (req, res) => {
 
     // Create user
     const result = await pool.query(
-      `INSERT INTO users (email, password_hash, first_name, last_name, role, status)
-       VALUES ($1, $2, $3, $4, $5, 'active')
+      `INSERT INTO users (email, password_hash, first_name, last_name, role, status, referred_by_code_id)
+       VALUES ($1, $2, $3, $4, $5, 'active', $6)
        RETURNING id, email, first_name, last_name, role, status, created_at`,
-      [email.toLowerCase(), passwordHash, firstName, lastName, assignedRole]
+      [email.toLowerCase(), passwordHash, firstName, lastName, assignedRole, referralCodeId]
     );
 
     const user = result.rows[0];
@@ -196,8 +209,12 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, email, first_name, last_name, role, status, avatar_url, phone, created_at, last_active
-       FROM users WHERE id = $1`,
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.avatar_url, u.phone, u.created_at, u.last_active,
+              array_remove(array_agg(sap.permission), NULL) as permissions
+       FROM users u
+       LEFT JOIN sub_admin_permissions sap ON u.id = sap.user_id
+       WHERE u.id = $1
+       GROUP BY u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.avatar_url, u.phone, u.created_at, u.last_active`,
       [req.user.id]
     );
 
@@ -217,7 +234,8 @@ const getProfile = async (req, res) => {
       avatarUrl: user.avatar_url,
       phone: user.phone,
       createdAt: user.created_at,
-      lastActive: user.last_active
+      lastActive: user.last_active,
+      permissions: user.permissions || []
     });
   } catch (error) {
     console.error('Get profile error:', error);

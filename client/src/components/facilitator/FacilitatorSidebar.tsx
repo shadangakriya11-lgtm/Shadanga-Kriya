@@ -8,6 +8,7 @@ import {
   Shield,
   BookOpen,
   Activity,
+  Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -18,6 +19,7 @@ const navItems = [
   { icon: BookOpen, label: "Courses", href: "/facilitator/courses" },
   { icon: Users, label: "Attendance", href: "/facilitator/attendance" },
   { icon: Play, label: "Sessions", href: "/facilitator/sessions" },
+  { icon: Ticket, label: "Referral Codes", href: "/facilitator/referrals" },
   { icon: BarChart3, label: "Reports", href: "/facilitator/reports" },
   { icon: Activity, label: "Monitoring", href: "/facilitator/monitoring" },
 ];
@@ -25,7 +27,7 @@ const navItems = [
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
 
   const handleSignOut = () => {
     logout();
@@ -52,6 +54,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;
+
+          // Check permissions
+          if (item.label === "Referral Codes") {
+            const hasPermission = user?.role === 'admin' || (Array.isArray(user?.permissions) && user.permissions.includes('manage_referrals'));
+            if (!hasPermission) return null;
+          }
 
           return (
             <NavLink

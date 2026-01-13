@@ -71,6 +71,7 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [referralCode, setReferralCode] = useState("");
 
   // Redirect if already logged in
   useEffect(() => {
@@ -143,6 +144,7 @@ export default function Auth() {
           password,
           firstName,
           lastName,
+          referralCode: referralCode || undefined,
         });
         toast({
           title: "Welcome to Shadanga Kriya! 🙏",
@@ -423,6 +425,25 @@ export default function Auth() {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
                       required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {mode === "signup" && (
+                <div className="space-y-2 animate-fade-in">
+                  <Label htmlFor="referralCode" className="text-foreground">
+                    Referral Code (Optional)
+                  </Label>
+                  <div className="relative group">
+                    <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="referralCode"
+                      type="text"
+                      placeholder="Enter referral code"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value)}
+                      className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
                     />
                   </div>
                 </div>

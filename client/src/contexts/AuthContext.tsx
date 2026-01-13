@@ -15,17 +15,9 @@ import {
   isAuthInitialized,
 } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import { User } from "@/types";
 
-interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: "learner" | "admin" | "facilitator" | "sub_admin";
-  phone?: string;
-  userId?: string;
-  permissions?: string[];
-}
+
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +29,7 @@ interface AuthContextType {
     password: string;
     firstName: string;
     lastName: string;
+    referralCode?: string;
   }) => Promise<User>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -188,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string;
     firstName: string;
     lastName: string;
+    referralCode?: string;
   }): Promise<User> => {
     console.log("[AuthContext] Registering user:", data.email);
     const response = await authApi.register(data);

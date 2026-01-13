@@ -86,8 +86,8 @@ const requirePermission = (permission) => {
       return next();
     }
 
-    // Sub-admin must have specific permission
-    if (req.user.role === 'sub_admin') {
+    // Sub-admin or Facilitator must have specific permission
+    if (req.user.role === 'sub_admin' || req.user.role === 'facilitator') {
       if (req.user.permissions && req.user.permissions.includes(permission)) {
         return next();
       }

@@ -43,6 +43,7 @@ import FacilitatorReports from "./pages/FacilitatorReports";
 import FacilitatorNotifications from "./pages/FacilitatorNotifications";
 import FacilitatorMonitoring from "./pages/FacilitatorMonitoring";
 import FacilitatorCourses from "./pages/FacilitatorCourses";
+import FacilitatorReferrals from "./pages/FacilitatorReferrals";
 import DownloadsPage from "./pages/learner/DownloadsPage";
 import NotFound from "./pages/NotFound";
 import About from "./pages/About";
@@ -424,6 +425,14 @@ const AppContent = () => (
                 element={
                   <ProtectedRoute allowedRoles={["facilitator", "sub_admin"]}>
                     <FacilitatorSessions />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/facilitator/referrals"
+                element={
+                  <ProtectedRoute allowedRoles={["facilitator", "sub_admin"]}>
+                    <FacilitatorReferrals />
                   </ProtectedRoute>
                 }
               />

@@ -34,6 +34,7 @@ import type {
   SettingsResponse,
   UpdateSettingsData,
   RazorpayKeyResponse,
+  ReferralCode,
 } from "@/types";
 import { Capacitor } from "@capacitor/core";
 import { Preferences } from "@capacitor/preferences";
@@ -640,6 +641,20 @@ export const notificationsApi = {
       method: "POST",
       body: JSON.stringify(data),
     }), // Admin only
+};
+
+// Referral API
+export const referralApi = {
+  generate: (description: string) =>
+    apiRequest<{ referralCode: ReferralCode }>("/referrals/generate", {
+      method: "POST",
+      body: JSON.stringify({ description }),
+    }),
+  getMyCodes: () => apiRequest<ReferralCode[]>("/referrals/my-codes"),
+  toggleStatus: (id: string) =>
+    apiRequest<{ isActive: boolean }>(`/referrals/${id}/toggle`, {
+      method: "PATCH",
+    }),
 };
 
 // Playback settings response type

@@ -5,12 +5,17 @@ export type UserRole = "learner" | "admin" | "facilitator" | "sub_admin";
 
 export interface User {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
+  name?: string; // Optional, or computed
   email: string;
   role: UserRole;
   createdAt: Date;
   lastActive?: Date;
   isActive: boolean;
+  avatarUrl?: string; // Add this too as backend returns it
+  phone?: string;
+  permissions?: string[];
 }
 
 export interface Course {
@@ -197,6 +202,16 @@ export interface Settings {
   [key: string]: string | number | boolean | undefined;
 }
 
+export interface ReferralCode {
+  id: string;
+  code: number;
+  description: string;
+  createdBy: string;
+  isActive: boolean;
+  createdAt: string;
+  useCount?: number;
+}
+
 export interface UpdateProfileData {
   firstName?: string;
   lastName?: string;
@@ -210,6 +225,10 @@ export interface CreateUserData {
   firstName: string;
   lastName: string;
   role?: UserRole;
+  referralCode?: string;
+  status?: string;
+  permissions?: string[];
+  assignments?: any[]; // Using any[] for now as Assignment interface is not exported
 }
 
 export interface UpdateUserData {
@@ -218,6 +237,8 @@ export interface UpdateUserData {
   email?: string;
   role?: UserRole;
   isActive?: boolean;
+  permissions?: string[];
+  assignments?: any[];
 }
 
 export interface CreateCourseData {

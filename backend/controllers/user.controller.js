@@ -149,7 +149,7 @@ const createUser = async (req, res) => {
     let userPermissions = [];
     if ((role === 'sub_admin' || role === 'facilitator') && permissions && Array.isArray(permissions) && permissions.length > 0) {
       // Use parameterized query to prevent SQL injection
-      const validPermissions = ['manage_users', 'manage_courses', 'manage_lessons', 'view_analytics', 'manage_sessions', 'manage_payments'];
+      const validPermissions = ['manage_users', 'manage_courses', 'manage_lessons', 'view_analytics', 'manage_sessions', 'manage_payments', 'manage_referrals'];
       const safePermissions = permissions.filter(p => validPermissions.includes(p));
 
       for (const permission of safePermissions) {
@@ -225,7 +225,7 @@ const updateUser = async (req, res) => {
 
       if (permissions.length > 0) {
         // Use parameterized query to prevent SQL injection
-        const validPermissions = ['manage_users', 'manage_courses', 'manage_lessons', 'view_analytics', 'manage_sessions', 'manage_payments'];
+        const validPermissions = ['manage_users', 'manage_courses', 'manage_lessons', 'view_analytics', 'manage_sessions', 'manage_payments', 'manage_referrals'];
         const safePermissions = permissions.filter(p => validPermissions.includes(p));
 
         for (const permission of safePermissions) {
