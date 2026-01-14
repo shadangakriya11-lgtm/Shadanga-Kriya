@@ -91,6 +91,7 @@ const migrations = [
     description: 'Populate duration_seconds from duration_minutes',
     sql: `
       UPDATE lessons 
+      SET duration_seconds = duration_minutes * 60
       WHERE (duration_seconds IS NULL OR duration_seconds = 0) AND duration_minutes > 0;
     `
   },
