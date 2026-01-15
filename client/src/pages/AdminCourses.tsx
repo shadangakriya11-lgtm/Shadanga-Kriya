@@ -368,38 +368,18 @@ export default function AdminCourses() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Status</Label>
-                      <Select
-                        value={newCourse.status}
-                        onValueChange={(v) =>
-                          setNewCourse((prev) => ({ ...prev, status: v }))
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">Active</SelectItem>
-                          <SelectItem value="locked">Locked</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Duration</Label>
-                      <Input
-                        value={newCourse.duration}
-                        onChange={(e) =>
-                          setNewCourse((prev) => ({
-                            ...prev,
-                            duration: e.target.value,
-                          }))
-                        }
-                        placeholder="e.g., 6 hours"
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label>Duration</Label>
+                    <Input
+                      value={newCourse.duration}
+                      onChange={(e) =>
+                        setNewCourse((prev) => ({
+                          ...prev,
+                          duration: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g., 6 hours"
+                    />
                   </div>
                   <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
                     <Button
