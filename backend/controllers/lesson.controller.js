@@ -306,14 +306,34 @@ const deleteLesson = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
-      'DELETE FROM lessons WHERE id = $1 RETURNING id',
+    // First, get the audio URL to delete from Cloudinary
+    const lessonResult = await pool.query(
+      'SELECT audio_url FROM lessons WHERE id = $1',
       [id]
     );
 
-    if (result.rows.length === 0) {
+    if (lessonResult.rows.length === 0) {
       return res.status(404).json({ error: 'Lesson not found' });
     }
+
+    const audioUrl = lessonResult.rows[0].audio_url;
+
+    // Delete audio from Cloudinary if it exists
+    if (audioUrl) {
+      const publicId = getCloudinaryPublicId(audioUrl);
+      if (publicId) {
+        try {
+          console.log('Deleting audio from Cloudinary on lesson delete:', publicId);
+          await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+        } catch (deleteError) {
+          console.error('Failed to delete audio from Cloudinary:', deleteError);
+          // Continue with lesson deletion even if Cloudinary delete fails
+        }
+      }
+    }
+
+    // Now delete the lesson from database
+    await pool.query('DELETE FROM lessons WHERE id = $1', [id]);
 
     res.json({ message: 'Lesson deleted' });
   } catch (error) {
