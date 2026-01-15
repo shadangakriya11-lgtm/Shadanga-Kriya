@@ -36,10 +36,10 @@ export default function AdminDashboard() {
       render: (user: any) => (
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium text-primary">
-            {(user.first_name || user.email || 'U').charAt(0).toUpperCase()}
+            {(user.firstName || user.email || 'U').charAt(0).toUpperCase()}
           </div>
           <div>
-            <p className="font-medium text-foreground">{user.first_name} {user.last_name}</p>
+            <p className="font-medium text-foreground">{user.firstName} {user.lastName}</p>
             <p className="text-xs text-muted-foreground">{user.email}</p>
           </div>
         </div>
@@ -55,20 +55,20 @@ export default function AdminDashboard() {
       ),
     },
     {
-      key: 'is_active',
+      key: 'status',
       header: 'Status',
       render: (user: any) => (
-        <Badge variant={user.is_active ? 'active' : 'locked'}>
-          {user.is_active ? 'Active' : 'Inactive'}
+        <Badge variant={user.status === 'active' ? 'active' : 'locked'}>
+          {user.status === 'active' ? 'Active' : 'Inactive'}
         </Badge>
       ),
     },
     {
-      key: 'created_at',
+      key: 'createdAt',
       header: 'Joined',
       render: (user: any) => (
         <span className="text-muted-foreground">
-          {new Date(user.created_at).toLocaleDateString()}
+          {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
         </span>
       ),
     },
@@ -81,7 +81,7 @@ export default function AdminDashboard() {
       render: (course: any) => (
         <div>
           <p className="font-medium text-foreground">{course.title}</p>
-          <p className="text-xs text-muted-foreground">{course.total_lessons || 0} lessons</p>
+          <p className="text-xs text-muted-foreground">{course.lessonCount || 0} lessons</p>
         </div>
       ),
     },
@@ -163,7 +163,7 @@ export default function AdminDashboard() {
             <StatCard
               icon={BookOpen}
               title="Total Courses"
-              value={stats.totalCourses || '0'}
+              value={String(stats.totalCourses || 0)}
               change="+2"
               trend="up"
               style={{ animationDelay: '200ms' }}
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
             <StatCard
               icon={DollarSign}
               title="Revenue"
-              value={`₹${((stats.revenue || 0) / 1000).toFixed(1)}k`}
+              value={`₹${(Number(stats.revenue || 0) / 1000).toFixed(1)}k`}
               change="+23%"
               trend="up"
               style={{ animationDelay: '300ms' }}
@@ -186,7 +186,7 @@ export default function AdminDashboard() {
                 <TrendingUp className="h-5 w-5 text-success" />
               </div>
               <div className="flex items-end gap-2 lg:gap-4">
-                <span className="font-serif text-3xl lg:text-5xl font-bold text-foreground">{stats.completionRate || 0}%</span>
+                <span className="font-serif text-3xl lg:text-5xl font-bold text-foreground">{String(stats.completionRate || 0)}%</span>
                 <span className="text-xs lg:text-sm text-success mb-1 lg:mb-2">+5% from last month</span>
               </div>
               <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
@@ -203,7 +203,7 @@ export default function AdminDashboard() {
                 <AlertTriangle className="h-5 w-5 text-warning" />
               </div>
               <div className="flex items-end gap-2 lg:gap-4">
-                <span className="font-serif text-3xl lg:text-5xl font-bold text-foreground">{stats.alerts || 0}</span>
+                <span className="font-serif text-3xl lg:text-5xl font-bold text-foreground">{String(stats.alerts || 0)}</span>
                 <span className="text-xs lg:text-sm text-muted-foreground mb-1 lg:mb-2">interruptions today</span>
               </div>
               <Button variant="warning" size="sm" className="mt-4">
