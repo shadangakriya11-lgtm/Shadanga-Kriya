@@ -60,6 +60,8 @@ const getAllCourses = async (req, res) => {
       thumbnailUrl: course.thumbnail_url,
       price: parseFloat(course.price),
       durationHours: course.duration_hours,
+      duration: course.duration,
+      type: course.type,
       status: course.status,
       category: course.category,
       prerequisites: course.prerequisites,
@@ -122,6 +124,8 @@ const getCourseById = async (req, res) => {
       thumbnailUrl: course.thumbnail_url,
       price: parseFloat(course.price),
       durationHours: course.duration_hours,
+      duration: course.duration,
+      type: course.type,
       status: course.status,
       category: course.category,
       prerequisites: course.prerequisites,
@@ -148,13 +152,13 @@ const getCourseById = async (req, res) => {
 // Create course
 const createCourse = async (req, res) => {
   try {
-    const { title, description, thumbnailUrl, price, durationHours, status, category, prerequisites, prerequisiteCourseId } = req.body;
+    const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO courses (title, description, thumbnail_url, price, duration_hours, status, category, prerequisites, prerequisite_course_id, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO courses (title, description, thumbnail_url, price, duration_hours, duration, status, category, type, prerequisites, prerequisite_course_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
-      [title, description, thumbnailUrl, price || 0, durationHours || 0, status || 'draft', category, prerequisites, prerequisiteCourseId, req.user.id]
+      [title, description, thumbnailUrl, price || 0, durationHours || 0, duration, status || 'active', category, type || 'self', prerequisites, prerequisiteCourseId, req.user.id]
     );
 
     const course = result.rows[0];
@@ -168,6 +172,8 @@ const createCourse = async (req, res) => {
         thumbnailUrl: course.thumbnail_url,
         price: parseFloat(course.price),
         durationHours: course.duration_hours,
+        duration: course.duration,
+        type: course.type,
         status: course.status,
         category: course.category,
         prerequisites: course.prerequisites,
@@ -194,7 +200,7 @@ const createCourse = async (req, res) => {
 const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, thumbnailUrl, price, durationHours, status, category, prerequisites, prerequisiteCourseId } = req.body;
+    const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId } = req.body;
 
     const result = await pool.query(
       `UPDATE courses 
@@ -203,14 +209,16 @@ const updateCourse = async (req, res) => {
            thumbnail_url = COALESCE($3, thumbnail_url),
            price = COALESCE($4, price),
            duration_hours = COALESCE($5, duration_hours),
-           status = COALESCE($6, status),
-           category = COALESCE($7, category),
-           prerequisites = COALESCE($8, prerequisites),
-           prerequisite_course_id = $9,
+           duration = COALESCE($6, duration),
+           status = COALESCE($7, status),
+           category = COALESCE($8, category),
+           type = COALESCE($9, type),
+           prerequisites = COALESCE($10, prerequisites),
+           prerequisite_course_id = $11,
            updated_at = NOW()
-       WHERE id = $10
+       WHERE id = $12
        RETURNING *`,
-      [title, description, thumbnailUrl, price, durationHours, status, category, prerequisites, prerequisiteCourseId, id]
+      [title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId, id]
     );
 
     if (result.rows.length === 0) {
@@ -228,6 +236,8 @@ const updateCourse = async (req, res) => {
         thumbnailUrl: course.thumbnail_url,
         price: parseFloat(course.price),
         durationHours: course.duration_hours,
+        duration: course.duration,
+        type: course.type,
         status: course.status,
         category: course.category,
         prerequisites: course.prerequisites,

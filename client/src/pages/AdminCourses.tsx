@@ -163,8 +163,8 @@ export default function AdminCourses() {
             course.status === "active"
               ? "active"
               : course.status === "completed"
-              ? "completed"
-              : "locked"
+                ? "completed"
+                : "locked"
           }
         >
           {course.status?.charAt(0).toUpperCase() + course.status?.slice(1)}
@@ -176,7 +176,7 @@ export default function AdminCourses() {
       header: "Price",
       render: (course: any) => (
         <span className="font-semibold text-foreground">
-          {course.price ? `$${course.price}` : "Free"}
+          {course.price ? `₹${course.price}` : "Free"}
         </span>
       ),
     },
@@ -354,7 +354,7 @@ export default function AdminCourses() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Price ($)</Label>
+                      <Label>Price (₹)</Label>
                       <Input
                         type="number"
                         value={newCourse.price}
@@ -420,8 +420,8 @@ export default function AdminCourses() {
                       {createCourse.isPending || updateCourse.isPending
                         ? "Saving..."
                         : editingCourse
-                        ? "Update Course"
-                        : "Create Course"}
+                          ? "Update Course"
+                          : "Create Course"}
                     </Button>
                   </div>
                 </div>

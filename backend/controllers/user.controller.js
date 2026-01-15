@@ -192,9 +192,19 @@ const updateUser = async (req, res) => {
   try {
     await client.query('BEGIN');
     const { id } = req.params;
-    const { firstName, lastName, role, status, phone, avatarUrl, permissions, password } = req.body; // Added password here if needed in future, but distinct endpoint usually better. Kept consistent with request.
+    const { firstName, lastName, role, status, phone, avatarUrl, permissions, password } = req.body;
 
-    // 1. Update User Basic Info
+    // 1. If password is provided, hash it and update separately
+    if (password && password.trim() !== '') {
+      const salt = await bcrypt.genSalt(12);
+      const passwordHash = await bcrypt.hash(password, salt);
+      await client.query(
+        'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+        [passwordHash, id]
+      );
+    }
+
+    // 2. Update User Basic Info
     const result = await client.query(
       `UPDATE users 
        SET first_name = COALESCE($1, first_name),
@@ -216,7 +226,7 @@ const updateUser = async (req, res) => {
 
     const user = result.rows[0];
 
-    // 2. Handle Permissions (if role is sub_admin/facilitator OR just updating permissions for existing user)
+    // 3. Handle Permissions (if role is sub_admin/facilitator OR just updating permissions for existing user)
     // If permissions array is provided, we replace existing permissions.
     let currentPermissions = [];
     if (permissions && Array.isArray(permissions)) {

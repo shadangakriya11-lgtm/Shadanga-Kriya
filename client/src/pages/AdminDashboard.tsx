@@ -107,7 +107,7 @@ export default function AdminDashboard() {
       key: 'price',
       header: 'Price',
       render: (course: any) => (
-        <span className="font-medium">${course.price || 0}</span>
+        <span className="font-medium">₹{course.price || 0}</span>
       ),
     },
   ];
@@ -137,10 +137,10 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      
+
       <div className="lg:ml-64">
         <AdminHeader title="Dashboard" subtitle="Overview of your therapy platform" />
-        
+
         <main className="p-4 lg:p-6">
           {/* Stats Grid */}
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6 lg:mb-8">
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
             <StatCard
               icon={DollarSign}
               title="Revenue"
-              value={`$${((stats.revenue || 0) / 1000).toFixed(1)}k`}
+              value={`₹${((stats.revenue || 0) / 1000).toFixed(1)}k`}
               change="+23%"
               trend="up"
               style={{ animationDelay: '300ms' }}

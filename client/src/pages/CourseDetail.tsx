@@ -65,8 +65,8 @@ export default function CourseDetail() {
       const prevLessonProgress =
         index > 0
           ? (progressData as any)?.lessons?.find(
-              (p: any) => p.id === lessonsData?.lessons[index - 1]?.id
-            )
+            (p: any) => p.id === lessonsData?.lessons[index - 1]?.id
+          )
           : null;
 
       return {
@@ -83,8 +83,8 @@ export default function CourseDetail() {
         status: lessonProgress?.completed
           ? "completed"
           : index === 0 || prevLessonProgress?.completed
-          ? "active"
-          : "locked",
+            ? "active"
+            : "locked",
         // Access Code fields
         accessCodeEnabled: l.accessCodeEnabled,
         hasAccessCode: l.hasAccessCode,
@@ -290,14 +290,14 @@ export default function CourseDetail() {
                 isEnrolled
                   ? "active"
                   : course.status === "active"
-                  ? "active"
-                  : "locked"
+                    ? "active"
+                    : "locked"
               }
             >
               {isEnrolled
                 ? "Enrolled"
                 : course.status?.charAt(0).toUpperCase() +
-                  course.status?.slice(1)}
+                course.status?.slice(1)}
             </Badge>
           </div>
 
@@ -319,7 +319,7 @@ export default function CourseDetail() {
             {course.price > 0 && (
               <div className="flex items-center gap-1.5">
                 <DollarSign className="h-4 w-4" />
-                <span>${course.price}</span>
+                <span>₹{course.price}</span>
               </div>
             )}
           </div>
