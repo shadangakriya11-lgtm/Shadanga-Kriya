@@ -235,8 +235,8 @@ export default function AdminLessons() {
             {lesson.durationMinutes
               ? `${lesson.durationMinutes} min`
               : lesson.duration_seconds
-              ? `${Math.round(lesson.duration_seconds / 60)} min`
-              : "0 min"}
+                ? `${Math.round(lesson.duration_seconds / 60)} min`
+                : "0 min"}
           </span>
         </div>
       ),
@@ -435,6 +435,7 @@ export default function AdminLessons() {
                         }))
                       }
                       placeholder="Enter lesson title"
+                      disabled={isUploading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -444,6 +445,7 @@ export default function AdminLessons() {
                       onValueChange={(v) =>
                         setNewLesson((prev) => ({ ...prev, courseId: v }))
                       }
+                      disabled={isUploading}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select course" />
@@ -470,6 +472,7 @@ export default function AdminLessons() {
                           }))
                         }
                         placeholder="15"
+                        disabled={isUploading}
                       />
                     </div>
                     <div className="space-y-2">
@@ -484,6 +487,7 @@ export default function AdminLessons() {
                           }))
                         }
                         placeholder="3"
+                        disabled={isUploading}
                       />
                     </div>
                   </div>
@@ -495,6 +499,7 @@ export default function AdminLessons() {
                         accept="audio/*"
                         onChange={handleFileChange}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        disabled={isUploading}
                       />
                       <div className="flex flex-col items-center">
                         <Upload className="h-8 w-8 text-muted-foreground mb-2" />
@@ -502,8 +507,8 @@ export default function AdminLessons() {
                           {selectedFile
                             ? selectedFile.name
                             : editingLesson?.audioUrl
-                            ? "Change audio file"
-                            : "Click or drag audio file here"}
+                              ? "Change audio file"
+                              : "Click or drag audio file here"}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           MP3, WAV, M4A up to 100MB
@@ -523,7 +528,7 @@ export default function AdminLessons() {
                         Let users skip forward/backward
                       </p>
                     </div>
-                    <Switch />
+                    <Switch disabled={isUploading} />
                   </div>
 
                   {/* Upload Progress Bar */}
