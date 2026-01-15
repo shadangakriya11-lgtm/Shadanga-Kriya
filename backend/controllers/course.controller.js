@@ -1,5 +1,18 @@
 const pool = require('../config/db.js');
 const { notifyAdmins } = require('./notification.controller.js');
+const cloudinary = require('cloudinary').v2;
+
+// Helper function to extract public_id from Cloudinary URL
+const getCloudinaryPublicId = (url) => {
+  if (!url) return null;
+  try {
+    // Cloudinary URLs look like: https://res.cloudinary.com/cloud_name/resource_type/upload/v123/folder/public_id.ext
+    const matches = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+    return matches ? matches[1] : null;
+  } catch (e) {
+    return null;
+  }
+};
 
 // Get all courses
 const getAllCourses = async (req, res) => {
@@ -256,16 +269,38 @@ const deleteCourse = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await pool.query(
-      'DELETE FROM courses WHERE id = $1 RETURNING id',
-      [id]
-    );
-
-    if (result.rows.length === 0) {
+    // First, check if course exists
+    const courseCheck = await pool.query('SELECT id FROM courses WHERE id = $1', [id]);
+    if (courseCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Course not found' });
     }
 
-    res.json({ message: 'Course deleted' });
+    // Get all lessons with audio URLs for this course before cascade delete
+    const lessonsResult = await pool.query(
+      'SELECT audio_url FROM lessons WHERE course_id = $1 AND audio_url IS NOT NULL',
+      [id]
+    );
+
+    // Delete all audio files from Cloudinary
+    if (lessonsResult.rows.length > 0) {
+      console.log(`Deleting ${lessonsResult.rows.length} audio files from Cloudinary for course ${id}`);
+      for (const lesson of lessonsResult.rows) {
+        const publicId = getCloudinaryPublicId(lesson.audio_url);
+        if (publicId) {
+          try {
+            await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+          } catch (deleteError) {
+            console.error('Failed to delete audio from Cloudinary:', deleteError);
+            // Continue with other deletions
+          }
+        }
+      }
+    }
+
+    // Now delete the course (lessons will be cascade deleted by database)
+    await pool.query('DELETE FROM courses WHERE id = $1', [id]);
+
+    res.json({ message: 'Course and associated lessons deleted' });
   } catch (error) {
     console.error('Delete course error:', error);
     res.status(500).json({ error: 'Failed to delete course' });
