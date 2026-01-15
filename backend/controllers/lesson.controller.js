@@ -1,4 +1,17 @@
 const pool = require('../config/db.js');
+const cloudinary = require('cloudinary').v2;
+
+// Helper function to extract public_id from Cloudinary URL
+const getCloudinaryPublicId = (url) => {
+  if (!url) return null;
+  try {
+    // Cloudinary URLs look like: https://res.cloudinary.com/cloud_name/resource_type/upload/v123/folder/public_id.ext
+    const matches = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+    return matches ? matches[1] : null;
+  } catch (e) {
+    return null;
+  }
+};
 
 // Get lessons by course
 const getLessonsByCourse = async (req, res) => {
@@ -209,7 +222,28 @@ const updateLesson = async (req, res) => {
 
     // Get audio URL from uploaded file or request body
     // multer-storage-cloudinary stores URL in 'path' or 'secure_url'
-    const audioUrl = req.file ? (req.file.path || req.file.secure_url) : req.body.audioUrl;
+    const newAudioUrl = req.file ? (req.file.path || req.file.secure_url) : null;
+
+    // If a new audio file is uploaded, delete the old one from Cloudinary
+    if (newAudioUrl) {
+      // Get the existing audio URL first
+      const existingLesson = await pool.query('SELECT audio_url FROM lessons WHERE id = $1', [id]);
+      if (existingLesson.rows.length > 0 && existingLesson.rows[0].audio_url) {
+        const oldAudioUrl = existingLesson.rows[0].audio_url;
+        const publicId = getCloudinaryPublicId(oldAudioUrl);
+        if (publicId) {
+          try {
+            console.log('Deleting old audio from Cloudinary:', publicId);
+            await cloudinary.uploader.destroy(publicId, { resource_type: 'video' }); // audio files are 'video' resource type in Cloudinary
+          } catch (deleteError) {
+            console.error('Failed to delete old audio from Cloudinary:', deleteError);
+            // Continue with update even if delete fails
+          }
+        }
+      }
+    }
+
+    const audioUrl = newAudioUrl || req.body.audioUrl;
 
     // Calculate duration fields if durationMinutes is provided
     let durationStr = null;
