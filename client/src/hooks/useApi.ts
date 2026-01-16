@@ -490,12 +490,34 @@ export function useCompletePayment() {
     mutationFn: paymentsApi.complete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myPayments"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayments"] });
+      queryClient.invalidateQueries({ queryKey: ["paymentStats"] });
       queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
       toast({ title: "Payment completed!" });
     },
     onError: (error: Error) => {
       toast({
         title: "Failed to complete payment",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useRefundPayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: paymentsApi.refund,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["myPayments"] });
+      queryClient.invalidateQueries({ queryKey: ["allPayments"] });
+      queryClient.invalidateQueries({ queryKey: ["paymentStats"] });
+      toast({ title: "Payment marked as refunded" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to refund payment",
         description: error.message,
         variant: "destructive",
       });

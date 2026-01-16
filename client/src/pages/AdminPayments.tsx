@@ -29,7 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useAllPayments, usePaymentStats, useUsers, useCourses, useCompletePayment, useActivateCourse } from '@/hooks/useApi';
+import { useAllPayments, usePaymentStats, useUsers, useCourses, useCompletePayment, useActivateCourse, useRefundPayment } from '@/hooks/useApi';
 import { useToast } from '@/hooks/use-toast';
 
 export default function AdminPayments() {
@@ -46,6 +46,7 @@ export default function AdminPayments() {
   const { data: coursesData } = useCourses();
   const completePayment = useCompletePayment();
   const activateCourse = useActivateCourse();
+  const refundPayment = useRefundPayment();
 
   const payments = (paymentsData?.payments || []).filter((payment: any) =>
     payment.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -348,19 +349,9 @@ export default function AdminPayments() {
     }
 
     try {
-      // We'll use the complete payment endpoint but with refunded status
-      // For now, just show a success message - you may want to add a dedicated endpoint
-      toast({
-        title: "Payment Marked as Refunded",
-        description: `Marked payment for ${tx.userName} as refunded`,
-      });
-      refetch();
+      await refundPayment.mutateAsync(tx.id);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to mark payment as refunded",
-        variant: "destructive",
-      });
+      console.error('Failed to refund payment:', error);
     }
   };
 

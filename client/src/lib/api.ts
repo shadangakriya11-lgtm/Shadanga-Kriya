@@ -560,6 +560,11 @@ export const paymentsApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
+  refund: (paymentId: string) =>
+    apiRequest<{ message: string; payment: Payment }>(
+      `/payments/${paymentId}/refund`,
+      { method: "POST" }
+    ),
 };
 
 // Sessions API
