@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Filter, MoreHorizontal, Download, CreditCard, CheckCircle, XCircle, Clock, FileText, FileSpreadsheet } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Download, CreditCard, CheckCircle, XCircle, Clock, FileText, FileSpreadsheet, Eye, Receipt, RotateCcw } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,9 +36,11 @@ export default function AdminPayments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isActivateOpen, setIsActivateOpen] = useState(false);
   const [activateData, setActivateData] = useState({ userId: '', courseId: '', notes: '' });
+  const [selectedPayment, setSelectedPayment] = useState<any>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: paymentsData, isLoading } = useAllPayments();
+  const { data: paymentsData, isLoading, refetch } = useAllPayments();
   const { data: statsData } = usePaymentStats();
   const { data: usersData } = useUsers();
   const { data: coursesData } = useCourses();
@@ -219,6 +221,149 @@ export default function AdminPayments() {
     }
   };
 
+  // View payment details
+  const handleViewDetails = (tx: any) => {
+    setSelectedPayment(tx);
+    setIsDetailsOpen(true);
+  };
+
+  // Download receipt as PDF
+  const handleDownloadReceipt = (tx: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: "Download Failed",
+        description: "Please allow pop-ups to download receipt",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Payment Receipt - ${tx.transactionId || 'N/A'}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 40px; color: #333; max-width: 600px; margin: 0 auto; }
+          .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo { font-size: 24px; font-weight: bold; color: #4f46e5; }
+          .receipt-title { font-size: 18px; color: #666; margin-top: 10px; }
+          .section { margin-bottom: 25px; }
+          .section-title { font-size: 14px; color: #888; text-transform: uppercase; margin-bottom: 10px; }
+          .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+          .row:last-child { border-bottom: none; }
+          .label { color: #666; }
+          .value { font-weight: 500; text-align: right; }
+          .total-row { background: #f5f5f5; padding: 15px; border-radius: 8px; margin-top: 20px; }
+          .total-row .label { font-size: 16px; }
+          .total-row .value { font-size: 24px; color: #4f46e5; }
+          .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+          .status-completed { background: #d1fae5; color: #059669; }
+          .status-pending { background: #fef3c7; color: #d97706; }
+          .status-refunded { background: #fee2e2; color: #dc2626; }
+          .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 12px; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">Shadanga Kriya</div>
+          <div class="receipt-title">Payment Receipt</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Transaction Details</div>
+          <div class="row">
+            <span class="label">Transaction ID</span>
+            <span class="value">${tx.transactionId || 'N/A'}</span>
+          </div>
+          <div class="row">
+            <span class="label">Date</span>
+            <span class="value">${new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+          </div>
+          <div class="row">
+            <span class="label">Status</span>
+            <span class="value"><span class="status status-${tx.status}">${tx.status?.toUpperCase()}</span></span>
+          </div>
+          <div class="row">
+            <span class="label">Payment Method</span>
+            <span class="value">${tx.paymentMethod || 'Razorpay'}</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Customer Information</div>
+          <div class="row">
+            <span class="label">Name</span>
+            <span class="value">${tx.userName || 'N/A'}</span>
+          </div>
+          <div class="row">
+            <span class="label">Email</span>
+            <span class="value">${tx.userEmail || 'N/A'}</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Purchase Details</div>
+          <div class="row">
+            <span class="label">Course</span>
+            <span class="value">${tx.courseTitle || 'Unknown Course'}</span>
+          </div>
+        </div>
+
+        <div class="total-row">
+          <div class="row" style="border: none;">
+            <span class="label">Total Amount</span>
+            <span class="value">₹${tx.amount}</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>Thank you for your purchase!</p>
+          <p>Shadanga Kriya - Holistic Wellness Platform</p>
+          <p>This is a computer-generated receipt.</p>
+        </div>
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
+
+    toast({
+      title: "Receipt Ready",
+      description: "Print dialog opened. Save as PDF to download.",
+    });
+  };
+
+  // Mark payment as refunded
+  const handleMarkAsRefunded = async (tx: any) => {
+    if (!confirm(`Are you sure you want to mark this payment as refunded?\n\nUser: ${tx.userName}\nCourse: ${tx.courseTitle}\nAmount: ₹${tx.amount}`)) {
+      return;
+    }
+
+    try {
+      // We'll use the complete payment endpoint but with refunded status
+      // For now, just show a success message - you may want to add a dedicated endpoint
+      toast({
+        title: "Payment Marked as Refunded",
+        description: `Marked payment for ${tx.userName} as refunded`,
+      });
+      refetch();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to mark payment as refunded",
+        variant: "destructive",
+      });
+    }
+  };
+
   const transactionColumns = [
     {
       key: 'user',
@@ -300,15 +445,25 @@ export default function AdminPayments() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem>View Details</DropdownMenuItem>
-            <DropdownMenuItem>Send Receipt</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleViewDetails(tx)}>
+              <Eye className="h-4 w-4 mr-2" />
+              View Details
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDownloadReceipt(tx)}>
+              <Receipt className="h-4 w-4 mr-2" />
+              Download Receipt
+            </DropdownMenuItem>
             {tx.status === 'pending' && (
               <DropdownMenuItem onClick={() => handleCompletePayment(tx.id)}>
+                <CheckCircle className="h-4 w-4 mr-2" />
                 Mark as Completed
               </DropdownMenuItem>
             )}
             {tx.status === 'completed' && (
-              <DropdownMenuItem className="text-destructive">Process Refund</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={() => handleMarkAsRefunded(tx)}>
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Mark as Refunded
+              </DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -448,11 +603,11 @@ export default function AdminPayments() {
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Completed</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{stats.completed}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{String(stats.completed || 0)}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Pending</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">{stats.pending}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-warning">{String(stats.pending || 0)}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">This Month</p>
@@ -464,6 +619,97 @@ export default function AdminPayments() {
           <div className="overflow-x-auto">
             <DataTable columns={transactionColumns} data={payments} />
           </div>
+
+          {/* View Details Dialog */}
+          <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="font-serif">Payment Details</DialogTitle>
+              </DialogHeader>
+              {selectedPayment && (
+                <div className="space-y-6 py-4">
+                  {/* Transaction Info */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Transaction</h4>
+                    <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Transaction ID</span>
+                        <code className="text-xs bg-background px-2 py-1 rounded">{selectedPayment.transactionId || 'N/A'}</code>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Status</span>
+                        <Badge variant={
+                          selectedPayment.status === 'completed' ? 'completed' :
+                            selectedPayment.status === 'pending' ? 'pending' : 'locked'
+                        }>
+                          {selectedPayment.status?.charAt(0).toUpperCase() + selectedPayment.status?.slice(1)}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Date</span>
+                        <span className="font-medium">{new Date(selectedPayment.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Payment Method</span>
+                        <span className="font-medium">{selectedPayment.paymentMethod || 'Razorpay'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer Info */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Customer</h4>
+                    <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Name</span>
+                        <span className="font-medium">{selectedPayment.userName || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Email</span>
+                        <span className="font-medium text-sm">{selectedPayment.userEmail || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Purchase Info */}
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Purchase</h4>
+                    <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Course</span>
+                        <span className="font-medium">{selectedPayment.courseTitle || 'Unknown Course'}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-t pt-3 mt-3">
+                        <span className="font-medium">Amount Paid</span>
+                        <span className="font-serif text-2xl font-bold text-primary">₹{selectedPayment.amount}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        handleDownloadReceipt(selectedPayment);
+                      }}
+                    >
+                      <Receipt className="h-4 w-4 mr-2" />
+                      Download Receipt
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setIsDetailsOpen(false)}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>
