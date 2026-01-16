@@ -198,7 +198,7 @@ const createCourse = async (req, res) => {
     // Notify admins - Fire and forget/Log error, don't block response or trigger main catch
     notifyAdmins(
       'New Course Created',
-      `Course "${course.title}" has been created by ${req.user.firstName} ${req.user.lastName}`,
+      `Course "${course.title}" has been created by ${req.user.first_name} ${req.user.last_name}`,
       'info',
       `/admin/courses`
     ).catch(err => console.error('Notification error:', err));
