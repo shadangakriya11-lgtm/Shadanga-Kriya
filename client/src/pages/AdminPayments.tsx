@@ -131,7 +131,7 @@ export default function AdminPayments() {
         
         <div class="summary">
           <div class="stat-card">
-            <div class="stat-value">$${stats.totalRevenue?.toLocaleString()}</div>
+            <div class="stat-value">₹${stats.totalRevenue?.toLocaleString()}</div>
             <div class="stat-label">Total Revenue</div>
           </div>
           <div class="stat-card">
@@ -164,7 +164,7 @@ export default function AdminPayments() {
               <tr>
                 <td>${tx.userName || 'Unknown'}<br><small>${tx.userEmail || ''}</small></td>
                 <td>${tx.courseTitle || 'Unknown Course'}</td>
-                <td>$${tx.amount}</td>
+                <td>₹${tx.amount}</td>
                 <td class="status-${tx.status}">${tx.status?.charAt(0).toUpperCase() + tx.status?.slice(1)}</td>
                 <td><code>${tx.transactionId || 'N/A'}</code></td>
                 <td>${new Date(tx.createdAt).toLocaleDateString()}</td>
@@ -174,7 +174,7 @@ export default function AdminPayments() {
           <tfoot>
             <tr>
               <td colspan="2"><strong>Total</strong></td>
-              <td><strong>$${totalAmount.toLocaleString()}</strong></td>
+              <td><strong>₹${totalAmount.toLocaleString()}</strong></td>
               <td colspan="3"></td>
             </tr>
           </tfoot>
@@ -189,7 +189,7 @@ export default function AdminPayments() {
 
     printWindow.document.close();
     printWindow.focus();
-    
+
     // Trigger print after a short delay to ensure content is loaded
     setTimeout(() => {
       printWindow.print();
@@ -246,7 +246,7 @@ export default function AdminPayments() {
       key: 'amount',
       header: 'Amount',
       render: (tx: any) => (
-        <span className="font-semibold text-foreground">${tx.amount}</span>
+        <span className="font-semibold text-foreground">₹{tx.amount}</span>
       ),
     },
     {
@@ -444,7 +444,7 @@ export default function AdminPayments() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Total Revenue</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">${stats.totalRevenue?.toLocaleString()}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">₹{stats.totalRevenue?.toLocaleString()}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Completed</p>
@@ -456,7 +456,7 @@ export default function AdminPayments() {
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">This Month</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">${stats.revenueThisMonth?.toLocaleString()}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">₹{stats.revenueThisMonth?.toLocaleString()}</p>
             </div>
           </div>
 
