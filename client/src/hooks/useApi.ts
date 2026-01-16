@@ -165,6 +165,26 @@ export function useDeleteLesson() {
   });
 }
 
+export function useReorderLessons() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ courseId, lessonIds }: { courseId: string; lessonIds: string[] }) =>
+      lessonsApi.reorder(courseId, lessonIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["allLessons"] });
+      toast({ title: "Lessons reordered successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to reorder lessons",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
 // Access Code hooks
 export function useAccessCodeInfo(lessonId: string) {
   return useQuery({

@@ -446,6 +446,12 @@ export const lessonsApi = {
         body: JSON.stringify({ code }),
       }
     ),
+  // Reorder lessons within a course
+  reorder: (courseId: string, lessonIds: string[]) =>
+    apiRequest<{ message: string }>(`/lessons/course/${courseId}/reorder`, {
+      method: "PUT",
+      body: JSON.stringify({ lessonIds }),
+    }),
 };
 
 // Enrollments API

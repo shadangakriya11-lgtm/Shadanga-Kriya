@@ -1,8 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { DataTable } from "@/components/admin/DataTable";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,20 +8,9 @@ import { Progress } from "@/components/ui/progress";
 import {
   Plus,
   Search,
-  MoreHorizontal,
   Upload,
-  Clock,
-  Pause,
-  KeyRound,
   Loader2,
 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -40,10 +27,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useCourses, useDeleteLesson } from "@/hooks/useApi";
+import { useCourses, useDeleteLesson, useReorderLessons } from "@/hooks/useApi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lessonsApi } from "@/lib/api";
 import { AccessCodeDialog } from "@/components/admin/AccessCodeDialog";
+import { SortableLessonList } from "@/components/admin/SortableLessonList";
 import { toast } from "@/hooks/use-toast";
 
 export default function AdminLessons() {
@@ -97,6 +85,7 @@ export default function AdminLessons() {
 
   const queryClient = useQueryClient();
   const deleteLesson = useDeleteLesson();
+  const reorderLessons = useReorderLessons();
 
   const lessons = (lessonsData || []).filter((lesson: any) => {
     const matchesSearch = lesson.title
@@ -106,6 +95,33 @@ export default function AdminLessons() {
       selectedCourse === "all" || lesson.courseId === selectedCourse;
     return matchesSearch && matchesCourse;
   });
+
+  // Group lessons by course for better organization and reordering
+  const lessonsByCourse = useMemo(() => {
+    const grouped: Record<string, { courseName: string; lessons: any[] }> = {};
+
+    for (const lesson of lessons) {
+      const courseId = lesson.courseId;
+      if (!grouped[courseId]) {
+        grouped[courseId] = {
+          courseName: lesson.courseName || "Unknown Course",
+          lessons: [],
+        };
+      }
+      grouped[courseId].lessons.push(lesson);
+    }
+
+    // Sort lessons within each course by order_index
+    for (const courseId of Object.keys(grouped)) {
+      grouped[courseId].lessons.sort((a, b) => {
+        const orderA = a.orderIndex ?? a.order_index ?? 0;
+        const orderB = b.orderIndex ?? b.order_index ?? 0;
+        return orderA - orderB;
+      });
+    }
+
+    return grouped;
+  }, [lessons]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -202,135 +218,6 @@ export default function AdminLessons() {
       }
     }
   };
-
-  const lessonColumns = [
-    {
-      key: "title",
-      header: "Lesson",
-      render: (lesson: any) => (
-        <div>
-          <p className="font-medium text-foreground">{lesson.title}</p>
-          <p className="text-sm text-muted-foreground">
-            {lesson.courseName || "Unknown Course"}
-          </p>
-        </div>
-      ),
-    },
-    {
-      key: "order",
-      header: "Order",
-      render: (lesson: any) => (
-        <span className="text-muted-foreground">
-          #{lesson.order_index || 1}
-        </span>
-      ),
-    },
-    {
-      key: "duration",
-      header: "Duration",
-      render: (lesson: any) => (
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">
-            {lesson.durationMinutes
-              ? `${lesson.durationMinutes} min`
-              : lesson.duration_seconds
-                ? `${Math.round(lesson.duration_seconds / 60)} min`
-                : "0 min"}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: "maxPauses",
-      header: "Max Pauses",
-      render: (lesson: any) => (
-        <div className="flex items-center gap-2">
-          <Pause className="h-4 w-4 text-muted-foreground" />
-          <span className="text-muted-foreground">
-            {lesson.max_pauses || 3}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: "audio",
-      header: "Audio",
-      render: (lesson: any) => (
-        <Badge variant={lesson.audioUrl ? "active" : "locked"}>
-          {lesson.audioUrl ? "Uploaded" : "Pending"}
-        </Badge>
-      ),
-    },
-    {
-      key: "accessCode",
-      header: "Access Code",
-      render: (lesson: any) => (
-        <div className="flex items-center gap-2">
-          {lesson.accessCodeEnabled ? (
-            <Badge
-              variant={
-                lesson.hasAccessCode
-                  ? lesson.accessCodeExpired
-                    ? "destructive"
-                    : "default"
-                  : "secondary"
-              }
-            >
-              <KeyRound className="h-3 w-3 mr-1" />
-              {lesson.hasAccessCode
-                ? lesson.accessCodeExpired
-                  ? "Expired"
-                  : "Active"
-                : "No Code"}
-            </Badge>
-          ) : (
-            <Badge variant="outline">Disabled</Badge>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "actions",
-      header: "",
-      render: (lesson: any) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => openEditDialog(lesson)}>
-              Edit Lesson
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => openEditDialog(lesson)}>
-              Upload Audio
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => openPreview(lesson)}
-              disabled={!lesson.audioUrl}
-            >
-              Preview
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setAccessCodeLesson(lesson)}>
-              <KeyRound className="h-4 w-4 mr-2" />
-              Manage Access Code
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => handleDeleteLesson(lesson.id)}
-            >
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-      className: "w-12",
-    },
-  ];
 
   const totalLessons = lessons.length;
   const withAudio = lessons.filter((l: any) => l.audioUrl).length;
@@ -636,9 +523,30 @@ export default function AdminLessons() {
             </div>
           </div>
 
-          {/* Lessons Table */}
-          <div className="overflow-x-auto">
-            <DataTable columns={lessonColumns} data={lessons} />
+          {/* Lessons List with Reordering */}
+          <div className="space-y-6">
+            {Object.entries(lessonsByCourse).map(([courseId, { courseName, lessons: courseLessons }]) => (
+              <SortableLessonList
+                key={courseId}
+                lessons={courseLessons}
+                courseId={courseId}
+                courseName={courseName}
+                onEdit={openEditDialog}
+                onPreview={openPreview}
+                onManageAccessCode={(lesson) => setAccessCodeLesson(lesson)}
+                onDelete={handleDeleteLesson}
+                onReorder={async (cId, lessonIds) => {
+                  await reorderLessons.mutateAsync({ courseId: cId, lessonIds });
+                }}
+                isReordering={reorderLessons.isPending}
+              />
+            ))}
+
+            {Object.keys(lessonsByCourse).length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No lessons found. Create your first lesson to get started.</p>
+              </div>
+            )}
           </div>
 
           {/* Access Code Management Dialog */}
