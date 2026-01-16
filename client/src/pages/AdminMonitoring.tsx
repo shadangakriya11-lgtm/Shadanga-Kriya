@@ -19,6 +19,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { useMonitoringStats } from "@/hooks/useApi";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +53,18 @@ interface UserLessonProgress {
   maxPauses: number;
   status: "in_progress" | "completed" | "paused" | "interrupted";
   lastActivity: Date | string;
+}
+
+interface MonitoringStats {
+  activeSessions: number;
+  completedToday: number;
+  interrupted: number;
+  pauseRequests: number;
+}
+
+interface MonitoringResponse {
+  monitoring: UserLessonProgress[];
+  stats: MonitoringStats;
 }
 
 interface ActionHandlers {
@@ -175,26 +201,43 @@ const getProgressColumns = (handlers: ActionHandlers) => [
 export default function AdminMonitoring() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserLessonProgress | null>(null);
+  const [pauseCount, setPauseCount] = useState("1");
+  const [isGranting, setIsGranting] = useState(false);
   const { toast } = useToast();
 
   const { data, isLoading, refetch } = useMonitoringStats();
+  const typedData = data as unknown as MonitoringResponse;
 
-  const monitoringData: UserLessonProgress[] = data?.monitoring || [];
-  const stats = data?.stats || {
+  const monitoringData: UserLessonProgress[] = typedData?.monitoring || [];
+  const stats = typedData?.stats || {
     activeSessions: 0,
     completedToday: 0,
     interrupted: 0,
     pauseRequests: 0,
   };
 
-  // Action handlers for user progress management
-  const handleGrantPause = async (item: UserLessonProgress) => {
+  // Open dialog for granting pauses
+  const handleGrantPause = (item: UserLessonProgress) => {
+    setSelectedUser(item);
+    setPauseCount("1");
+    setPauseDialogOpen(true);
+  };
+
+  // Actually grant the pauses
+  const confirmGrantPause = async () => {
+    if (!selectedUser) return;
+
+    setIsGranting(true);
     try {
-      await progressApi.grantPause(item.userId, item.lessonId, 1);
+      const count = parseInt(pauseCount);
+      await progressApi.grantPause(selectedUser.userId, selectedUser.lessonId, count);
       toast({
         title: "Pause Granted",
-        description: `Added 1 extra pause for ${item.userName} on "${item.lessonTitle}"`,
+        description: `Added ${count} extra pause(s) for ${selectedUser.userName} on "${selectedUser.lessonTitle}"`,
       });
+      setPauseDialogOpen(false);
       refetch();
     } catch (error) {
       toast({
@@ -202,6 +245,8 @@ export default function AdminMonitoring() {
         description: "Failed to grant extra pause",
         variant: "destructive",
       });
+    } finally {
+      setIsGranting(false);
     }
   };
 
@@ -349,7 +394,7 @@ export default function AdminMonitoring() {
                 Active Sessions (1h)
               </p>
               <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">
-                {stats.activeSessions}
+                {String(stats.activeSessions || 0)}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
@@ -357,7 +402,7 @@ export default function AdminMonitoring() {
                 Completed Today
               </p>
               <p className="font-serif text-xl lg:text-2xl font-bold text-success">
-                {stats.completedToday}
+                {String(stats.completedToday || 0)}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
@@ -365,7 +410,7 @@ export default function AdminMonitoring() {
                 Interrupted
               </p>
               <p className="font-serif text-xl lg:text-2xl font-bold text-destructive">
-                {stats.interrupted}
+                {String(stats.interrupted || 0)}
               </p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
@@ -373,7 +418,7 @@ export default function AdminMonitoring() {
                 Pause Requests
               </p>
               <p className="font-serif text-xl lg:text-2xl font-bold text-warning">
-                {stats.pauseRequests}
+                {String(stats.pauseRequests || 0)}
               </p>
             </div>
           </div>
@@ -382,6 +427,72 @@ export default function AdminMonitoring() {
           <div className="overflow-x-auto">
             <DataTable columns={progressColumns} data={filteredProgress} />
           </div>
+
+          {/* Grant Extra Pause Dialog */}
+          <Dialog open={pauseDialogOpen} onOpenChange={setPauseDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-serif">Grant Extra Pause</DialogTitle>
+              </DialogHeader>
+              {selectedUser && (
+                <div className="space-y-4 py-4">
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">User</span>
+                      <span className="font-medium">{selectedUser.userName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Lesson</span>
+                      <span className="font-medium">{selectedUser.lessonTitle}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Current Pauses</span>
+                      <span className="font-medium text-destructive">
+                        {selectedUser.pausesUsed} / {selectedUser.maxPauses} used
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="pauseCount">Number of Pauses to Grant</Label>
+                    <Select value={pauseCount} onValueChange={setPauseCount}>
+                      <SelectTrigger id="pauseCount">
+                        <SelectValue placeholder="Select number" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                          <SelectItem key={num} value={num.toString()}>
+                            {num} pause{num > 1 ? 's' : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      This will allow the user to pause {pauseCount} more time{parseInt(pauseCount) > 1 ? 's' : ''} during the lesson.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => setPauseDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="premium"
+                      className="flex-1"
+                      onClick={confirmGrantPause}
+                      disabled={isGranting}
+                    >
+                      {isGranting ? 'Granting...' : `Grant ${pauseCount} Pause${parseInt(pauseCount) > 1 ? 's' : ''}`}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>

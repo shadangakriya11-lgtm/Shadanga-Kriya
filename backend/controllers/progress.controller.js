@@ -251,15 +251,30 @@ const grantExtraPause = async (req, res) => {
     const { userId, lessonId } = req.params;
     const { additionalPauses = 1 } = req.body;
 
-    // Get current lesson max pauses
+    // Get lesson info
     const lessonResult = await pool.query(
-      'SELECT max_pauses FROM lessons WHERE id = $1',
+      'SELECT l.max_pauses, l.title, c.title as course_title FROM lessons l JOIN courses c ON l.course_id = c.id WHERE l.id = $1',
       [lessonId]
     );
 
     if (lessonResult.rows.length === 0) {
       return res.status(404).json({ error: 'Lesson not found' });
     }
+
+    const lessonInfo = lessonResult.rows[0];
+
+    // Get user info
+    const userResult = await pool.query(
+      'SELECT first_name, last_name, email FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userInfo = userResult.rows[0];
+    const userName = `${userInfo.first_name} ${userInfo.last_name}`;
 
     // Update or insert lesson progress with reduced pauses_used count
     const result = await pool.query(
@@ -268,6 +283,7 @@ const grantExtraPause = async (req, res) => {
        ON CONFLICT (user_id, lesson_id) 
        DO UPDATE SET 
          pauses_used = GREATEST(0, lesson_progress.pauses_used - $3),
+         status = 'in_progress',
          updated_at = NOW()
        RETURNING *`,
       [userId, lessonId, additionalPauses]
@@ -275,6 +291,15 @@ const grantExtraPause = async (req, res) => {
 
     // Log the action
     console.log(`Admin ${req.user.id} granted ${additionalPauses} extra pause(s) to user ${userId} for lesson ${lessonId}`);
+
+    // Send notification to admins
+    const { notifyAdmins } = require('./notification.controller.js');
+    notifyAdmins(
+      'Extra Pause Granted',
+      `${additionalPauses} extra pause(s) granted to ${userName} for lesson "${lessonInfo.title}" in course "${lessonInfo.course_title}"`,
+      'info',
+      `/admin/monitoring`
+    ).catch(err => console.error('Notification error:', err));
 
     res.json({
       message: `Granted ${additionalPauses} extra pause(s)`,

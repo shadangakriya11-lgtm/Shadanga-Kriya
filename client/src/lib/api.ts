@@ -719,6 +719,8 @@ export const referralApi = {
   },
 };
 
+
+
 // Playback settings response type
 export interface PlaybackSettingsResponse {
   screenLockEnabled: boolean;
