@@ -16,6 +16,7 @@ export interface User {
   avatarUrl?: string; // Add this too as backend returns it
   phone?: string;
   permissions?: string[];
+  assignedCourses?: string[];
 }
 
 export interface Course {
@@ -31,6 +32,7 @@ export interface Course {
   thumbnail?: string;
   price?: number;
 }
+
 
 export interface Lesson {
   id: string;
@@ -228,6 +230,7 @@ export interface CreateUserData {
   referralCode?: string;
   status?: string;
   permissions?: string[];
+  assignedCourseIds?: string[];
   assignments?: any[]; // Using any[] for now as Assignment interface is not exported
 }
 
@@ -236,8 +239,10 @@ export interface UpdateUserData {
   lastName?: string;
   email?: string;
   role?: UserRole;
+  status?: string;
   isActive?: boolean;
   permissions?: string[];
+  assignedCourseIds?: string[];
   assignments?: any[];
 }
 

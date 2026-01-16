@@ -210,9 +210,11 @@ const getProfile = async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.avatar_url, u.phone, u.created_at, u.last_active,
-              array_remove(array_agg(sap.permission), NULL) as permissions
+              array_remove(array_agg(DISTINCT sap.permission), NULL) as permissions,
+              array_remove(array_agg(DISTINCT fc.course_id), NULL) as assigned_courses
        FROM users u
        LEFT JOIN sub_admin_permissions sap ON u.id = sap.user_id
+       LEFT JOIN facilitator_courses fc ON u.id = fc.user_id
        WHERE u.id = $1
        GROUP BY u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.avatar_url, u.phone, u.created_at, u.last_active`,
       [req.user.id]
@@ -235,7 +237,8 @@ const getProfile = async (req, res) => {
       phone: user.phone,
       createdAt: user.created_at,
       lastActive: user.last_active,
-      permissions: user.permissions || []
+      permissions: user.permissions || [],
+      assignedCourses: user.assigned_courses || []
     });
   } catch (error) {
     console.error('Get profile error:', error);

@@ -53,6 +53,16 @@ const getAllCourses = async (req, res) => {
       paramIndex++;
     }
 
+    // Role-based filtering
+    if (req.user && req.user.role === 'facilitator') {
+      query += ` AND (
+        c.id IN (SELECT course_id FROM facilitator_courses WHERE user_id = $${paramIndex})
+        OR c.created_by = $${paramIndex}
+      )`;
+      params.push(req.user.id);
+      paramIndex++;
+    }
+
     query += ` GROUP BY c.id, u.first_name, u.last_name`;
 
     // Get total count
@@ -214,6 +224,19 @@ const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId } = req.body;
+
+    // Check permission for facilitator
+    if (req.user.role === 'facilitator') {
+      const accessCheck = await pool.query(
+        `SELECT 1 FROM facilitator_courses WHERE user_id = $1 AND course_id = $2
+         UNION
+         SELECT 1 FROM courses WHERE id = $2 AND created_by = $1`,
+        [req.user.id, id]
+      );
+      if (accessCheck.rows.length === 0) {
+        return res.status(403).json({ error: 'Not authorized to manage this course' });
+      }
+    }
 
     const result = await pool.query(
       `UPDATE courses 

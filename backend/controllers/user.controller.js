@@ -9,9 +9,11 @@ const getAllUsers = async (req, res) => {
 
     let query = `
       SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.avatar_url, u.phone, u.created_at, u.last_active,
-             array_remove(array_agg(sap.permission), NULL) as permissions
+             array_remove(array_agg(DISTINCT sap.permission), NULL) as permissions,
+             array_remove(array_agg(DISTINCT fc.course_id), NULL) as assigned_courses
       FROM users u
       LEFT JOIN sub_admin_permissions sap ON u.id = sap.user_id
+      LEFT JOIN facilitator_courses fc ON u.id = fc.user_id
       WHERE 1=1
     `;
     const params = [];
@@ -61,7 +63,8 @@ const getAllUsers = async (req, res) => {
       phone: user.phone,
       createdAt: user.created_at,
       lastActive: user.last_active,
-      permissions: user.permissions || []
+      permissions: user.permissions || [],
+      assignedCourses: user.assigned_courses || []
     }));
 
     res.json({
@@ -85,8 +88,14 @@ const getUserById = async (req, res) => {
     const { id } = req.params;
 
     const result = await pool.query(
-      `SELECT id, email, first_name, last_name, role, status, avatar_url, phone, created_at, last_active
-       FROM users WHERE id = $1`,
+      `SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.avatar_url, u.phone, u.created_at, u.last_active,
+              array_remove(array_agg(DISTINCT sap.permission), NULL) as permissions,
+              array_remove(array_agg(DISTINCT fc.course_id), NULL) as assigned_courses
+       FROM users u
+       LEFT JOIN sub_admin_permissions sap ON u.id = sap.user_id
+       LEFT JOIN facilitator_courses fc ON u.id = fc.user_id
+       WHERE u.id = $1
+       GROUP BY u.id`,
       [id]
     );
 
@@ -106,7 +115,9 @@ const getUserById = async (req, res) => {
       avatarUrl: user.avatar_url,
       phone: user.phone,
       createdAt: user.created_at,
-      lastActive: user.last_active
+      lastActive: user.last_active,
+      permissions: user.permissions || [],
+      assignedCourses: user.assigned_courses || []
     });
   } catch (error) {
     console.error('Get user error:', error);
@@ -119,7 +130,7 @@ const createUser = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { email, password, firstName, lastName, role, status = 'active', phone, permissions } = req.body;
+    const { email, password, firstName, lastName, role, status = 'active', phone, permissions, assignedCourseIds } = req.body;
 
     // Check if user exists
     const existingUser = await client.query(
@@ -161,6 +172,23 @@ const createUser = async (req, res) => {
       userPermissions = safePermissions;
     }
 
+    // Handle Facilitator Courses
+    let userAssignedCourses = [];
+    if (role === 'facilitator' && assignedCourseIds && Array.isArray(assignedCourseIds) && assignedCourseIds.length > 0) {
+      for (const courseId of assignedCourseIds) {
+        // Simple check if course exists could be added, but FK constraint handles validity
+        try {
+          await client.query(
+            'INSERT INTO facilitator_courses (user_id, course_id, assigned_by) VALUES ($1, $2, $3)',
+            [user.id, courseId, req.user.id]
+          );
+          userAssignedCourses.push(courseId);
+        } catch (err) {
+          console.warn(`Failed to assign course ${courseId} to user ${user.id}: ${err.message}`);
+        }
+      }
+    }
+
     await client.query('COMMIT');
 
     res.status(201).json({
@@ -174,7 +202,8 @@ const createUser = async (req, res) => {
         status: user.status,
         phone: user.phone,
         createdAt: user.created_at,
-        permissions: userPermissions
+        permissions: userPermissions,
+        assignedCourses: userAssignedCourses
       }
     });
   } catch (error) {
@@ -192,7 +221,7 @@ const updateUser = async (req, res) => {
   try {
     await client.query('BEGIN');
     const { id } = req.params;
-    const { firstName, lastName, role, status, phone, avatarUrl, permissions, password } = req.body;
+    const { firstName, lastName, role, status, phone, avatarUrl, permissions, password, assignedCourseIds } = req.body;
 
     // 1. If password is provided, hash it and update separately
     if (password && password.trim() !== '') {
@@ -252,6 +281,31 @@ const updateUser = async (req, res) => {
       currentPermissions = permResult.rows.map(r => r.permission);
     }
 
+    // 4. Handle Assigned Courses
+    let currentAssignedCourses = [];
+    if (assignedCourseIds && Array.isArray(assignedCourseIds)) {
+      // Delete existing
+      await client.query('DELETE FROM facilitator_courses WHERE user_id = $1', [id]);
+
+      if (assignedCourseIds.length > 0) {
+        for (const courseId of assignedCourseIds) {
+          try {
+            await client.query(
+              'INSERT INTO facilitator_courses (user_id, course_id, assigned_by) VALUES ($1, $2, $3)',
+              [id, courseId, req.user.id]
+            );
+            currentAssignedCourses.push(courseId);
+          } catch (err) {
+            console.warn(`Failed to assign course ${courseId}: ${err.message}`);
+          }
+        }
+      }
+    } else {
+      // Fetch existing if not updated
+      const coursesResult = await client.query('SELECT course_id FROM facilitator_courses WHERE user_id = $1', [id]);
+      currentAssignedCourses = coursesResult.rows.map(r => r.course_id);
+    }
+
     await client.query('COMMIT');
 
     res.json({
@@ -265,7 +319,8 @@ const updateUser = async (req, res) => {
         status: user.status,
         phone: user.phone,
         avatarUrl: user.avatar_url,
-        permissions: currentPermissions
+        permissions: currentPermissions,
+        assignedCourses: currentAssignedCourses
       }
     });
   } catch (error) {

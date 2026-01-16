@@ -28,7 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useUsers, useUserStats, useCreateUser, useUpdateUser, useDeleteUser } from '@/hooks/useApi';
+import { UserRole } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useUsers, useUserStats, useCreateUser, useUpdateUser, useDeleteUser, useCourses } from '@/hooks/useApi';
 import { toast } from '@/hooks/use-toast';
 
 export default function AdminUsers() {
@@ -40,15 +42,19 @@ export default function AdminUsers() {
     password: '',
     firstName: '',
     lastName: '',
-    role: 'learner',
-    status: 'active'
+    role: 'learner' as UserRole,
+    status: 'active',
+    assignedCourseIds: [] as string[]
   });
 
   const { data: usersData, isLoading } = useUsers({ search: searchQuery });
   const { data: statsData } = useUserStats();
+  const { data: coursesData } = useCourses(); // Fetch all courses
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
+
+  const allCourses = coursesData?.courses || [];
 
   const users = usersData?.users || [];
   const stats = statsData || { total: 0, active: 0, inactive: 0, admins: 0 };
@@ -65,7 +71,15 @@ export default function AdminUsers() {
       }
       setIsDialogOpen(false);
       setEditingUser(null);
-      setFormData({ email: '', password: '', firstName: '', lastName: '', role: 'learner', status: 'active' });
+      setFormData({
+        email: '',
+        password: '',
+        firstName: '',
+        lastName: '',
+        role: 'learner',
+        status: 'active',
+        assignedCourseIds: []
+      });
     } catch (error) {
       console.error('Failed to save user:', error);
     }
@@ -88,7 +102,8 @@ export default function AdminUsers() {
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
-      status: user.status
+      status: user.status,
+      assignedCourseIds: user.assignedCourses || []
     });
     setIsDialogOpen(true);
   };
@@ -220,7 +235,15 @@ export default function AdminUsers() {
               setIsDialogOpen(open);
               if (!open) {
                 setEditingUser(null);
-                setFormData({ email: '', password: '', firstName: '', lastName: '', role: 'learner', status: 'active' });
+                setFormData({
+                  email: '',
+                  password: '',
+                  firstName: '',
+                  lastName: '',
+                  role: 'learner',
+                  status: 'active',
+                  assignedCourseIds: []
+                });
               }
             }}>
               <DialogTrigger asChild>
@@ -274,7 +297,7 @@ export default function AdminUsers() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Role</Label>
-                      <Select value={formData.role} onValueChange={(v) => setFormData(prev => ({ ...prev, role: v }))}>
+                      <Select value={formData.role} onValueChange={(v) => setFormData(prev => ({ ...prev, role: v as UserRole }))}>
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
@@ -298,13 +321,51 @@ export default function AdminUsers() {
                       </Select>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-3 pt-4">
-                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-                    <Button variant="premium" onClick={handleCreateOrUpdateUser} disabled={createUser.isPending || updateUser.isPending}>
-                      {createUser.isPending || updateUser.isPending ? 'Saving...' : (editingUser ? 'Update User' : 'Create User')}
-                    </Button>
-                  </div>
+
+                  {/* Course Assignment for Facilitators */}
+                  {formData.role === 'facilitator' && (
+                    <div className="space-y-2 col-span-2">
+                      <Label>Assigned Courses</Label>
+                      <div className="border rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                        {allCourses.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No courses available.</p>
+                        ) : (
+                          allCourses.map((course: any) => (
+                            <div key={course.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`course-${course.id}`}
+                                checked={formData.assignedCourseIds?.includes(course.id)}
+                                onCheckedChange={(checked) => {
+                                  const current = formData.assignedCourseIds || [];
+                                  if (checked) {
+                                    setFormData(prev => ({ ...prev, assignedCourseIds: [...current, course.id] }));
+                                  } else {
+                                    setFormData(prev => ({ ...prev, assignedCourseIds: current.filter(id => id !== course.id) }));
+                                  }
+                                }}
+                              />
+                              <Label htmlFor={`course-${course.id}`} className="cursor-pointer font-normal">
+                                {course.title}
+                              </Label>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Facilitators can only manage sessions for assigned courses.
+                      </p>
+                    </div>
+                  )}
                 </div>
+
+
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                  <Button variant="premium" onClick={handleCreateOrUpdateUser} disabled={createUser.isPending || updateUser.isPending}>
+                    {createUser.isPending || updateUser.isPending ? 'Saving...' : (editingUser ? 'Update User' : 'Create User')}
+                  </Button>
+                </div>
+
               </DialogContent>
             </Dialog>
           </div>
@@ -313,19 +374,19 @@ export default function AdminUsers() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Total Users</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.total?.toLocaleString()}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{String(stats.total || 0).toLocaleString()}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Active</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{stats.active}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-success">{String(stats.active || 0)}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Inactive</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-locked">{stats.inactive}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-locked">{String(stats.inactive || 0)}</p>
             </div>
             <div className="bg-card rounded-xl border border-border/50 p-4">
               <p className="text-xs lg:text-sm text-muted-foreground">Admins</p>
-              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{stats.admins}</p>
+              <p className="font-serif text-xl lg:text-2xl font-bold text-foreground">{String(stats.admins || 0)}</p>
             </div>
           </div>
 
@@ -334,7 +395,7 @@ export default function AdminUsers() {
             <DataTable columns={userColumns} data={users} />
           </div>
         </main>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
