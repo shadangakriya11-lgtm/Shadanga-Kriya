@@ -70,7 +70,8 @@ export default function AdminCourses() {
   const deleteCourse = useDeleteCourse();
 
   const courses = (coursesData?.courses || []).filter((course: any) =>
-    course.title?.toLowerCase().includes(searchQuery.toLowerCase())
+    course.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    course.id?.toLowerCase().includes(searchQuery.toLowerCase())
   );
   const stats = (statsData as {
     total?: number;
