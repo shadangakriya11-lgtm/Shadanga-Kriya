@@ -33,6 +33,13 @@ export default function LearnerHome() {
   // Map courses with enrollment status
   const mappedCourses: Course[] = courses.map((course: any) => {
     const enrollment = enrollments.find((e: any) => e.courseId === course.id);
+    const totalLessons = enrollment?.totalLessons || course.lessonCount || 0;
+    const completedLessons = enrollment?.completedLessons || 0;
+    // Calculate progress from actual lesson counts for accuracy
+    const calculatedProgress = totalLessons > 0
+      ? Math.round((completedLessons / totalLessons) * 100)
+      : 0;
+
     return {
       id: course.id,
       title: course.title,
@@ -45,9 +52,9 @@ export default function LearnerHome() {
         : course.price > 0
           ? "locked"
           : "pending",
-      progress: enrollment?.progressPercent || 0,
-      totalLessons: course.lessonCount || 0,
-      completedLessons: enrollment?.completedLessons || 0,
+      progress: calculatedProgress,
+      totalLessons: totalLessons,
+      completedLessons: completedLessons,
       duration: course.durationHours
         ? `${course.durationHours} hours`
         : "0 min",

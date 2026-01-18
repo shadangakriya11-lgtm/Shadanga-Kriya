@@ -14,7 +14,7 @@ const NotFound = () => {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = "/login";
+    window.location.href = "/auth";
   };
 
   return (
@@ -43,7 +43,7 @@ const NotFound = () => {
 
           {!isLoggedIn && (
             <Button asChild variant="outline">
-              <a href="/login" className="flex items-center gap-2">
+              <a href="/auth" className="flex items-center gap-2">
                 <LogOut className="h-4 w-4" />
                 Go to Login
               </a>

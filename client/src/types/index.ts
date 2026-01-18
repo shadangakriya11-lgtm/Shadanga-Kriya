@@ -148,6 +148,10 @@ export interface Enrollment {
   courseId: string;
   status: string;
   enrolledAt: Date;
+  completedAt?: Date;
+  progressPercent: number;
+  totalLessons: number;
+  completedLessons: number;
   course?: Course;
   user?: User;
 }

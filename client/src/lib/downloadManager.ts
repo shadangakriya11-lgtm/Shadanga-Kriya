@@ -191,12 +191,12 @@ export interface DownloadedLesson {
 export interface DownloadProgress {
   lessonId: string;
   status:
-    | "pending"
-    | "downloading"
-    | "encrypting"
-    | "saving"
-    | "completed"
-    | "error";
+  | "pending"
+  | "downloading"
+  | "encrypting"
+  | "saving"
+  | "completed"
+  | "error";
   progress: number;
   error?: string;
 }
@@ -227,9 +227,8 @@ export const getDeviceId = async (): Promise<string> => {
 export const registerDevice = async (token: string): Promise<void> => {
   const deviceId = await getDeviceId();
   const platform = Capacitor.getPlatform();
-  const deviceName = `${
-    platform.charAt(0).toUpperCase() + platform.slice(1)
-  } Device`;
+  const deviceName = `${platform.charAt(0).toUpperCase() + platform.slice(1)
+    } Device`;
 
   const response = await fetch(`${API_BASE}/downloads/devices`, {
     method: "POST",
@@ -574,6 +573,28 @@ export const deleteDownloadedLesson = async (
       console.warn("Failed to notify backend of deletion:", e);
     }
   }
+};
+
+/**
+ * Delete all downloaded lessons for a specific course
+ */
+export const deleteDownloadsForCourse = async (
+  courseId: string,
+  token?: string
+): Promise<number> => {
+  const downloadsForCourse = await getDownloadedLessonsForCourse(courseId);
+
+  let deletedCount = 0;
+  for (const download of downloadsForCourse) {
+    try {
+      await deleteDownloadedLesson(download.lessonId, token);
+      deletedCount++;
+    } catch (e) {
+      console.warn(`Failed to delete lesson ${download.lessonId}:`, e);
+    }
+  }
+
+  return deletedCount;
 };
 
 /**

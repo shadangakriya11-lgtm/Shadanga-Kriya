@@ -491,15 +491,15 @@ export default function Auth() {
                 <div className="text-xs text-muted-foreground space-y-1.5">
                   <p className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Admin: admin@therapy.com / admin123
+                    Admin: admin@therapy.com / Admin@123!
                   </p>
                   <p className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-teal-600"></span>
-                    Facilitator: facilitator@therapy.com / facilitator123
+                    Facilitator: facilitator@therapy.com / Facilitator@123!
                   </p>
                   <p className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-teal-500"></span>
-                    Learner: sarah@example.com / learner123
+                    Learner: sarah@example.com / Learner@123!
                   </p>
                 </div>
               </div>

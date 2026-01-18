@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { LessonCard } from "@/components/learner/LessonCard";
 import { PreLessonProtocol } from "@/components/learner/PreLessonProtocol";
@@ -13,6 +13,7 @@ import {
   DollarSign,
   AlertCircle,
   Users,
+  Trash2,
 } from "lucide-react";
 import { Lesson } from "@/types";
 import {
@@ -26,6 +27,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { AccessCodeInputDialog } from "@/components/learner/AccessCodeInputDialog";
+import {
+  getDownloadedLessonsForCourse,
+  deleteDownloadsForCourse,
+  DownloadedLesson,
+} from "@/lib/downloadManager";
 
 type ViewState = "details" | "protocol" | "player";
 
@@ -49,6 +55,25 @@ export default function CourseDetail() {
     error: progressError,
   } = useCourseProgress(id || "");
   const updateProgress = useUpdateLessonProgress();
+
+  // Track downloaded lessons for this course
+  const [downloadedCount, setDownloadedCount] = useState(0);
+  const [isDeletingDownloads, setIsDeletingDownloads] = useState(false);
+
+  // Fetch downloaded lessons count
+  useEffect(() => {
+    const fetchDownloadCount = async () => {
+      if (id) {
+        try {
+          const downloads = await getDownloadedLessonsForCourse(id);
+          setDownloadedCount(downloads.length);
+        } catch (e) {
+          console.warn("Failed to get download count:", e);
+        }
+      }
+    };
+    fetchDownloadCount();
+  }, [id]);
 
   // Check attendance for on-site courses
   const isOnsiteCourse = courseData?.type === "onsite";
@@ -209,6 +234,36 @@ export default function CourseDetail() {
     setSelectedLesson(null);
   };
 
+  const handleDeleteDownloads = async () => {
+    if (!id || downloadedCount === 0) return;
+
+    setIsDeletingDownloads(true);
+    try {
+      const deletedCount = await deleteDownloadsForCourse(id);
+      setDownloadedCount(0);
+      toast({
+        title: "Downloads Deleted",
+        description: `${deletedCount} audio file${deletedCount !== 1 ? 's' : ''} deleted successfully.`,
+      });
+    } catch (error) {
+      console.error("Failed to delete downloads:", error);
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete some downloads. Please try again.",
+        variant: "destructive",
+      });
+      // Refresh the count
+      try {
+        const downloads = await getDownloadedLessonsForCourse(id);
+        setDownloadedCount(downloads.length);
+      } catch (e) {
+        // Ignore
+      }
+    } finally {
+      setIsDeletingDownloads(false);
+    }
+  };
+
   if (view === "protocol" && selectedLesson) {
     return (
       <PreLessonProtocol
@@ -341,6 +396,27 @@ export default function CourseDetail() {
             <p className="text-sm text-muted-foreground mt-2">
               {completedLessons} of {totalLessons} lessons completed
             </p>
+          </section>
+        )}
+
+        {/* Delete Downloads Option */}
+        {isEnrolled && (
+          <section className="mb-8 animate-fade-in animate-delay-150">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDeleteDownloads}
+              disabled={downloadedCount === 0 || isDeletingDownloads}
+              className="w-full flex items-center justify-center gap-2 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+            >
+              <Trash2 className="h-4 w-4" />
+              {isDeletingDownloads
+                ? "Deleting..."
+                : downloadedCount > 0
+                  ? `Delete Downloaded Audio (${downloadedCount})`
+                  : "No Downloaded Audio"
+              }
+            </Button>
           </section>
         )}
 
