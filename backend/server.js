@@ -24,6 +24,7 @@ const certificateRoutes = require('./routes/certificate.routes.js');
 const exportRoutes = require('./routes/export.routes.js');
 const downloadRoutes = require('./routes/download.routes.js');
 const referralRoutes = require('./routes/referral.routes.js');
+const demoRoutes = require('./routes/demo.routes.js');
 
 const app = express();
 
@@ -54,6 +55,9 @@ app.use(mongoSanitize());
 
 // SECURITY: Prevent HTTP Parameter Pollution
 app.use(hpp());
+
+// Serve static files from public directory (for demo audio, etc.)
+app.use('/public', express.static(path.join(__dirname, 'public')));
 
 // ===== RATE LIMITING (per express-rate-limit v8 documentation) =====
 
@@ -132,6 +136,7 @@ app.use('/api/certificates', certificateRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/downloads', downloadRoutes);
 app.use('/api/referrals', referralRoutes);
+app.use('/api/demo', demoRoutes);
 
 // SECURITY: Error handling middleware - don't expose sensitive data
 app.use((err, req, res, next) => {
