@@ -68,7 +68,7 @@ export const initializeAuth = async (): Promise<boolean> => {
       "[Auth] Initializing auth on platform:",
       platform,
       "isNative:",
-      isNative
+      isNative,
     );
 
     if (isNative) {
@@ -77,12 +77,12 @@ export const initializeAuth = async (): Promise<boolean> => {
         await Preferences.configure({ group: PREFERENCES_GROUP });
         console.log(
           "[Auth] Preferences configured with group:",
-          PREFERENCES_GROUP
+          PREFERENCES_GROUP,
         );
       } catch (configError) {
         console.log(
           "[Auth] Could not configure Preferences group (may not be supported):",
-          configError
+          configError,
         );
       }
 
@@ -92,7 +92,7 @@ export const initializeAuth = async (): Promise<boolean> => {
       tokenCache = result.value;
       console.log(
         "[Auth] Token from Preferences:",
-        tokenCache ? `found (${tokenCache.substring(0, 20)}...)` : "not found"
+        tokenCache ? `found (${tokenCache.substring(0, 20)}...)` : "not found",
       );
 
       // If not found in Preferences, try localStorage as fallback
@@ -101,7 +101,7 @@ export const initializeAuth = async (): Promise<boolean> => {
           const localToken = localStorage.getItem(TOKEN_KEY);
           if (localToken) {
             console.log(
-              "[Auth] Found token in localStorage backup, migrating to Preferences..."
+              "[Auth] Found token in localStorage backup, migrating to Preferences...",
             );
             tokenCache = localToken;
             // Migrate to Preferences
@@ -126,7 +126,7 @@ export const initializeAuth = async (): Promise<boolean> => {
       tokenCache = localStorage.getItem(TOKEN_KEY);
       console.log(
         "[Auth] Token from localStorage:",
-        tokenCache ? `found (${tokenCache.substring(0, 20)}...)` : "not found"
+        tokenCache ? `found (${tokenCache.substring(0, 20)}...)` : "not found",
       );
     }
 
@@ -156,7 +156,7 @@ export const isAuthInitialized = () => isInitialized;
 const getApiBaseUrl = (): string => {
   // Production URL from environment variable
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    return `${import.meta.env.VITE_API_URL}/api`;
   }
 
   // Local development
@@ -173,7 +173,7 @@ const getApiBaseUrl = (): string => {
   }
 
   // Fallback - update this with your production backend URL
-  return "https://backend-serene-flow.onrender.com/api";
+  return "https://shadanga-kriya-h1hs.onrender.com/api";
 };
 
 const API_BASE_URL = getApiBaseUrl();
@@ -184,7 +184,7 @@ const getToken = () => tokenCache;
 // API request helper
 async function apiRequest<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
   const token = getToken();
 
@@ -307,7 +307,7 @@ export const lessonsApi = {
   // Create/Update with progress tracking for file uploads
   createWithProgress: (
     data: FormData,
-    onProgress: (progress: number) => void
+    onProgress: (progress: number) => void,
   ): Promise<Lesson> => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -339,7 +339,7 @@ export const lessonsApi = {
 
       xhr.addEventListener("error", () => reject(new Error("Network error")));
       xhr.addEventListener("abort", () =>
-        reject(new Error("Upload cancelled"))
+        reject(new Error("Upload cancelled")),
       );
 
       xhr.open("POST", `${API_BASE_URL}/lessons`);
@@ -351,7 +351,7 @@ export const lessonsApi = {
   updateWithProgress: (
     id: string,
     data: FormData,
-    onProgress: (progress: number) => void
+    onProgress: (progress: number) => void,
   ): Promise<Lesson> => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -383,7 +383,7 @@ export const lessonsApi = {
 
       xhr.addEventListener("error", () => reject(new Error("Network error")));
       xhr.addEventListener("abort", () =>
-        reject(new Error("Upload cancelled"))
+        reject(new Error("Upload cancelled")),
       );
 
       xhr.open("PUT", `${API_BASE_URL}/lessons/${id}`);
@@ -412,7 +412,7 @@ export const lessonsApi = {
   generateAccessCode: (
     lessonId: string,
     codeType: "permanent" | "temporary",
-    expiresInMinutes?: number
+    expiresInMinutes?: number,
   ) =>
     apiRequest<{
       message: string;
@@ -444,7 +444,7 @@ export const lessonsApi = {
       {
         method: "POST",
         body: JSON.stringify({ code }),
-      }
+      },
     ),
   // Reorder lessons within a course
   reorder: (courseId: string, lessonIds: string[]) =>
@@ -481,7 +481,7 @@ export const enrollmentsApi = {
       `/enrollments/admin/${userId}/${courseId}`,
       {
         method: "DELETE",
-      }
+      },
     ),
 };
 
@@ -499,28 +499,28 @@ export const progressApi = {
   grantPause: (
     userId: string,
     lessonId: string,
-    additionalPauses: number = 1
+    additionalPauses: number = 1,
   ) =>
     apiRequest<Record<string, unknown>>(
       `/progress/${userId}/${lessonId}/grant-pause`,
       {
         method: "POST",
         body: JSON.stringify({ additionalPauses }),
-      }
+      },
     ),
   resetLesson: (userId: string, lessonId: string) =>
     apiRequest<Record<string, unknown>>(
       `/progress/${userId}/${lessonId}/reset`,
       {
         method: "POST",
-      }
+      },
     ),
   lockLesson: (userId: string, lessonId: string) =>
     apiRequest<Record<string, unknown>>(
       `/progress/${userId}/${lessonId}/lock`,
       {
         method: "POST",
-      }
+      },
     ),
 };
 
@@ -563,7 +563,7 @@ export const paymentsApi = {
   refund: (paymentId: string) =>
     apiRequest<{ message: string; payment: Payment }>(
       `/payments/${paymentId}/refund`,
-      { method: "POST" }
+      { method: "POST" },
     ),
 };
 
@@ -602,7 +602,7 @@ export const attendanceApi = {
   mark: (sessionId: string, userId: string, status: "present" | "absent") =>
     apiRequest<{ message: string }>(
       `/attendance/session/${sessionId}/user/${userId}`,
-      { method: "PUT", body: JSON.stringify({ status }) }
+      { method: "PUT", body: JSON.stringify({ status }) },
     ),
   bulkMark: (sessionId: string, attendances: BulkAttendanceData[]) =>
     apiRequest<{ message: string }>(`/attendance/session/${sessionId}/bulk`, {
@@ -618,11 +618,11 @@ export const analyticsApi = {
   getDashboard: () => apiRequest<AnalyticsDashboard>("/analytics/dashboard"),
   getEnrollmentTrends: (period?: string) =>
     apiRequest<AnalyticsDashboard>(
-      `/analytics/enrollments?period=${period || "30"}`
+      `/analytics/enrollments?period=${period || "30"}`,
     ),
   getRevenue: (period?: string) =>
     apiRequest<AnalyticsDashboard>(
-      `/analytics/revenue?period=${period || "30"}`
+      `/analytics/revenue?period=${period || "30"}`,
     ),
   getCourse: (courseId: string) =>
     apiRequest<AnalyticsDashboard>(`/analytics/course/${courseId}`),
@@ -630,7 +630,7 @@ export const analyticsApi = {
     apiRequest<AnalyticsDashboard>("/analytics/facilitator"),
   getLearner: (learnerId?: string) =>
     apiRequest<AnalyticsDashboard>(
-      `/analytics/learner${learnerId ? `/${learnerId}` : ""}`
+      `/analytics/learner${learnerId ? `/${learnerId}` : ""}`,
     ),
   getMonitoring: () => apiRequest<AnalyticsDashboard>("/analytics/monitoring"),
 };
@@ -639,7 +639,7 @@ export const analyticsApi = {
 export const notificationsApi = {
   getAll: (unreadOnly?: boolean) =>
     apiRequest<NotificationsResponse>(
-      `/notifications?unreadOnly=${unreadOnly || false}`
+      `/notifications?unreadOnly=${unreadOnly || false}`,
     ),
   markRead: (id: string) =>
     apiRequest<Notification>(`/notifications/${id}/read`, { method: "PUT" }),
@@ -701,25 +701,41 @@ export const referralApi = {
       method: "PATCH",
     }),
   // Admin analytics endpoints
-  getAdminAnalytics: (params?: { startDate?: string; endDate?: string; facilitatorId?: string }) => {
-    const query = params ? "?" + new URLSearchParams(
-      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined))
-    ).toString() : "";
-    return apiRequest<{ analytics: ReferralAnalyticsItem[]; summary: ReferralAnalyticsSummary }>(
-      `/referrals/admin/analytics${query}`
-    );
+  getAdminAnalytics: (params?: {
+    startDate?: string;
+    endDate?: string;
+    facilitatorId?: string;
+  }) => {
+    const query = params
+      ? "?" +
+        new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params).filter(([, v]) => v !== undefined),
+          ),
+        ).toString()
+      : "";
+    return apiRequest<{
+      analytics: ReferralAnalyticsItem[];
+      summary: ReferralAnalyticsSummary;
+    }>(`/referrals/admin/analytics${query}`);
   },
-  getReferredUsersByFacilitator: (facilitatorId: string, params?: { startDate?: string; endDate?: string }) => {
-    const query = params ? "?" + new URLSearchParams(
-      Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined))
-    ).toString() : "";
+  getReferredUsersByFacilitator: (
+    facilitatorId: string,
+    params?: { startDate?: string; endDate?: string },
+  ) => {
+    const query = params
+      ? "?" +
+        new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params).filter(([, v]) => v !== undefined),
+          ),
+        ).toString()
+      : "";
     return apiRequest<{ users: ReferredUser[] }>(
-      `/referrals/admin/facilitator/${facilitatorId}/users${query}`
+      `/referrals/admin/facilitator/${facilitatorId}/users${query}`,
     );
   },
 };
-
-
 
 // Playback settings response type
 export interface PlaybackSettingsResponse {
@@ -777,7 +793,7 @@ export const setAuthToken = async (token: string): Promise<void> => {
         "[Auth] Token saved to Preferences - verified:",
         verify.value ? "YES" : "NO",
         "Token preview:",
-        verify.value ? verify.value.substring(0, 20) + "..." : "none"
+        verify.value ? verify.value.substring(0, 20) + "..." : "none",
       );
 
       // Also save to localStorage as backup (Android WebView supports it)
@@ -905,10 +921,13 @@ export const demoApi = {
   getStatus: () => apiRequest<DemoStatusResponse>("/demo/status"),
 
   submitQuestionnaire: (responses: QuestionnaireResponse) =>
-    apiRequest<{ message: string; canProceed: boolean }>("/demo/questionnaire", {
-      method: "POST",
-      body: JSON.stringify({ responses }),
-    }),
+    apiRequest<{ message: string; canProceed: boolean }>(
+      "/demo/questionnaire",
+      {
+        method: "POST",
+        body: JSON.stringify({ responses }),
+      },
+    ),
 
   getDecryptionKey: (deviceId: string) =>
     apiRequest<DemoDecryptionResponse>("/demo/decrypt", {
@@ -917,10 +936,11 @@ export const demoApi = {
     }),
 
   markCompleted: () =>
-    apiRequest<{ message: string; hasWatchedDemo: boolean; demoWatchedAt: string }>(
-      "/demo/complete",
-      { method: "POST" }
-    ),
+    apiRequest<{
+      message: string;
+      hasWatchedDemo: boolean;
+      demoWatchedAt: string;
+    }>("/demo/complete", { method: "POST" }),
 
   skip: () =>
     apiRequest<{ message: string; demoSkipped: boolean }>("/demo/skip", {
@@ -938,4 +958,3 @@ export const demoApi = {
       body: JSON.stringify({ audioUrl }),
     }),
 };
-

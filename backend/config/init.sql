@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS users (
   status user_status NOT NULL DEFAULT 'active',
   avatar_url TEXT,
   phone VARCHAR(20),
+  login_attempts INTEGER DEFAULT 0,
+  locked_until TIMESTAMP,
+  referred_by_code_id UUID,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -298,6 +301,51 @@ CREATE TABLE IF NOT EXISTS user_devices (
 CREATE INDEX IF NOT EXISTS idx_offline_downloads_user_id ON offline_downloads(user_id);
 CREATE INDEX IF NOT EXISTS idx_offline_downloads_lesson_id ON offline_downloads(lesson_id);
 CREATE INDEX IF NOT EXISTS idx_user_devices_user_id ON user_devices(user_id);
+
+-- Notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  type VARCHAR(50) DEFAULT 'info',
+  is_read BOOLEAN DEFAULT false,
+  link VARCHAR(255),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+
+-- Admin settings table
+CREATE TABLE IF NOT EXISTS admin_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  setting_key VARCHAR(255) UNIQUE NOT NULL,
+  setting_value TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_settings_key ON admin_settings(setting_key);
+
+-- Referral codes table
+CREATE TABLE IF NOT EXISTS referral_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code INTEGER NOT NULL UNIQUE,
+  description TEXT,
+  created_by UUID REFERENCES users(id) ON DELETE CASCADE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_referral_codes_code ON referral_codes(code);
+CREATE INDEX IF NOT EXISTS idx_referral_codes_created_by ON referral_codes(created_by);
+
+-- Add foreign key for referred_by_code_id after referral_codes table exists
+ALTER TABLE users ADD CONSTRAINT fk_users_referred_by_code 
+  FOREIGN KEY (referred_by_code_id) REFERENCES referral_codes(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS idx_users_referred_by_code_id ON users(referred_by_code_id);
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (email, password_hash, first_name, last_name, user_id, role, status)
