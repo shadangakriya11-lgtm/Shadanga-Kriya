@@ -11,6 +11,7 @@ import {
   usersApi,
   notificationsApi,
   settingsApi,
+  demoApi,
   PlaybackSettingsResponse,
 } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
@@ -885,3 +886,99 @@ export function usePlaybackSettings() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 }
+
+// Demo hooks
+export function useDemoStatus() {
+  return useQuery({
+    queryKey: ["demoStatus"],
+    queryFn: () => demoApi.getStatus(),
+    staleTime: 30 * 1000, // Cache for 30 seconds
+  });
+}
+
+export function useSubmitQuestionnaire() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: demoApi.submitQuestionnaire,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["demoStatus"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to submit questionnaire",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useMarkDemoCompleted() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: demoApi.markCompleted,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["demoStatus"] });
+      toast({ title: "Demo completed!" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to mark demo as completed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useSkipDemo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: demoApi.skip,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["demoStatus"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to skip demo",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+
+export function useDemoAudioInfo() {
+  return useQuery({
+    queryKey: ["demoAudioInfo"],
+    queryFn: () => demoApi.getAudioInfo(),
+    enabled: false, // Only fetch when explicitly called
+  });
+}
+
+// Admin demo analytics
+export function useDemoAnalytics() {
+  return useQuery({
+    queryKey: ["demoAnalytics"],
+    queryFn: () => demoApi.getAnalytics(),
+  });
+}
+
+export function useSetDemoAudioUrl() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: demoApi.setAudioUrl,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["demoAnalytics"] });
+      toast({ title: "Demo audio URL updated" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update demo audio URL",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+}
+

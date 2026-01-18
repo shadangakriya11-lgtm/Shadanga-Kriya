@@ -849,3 +849,93 @@ export const isAuthenticated = () => !!tokenCache;
  * Get the current cached token (sync)
  */
 export const getCachedToken = () => tokenCache;
+
+// Demo API Types
+export interface DemoStatusResponse {
+  hasWatchedDemo: boolean;
+  demoWatchedAt: string | null;
+  demoSkipped: boolean;
+  showDemo: boolean;
+}
+
+export interface QuestionnaireResponse {
+  question1: string;
+  question2: string;
+  question3: string;
+  question4: string;
+  question5: string;
+}
+
+export interface DemoDecryptionResponse {
+  key: string;
+  algorithm: string;
+  audioUrl: string | null;
+  message: string;
+}
+
+export interface DemoAudioInfoResponse {
+  audioUrl: string;
+  title: string;
+  description: string;
+}
+
+export interface DemoAnalyticsResponse {
+  stats: {
+    totalWatched: number;
+    totalSkipped: number;
+    pending: number;
+    totalUsers: number;
+    completionRate: string;
+  };
+  questionnaireStats: Record<string, Record<string, number>>;
+  recentResponses: Array<{
+    id: string;
+    name: string;
+    email: string;
+    hasWatchedDemo: boolean;
+    demoWatchedAt: string | null;
+    demoSkipped: boolean;
+    responses: QuestionnaireResponse | null;
+    createdAt: string;
+  }>;
+}
+
+// Demo API
+export const demoApi = {
+  getStatus: () => apiRequest<DemoStatusResponse>("/demo/status"),
+
+  submitQuestionnaire: (responses: QuestionnaireResponse) =>
+    apiRequest<{ message: string; canProceed: boolean }>("/demo/questionnaire", {
+      method: "POST",
+      body: JSON.stringify({ responses }),
+    }),
+
+  getDecryptionKey: (deviceId: string) =>
+    apiRequest<DemoDecryptionResponse>("/demo/decrypt", {
+      method: "POST",
+      body: JSON.stringify({ deviceId }),
+    }),
+
+  markCompleted: () =>
+    apiRequest<{ message: string; hasWatchedDemo: boolean; demoWatchedAt: string }>(
+      "/demo/complete",
+      { method: "POST" }
+    ),
+
+  skip: () =>
+    apiRequest<{ message: string; demoSkipped: boolean }>("/demo/skip", {
+      method: "POST",
+    }),
+
+  getAudioInfo: () => apiRequest<DemoAudioInfoResponse>("/demo/audio-info"),
+
+  // Admin endpoints
+  getAnalytics: () => apiRequest<DemoAnalyticsResponse>("/demo/analytics"),
+
+  setAudioUrl: (audioUrl: string) =>
+    apiRequest<{ message: string; audioUrl: string }>("/demo/audio-url", {
+      method: "POST",
+      body: JSON.stringify({ audioUrl }),
+    }),
+};
+

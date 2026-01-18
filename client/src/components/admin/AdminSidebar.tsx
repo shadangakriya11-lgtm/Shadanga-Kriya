@@ -15,6 +15,7 @@ import {
   X,
   Bell,
   Ticket,
+  Headphones,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -33,6 +34,7 @@ const navItems = [
   { icon: UserCog, label: 'Sub-Admins', href: '/admin/subadmins' },
   { icon: BarChart3, label: 'Analytics', href: '/admin/analytics' },
   { icon: Ticket, label: 'Referrals', href: '/admin/referrals' },
+  { icon: Headphones, label: 'Demo Analytics', href: '/admin/demo-analytics' },
   { icon: Bell, label: 'Notifications', href: '/admin/notifications' },
 ];
 

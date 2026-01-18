@@ -6,10 +6,10 @@ import { CourseCard } from "@/components/learner/CourseCard";
 import { PaymentModal } from "@/components/learner/PaymentModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { BookOpen, Clock, CheckCircle2, Search, X } from "lucide-react";
+import { BookOpen, Clock, CheckCircle2, Search, X, Headphones, Sparkles, ChevronRight } from "lucide-react";
 import { Course } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCourses, useMyEnrollments } from "@/hooks/useApi";
+import { useCourses, useMyEnrollments, useDemoStatus, useSkipDemo } from "@/hooks/useApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 
@@ -24,6 +24,8 @@ export default function LearnerHome() {
   const { data: coursesData, isLoading: coursesLoading } = useCourses();
   const { data: enrollmentsData, isLoading: enrollmentsLoading } =
     useMyEnrollments();
+  const { data: demoStatus } = useDemoStatus();
+  const skipDemoMutation = useSkipDemo();
 
   const courses = coursesData?.courses || [];
   const enrollments = enrollmentsData?.enrollments || [];
@@ -41,8 +43,8 @@ export default function LearnerHome() {
           ? "completed"
           : "active"
         : course.price > 0
-        ? "locked"
-        : "pending",
+          ? "locked"
+          : "pending",
       progress: enrollment?.progressPercent || 0,
       totalLessons: course.lessonCount || 0,
       completedLessons: enrollment?.completedLessons || 0,
@@ -96,7 +98,16 @@ export default function LearnerHome() {
     navigate(`/course/${courseId}`);
   };
 
+  const handleListenDemo = () => {
+    navigate("/demo");
+  };
+
+  const handleSkipDemo = async () => {
+    await skipDemoMutation.mutateAsync();
+  };
+
   const isLoading = coursesLoading || enrollmentsLoading;
+  const showDemoBanner = demoStatus?.showDemo;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -105,6 +116,59 @@ export default function LearnerHome() {
       />
 
       <main className="px-4 py-6 max-w-3xl mx-auto">
+        {/* Demo Banner */}
+        {showDemoBanner && (
+          <section className="mb-6 animate-fade-in">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary/90 to-primary/70 shadow-xl">
+              {/* Background decoration */}
+              <div className="absolute inset-0 opacity-10">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-white rounded-full blur-3xl transform translate-x-10 -translate-y-10" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-white rounded-full blur-3xl transform -translate-x-10 translate-y-10" />
+              </div>
+
+              <div className="relative p-6">
+                <div className="flex items-start gap-4">
+                  <div className="h-14 w-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+                    <Headphones className="h-7 w-7 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Sparkles className="h-4 w-4 text-yellow-300" />
+                      <span className="text-xs font-medium text-white/80 uppercase tracking-wider">
+                        विशेष Demo
+                      </span>
+                    </div>
+                    <h3 className="font-serif text-xl font-bold text-white mb-2">
+                      Demo Meditation सुनें
+                    </h3>
+                    <p className="text-sm text-white/80 mb-4">
+                      अपनी ध्यान यात्रा शुरू करने से पहले एक विशेष Demo Meditation का अनुभव करें।
+                    </p>
+
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        onClick={handleListenDemo}
+                        className="bg-white text-primary hover:bg-white/90 font-medium shadow-lg"
+                      >
+                        🎧 Demo सुनें
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={handleSkipDemo}
+                        className="text-white/80 hover:text-white hover:bg-white/10"
+                        disabled={skipDemoMutation.isPending}
+                      >
+                        {skipDemoMutation.isPending ? "..." : "बाद में"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
         {/* Welcome Section */}
         <section className="mb-8">
           <h1 className="font-serif text-3xl font-bold text-foreground mb-2">

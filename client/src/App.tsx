@@ -37,6 +37,7 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminNotifications from "./pages/AdminNotifications";
 import AdminSettings from "./pages/AdminSettings";
 import AdminReferralAnalytics from "./pages/AdminReferralAnalytics";
+import AdminDemoAnalytics from "./pages/AdminDemoAnalytics";
 import FacilitatorDashboard from "./pages/FacilitatorDashboard";
 import FacilitatorAttendance from "./pages/FacilitatorAttendance";
 import FacilitatorSessions from "./pages/FacilitatorSessions";
@@ -46,6 +47,7 @@ import FacilitatorMonitoring from "./pages/FacilitatorMonitoring";
 import FacilitatorCourses from "./pages/FacilitatorCourses";
 import FacilitatorReferrals from "./pages/FacilitatorReferrals";
 import DownloadsPage from "./pages/learner/DownloadsPage";
+import Demo from "./pages/Demo";
 import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import VisionMission from "./pages/VisionMission";
@@ -298,6 +300,14 @@ const AppContent = () => (
                 }
               />
               <Route
+                path="/demo"
+                element={
+                  <ProtectedRoute allowedRoles={["learner"]}>
+                    <Demo />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/privacy"
                 element={
                   <ProtectedRoute allowedRoles={["learner"]}>
@@ -400,6 +410,14 @@ const AppContent = () => (
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminSettings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/demo-analytics"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminDemoAnalytics />
                   </ProtectedRoute>
                 }
               />
