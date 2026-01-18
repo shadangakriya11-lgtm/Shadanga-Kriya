@@ -23,9 +23,10 @@ import {
   Save,
   Loader2,
   Play,
+  Music,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { settingsApi } from "@/lib/api";
+import { settingsApi, demoApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AdminSettings() {
@@ -49,9 +50,15 @@ export default function AdminSettings() {
   });
   const [isSavingPlayback, setIsSavingPlayback] = useState(false);
 
+  // Media settings state
+  const [demoAudioUrl, setDemoAudioUrl] = useState("");
+  const [isSavingMedia, setIsSavingMedia] = useState(false);
+  const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+
   useEffect(() => {
     fetchSettings();
     fetchPlaybackSettings();
+    fetchMediaSettings();
   }, []);
 
   const fetchSettings = async () => {
@@ -60,8 +67,8 @@ export default function AdminSettings() {
       const data = await settingsApi.getSettings();
       if (data.settings) {
         setSettings({
-          razorpayKeyId: data.settings.razorpay_key_id || "",
-          razorpaySecretKey: data.settings.razorpay_secret_key || "",
+          razorpayKeyId: String(data.settings.razorpay_key_id || ""),
+          razorpaySecretKey: String(data.settings.razorpay_secret_key || ""),
           razorpayTestMode: data.settings.razorpay_test_mode === "true",
           autoActivate: true, // Mocked for now OR could be added to DB later
         });
@@ -147,6 +154,47 @@ export default function AdminSettings() {
     }
   };
 
+  const fetchMediaSettings = async () => {
+    setIsLoadingMedia(true);
+    try {
+      const data = await settingsApi.getDemoAudioUrl();
+      setDemoAudioUrl(data.audioUrl || "");
+    } catch (error) {
+      console.error("Fetch demo audio URL error:", error);
+    } finally {
+      setIsLoadingMedia(false);
+    }
+  };
+
+  const handleSaveMedia = async () => {
+    if (!demoAudioUrl.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid URL",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingMedia(true);
+    try {
+      await demoApi.setAudioUrl(demoAudioUrl);
+      toast({
+        title: "Settings Saved",
+        description: "Demo audio URL has been updated successfully",
+      });
+    } catch (error) {
+      console.error("Save media settings error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save demo audio URL",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingMedia(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
@@ -176,6 +224,10 @@ export default function AdminSettings() {
               <TabsTrigger value="payments" className="gap-2">
                 <CreditCard className="h-4 w-4" />
                 Payments
+              </TabsTrigger>
+              <TabsTrigger value="media" className="gap-2">
+                <Music className="h-4 w-4" />
+                Media
               </TabsTrigger>
             </TabsList>
 
@@ -678,6 +730,59 @@ export default function AdminSettings() {
                       <>
                         <Save className="mr-2 h-4 w-4" />
                         Save Payment Settings
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="media">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-serif">Demo Audio Settings</CardTitle>
+                  <CardDescription>
+                    Configure the demo meditation audio URL. This URL is used for the
+                    demo audio that new users can listen to before enrolling.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="demoAudioUrl">Demo Audio URL</Label>
+                    <Input
+                      id="demoAudioUrl"
+                      placeholder="https://example.com/demo.mp3"
+                      value={demoAudioUrl}
+                      onChange={(e) => setDemoAudioUrl(e.target.value)}
+                      disabled={isLoadingMedia}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter the full URL to your demo meditation audio file (MP3 format recommended).
+                      This can be hosted on your backend server, Cloudinary, or any CDN.
+                    </p>
+                  </div>
+
+                  {demoAudioUrl && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm font-medium mb-1">Current URL:</p>
+                      <p className="text-xs text-muted-foreground break-all">{demoAudioUrl}</p>
+                    </div>
+                  )}
+
+                  <Button
+                    variant="premium"
+                    onClick={handleSaveMedia}
+                    disabled={isSavingMedia || isLoadingMedia}
+                  >
+                    {isSavingMedia ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Media Settings
                       </>
                     )}
                   </Button>

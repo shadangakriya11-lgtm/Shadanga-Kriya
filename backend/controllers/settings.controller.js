@@ -266,11 +266,29 @@ const getSetting = async (key) => {
         return null;
     }
 };
+// Get demo audio URL (admin only)
+const getDemoAudioUrl = async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT value FROM app_settings WHERE key = 'demo_audio_url'`
+        );
+
+        const audioUrl = result.rows.length > 0
+            ? result.rows[0].value
+            : '';
+
+        res.json({ audioUrl });
+    } catch (error) {
+        console.error('Get demo audio URL error:', error);
+        res.status(500).json({ error: 'Failed to get demo audio URL' });
+    }
+};
 
 module.exports = {
     getSettings,
     updateSettings,
     getRazorpayKey,
     getPlaybackSettings,
-    getSetting
+    getSetting,
+    getDemoAudioUrl
 };

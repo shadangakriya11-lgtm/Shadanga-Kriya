@@ -15,4 +15,8 @@ router.get('/razorpay-key', verifyToken, settingsController.getRazorpayKey);
 // Get playback settings (accessible to all authenticated users)
 router.get('/playback', verifyToken, settingsController.getPlaybackSettings);
 
+// Get demo audio URL (admin only)
+router.get('/demo-audio-url', verifyToken, isAdmin, settingsController.getDemoAudioUrl);
+
 module.exports = router;
+

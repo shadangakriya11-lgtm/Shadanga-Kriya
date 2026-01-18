@@ -708,11 +708,11 @@ export const referralApi = {
   }) => {
     const query = params
       ? "?" +
-        new URLSearchParams(
-          Object.fromEntries(
-            Object.entries(params).filter(([, v]) => v !== undefined),
-          ),
-        ).toString()
+      new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v !== undefined),
+        ),
+      ).toString()
       : "";
     return apiRequest<{
       analytics: ReferralAnalyticsItem[];
@@ -725,11 +725,11 @@ export const referralApi = {
   ) => {
     const query = params
       ? "?" +
-        new URLSearchParams(
-          Object.fromEntries(
-            Object.entries(params).filter(([, v]) => v !== undefined),
-          ),
-        ).toString()
+      new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v !== undefined),
+        ),
+      ).toString()
       : "";
     return apiRequest<{ users: ReferredUser[] }>(
       `/referrals/admin/facilitator/${facilitatorId}/users${query}`,
@@ -760,6 +760,8 @@ export const settingsApi = {
     apiRequest<RazorpayKeyResponse>("/settings/razorpay-key"),
   getPlaybackSettings: () =>
     apiRequest<PlaybackSettingsResponse>("/settings/playback"),
+  getDemoAudioUrl: () =>
+    apiRequest<{ audioUrl: string }>("/settings/demo-audio-url"),
 };
 
 // Auth helpers - use localStorage which works on Android WebView
