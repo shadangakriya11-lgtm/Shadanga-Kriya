@@ -1,13 +1,28 @@
 const pool = require('../config/db.js');
-const cloudinary = require('cloudinary').v2;
+const { S3Client, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-// Helper function to extract public_id from Cloudinary URL
-const getCloudinaryPublicId = (url) => {
+// Configure Cloudflare R2 (S3 Client) for manual operations (deletes)
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  }
+});
+
+const R2_PUBLIC_URL_BASE = process.env.R2_PUBLIC_URL || ''; // Add R2_PUBLIC_URL to .env if you have a custom domain/worker
+
+// Helper function to extract Key from R2 URL
+const getR2KeyFromUrl = (url) => {
   if (!url) return null;
   try {
-    // Cloudinary URLs look like: https://res.cloudinary.com/cloud_name/resource_type/upload/v123/folder/public_id.ext
-    const matches = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-    return matches ? matches[1] : null;
+    // If using custom domain: https://pub-xxx.r2.dev/therapy-lms/audio/filename.mp3
+    // We need 'therapy-lms/audio/filename.mp3'
+    const urlObj = new URL(url);
+    // Remove leading slash
+    return urlObj.pathname.substring(1);
   } catch (e) {
     return null;
   }
@@ -39,27 +54,47 @@ const getLessonsByCourse = async (req, res) => {
       [courseId]
     );
 
-    const lessons = result.rows.map(l => ({
-      id: l.id,
-      courseId: l.course_id,
-      title: l.title,
-      description: l.description,
-      content: l.content,
-      // SECURITY: Only expose audioUrl to admin/facilitator or enrolled users
-      audioUrl: canViewAudio ? l.audio_url : null,
-      videoUrl: canViewAudio ? l.video_url : null,
-      duration: l.duration,
-      durationSeconds: l.duration_seconds,
-      durationMinutes: l.duration_minutes,
-      orderIndex: l.order_index,
-      maxPauses: l.max_pauses,
-      isLocked: l.is_locked,
-      createdAt: l.created_at,
-      // Access Code fields
-      accessCodeEnabled: l.access_code_enabled,
-      hasAccessCode: !!l.access_code,
-      accessCodeType: l.access_code_type,
-      accessCodeExpired: l.access_code_type === 'temporary' && l.access_code_expires_at && new Date(l.access_code_expires_at) < new Date()
+    const lessons = await Promise.all(result.rows.map(async l => {
+      // Sign the audio URL if it's an R2 URL and user has access
+      let audioUrl = canViewAudio ? l.audio_url : null;
+      if (audioUrl) {
+        const key = getR2KeyFromUrl(audioUrl);
+        if (key) {
+          try {
+            const command = new GetObjectCommand({
+              Bucket: process.env.R2_BUCKET_AUDIOS,
+              Key: key
+            });
+            audioUrl = await getSignedUrl(r2, command, { expiresIn: 1800 }); // Valid for 30 minutes
+          } catch (e) {
+            console.error('Failed to sign audio URL:', e);
+            // Keep original URL if signing fails (or handle as needed)
+          }
+        }
+      }
+
+      return {
+        id: l.id,
+        courseId: l.course_id,
+        title: l.title,
+        description: l.description,
+        content: l.content,
+        // SECURITY: Only expose audioUrl to admin/facilitator or enrolled users
+        audioUrl: audioUrl,
+        videoUrl: canViewAudio ? l.video_url : null,
+        duration: l.duration,
+        durationSeconds: l.duration_seconds,
+        durationMinutes: l.duration_minutes,
+        orderIndex: l.order_index,
+        maxPauses: l.max_pauses,
+        isLocked: l.is_locked,
+        createdAt: l.created_at,
+        // Access Code fields
+        accessCodeEnabled: l.access_code_enabled,
+        hasAccessCode: !!l.access_code,
+        accessCodeType: l.access_code_type,
+        accessCodeExpired: l.access_code_type === 'temporary' && l.access_code_expires_at && new Date(l.access_code_expires_at) < new Date()
+      };
     }));
 
     res.json({ lessons });
@@ -115,6 +150,23 @@ const getLessonById = async (req, res) => {
       }
     }
 
+    // Sign the audio URL if it's an R2 URL and user has access
+    let audioUrl = canViewAudio ? l.audio_url : null;
+    if (audioUrl) {
+      const key = getR2KeyFromUrl(audioUrl);
+      if (key) {
+        try {
+          const command = new GetObjectCommand({
+            Bucket: process.env.R2_BUCKET_AUDIOS,
+            Key: key
+          });
+          audioUrl = await getSignedUrl(r2, command, { expiresIn: 3600 }); // Valid for 1 hour
+        } catch (e) {
+          console.error('Failed to sign audio URL:', e);
+        }
+      }
+    }
+
     res.json({
       id: l.id,
       courseId: l.course_id,
@@ -123,7 +175,7 @@ const getLessonById = async (req, res) => {
       description: l.description,
       content: l.content,
       // SECURITY: Only expose audioUrl/videoUrl to admin/facilitator or enrolled users
-      audioUrl: canViewAudio ? l.audio_url : null,
+      audioUrl: audioUrl,
       videoUrl: canViewAudio ? l.video_url : null,
       duration: l.duration,
       durationSeconds: l.duration_seconds,
@@ -155,8 +207,8 @@ const createLesson = async (req, res) => {
     }
 
     // Get audio URL from uploaded file or request body (fallback)
-    // multer-storage-cloudinary stores URL in 'path' or 'secure_url'
-    const audioUrl = req.file ? (req.file.path || req.file.secure_url) : req.body.audioUrl;
+    // multer-s3 adds 'location' (the full URL) and 'key' to req.file
+    const audioUrl = req.file ? req.file.location : req.body.audioUrl;
 
     // Verify course exists
     const courseCheck = await pool.query('SELECT id FROM courses WHERE id = $1', [courseId]);
@@ -221,22 +273,24 @@ const updateLesson = async (req, res) => {
     }
 
     // Get audio URL from uploaded file or request body
-    // multer-storage-cloudinary stores URL in 'path' or 'secure_url'
-    const newAudioUrl = req.file ? (req.file.path || req.file.secure_url) : null;
+    const newAudioUrl = req.file ? req.file.location : null;
 
-    // If a new audio file is uploaded, delete the old one from Cloudinary
+    // If a new audio file is uploaded, delete the old one from R2
     if (newAudioUrl) {
       // Get the existing audio URL first
       const existingLesson = await pool.query('SELECT audio_url FROM lessons WHERE id = $1', [id]);
       if (existingLesson.rows.length > 0 && existingLesson.rows[0].audio_url) {
         const oldAudioUrl = existingLesson.rows[0].audio_url;
-        const publicId = getCloudinaryPublicId(oldAudioUrl);
-        if (publicId) {
+        const key = getR2KeyFromUrl(oldAudioUrl);
+        if (key) {
           try {
-            console.log('Deleting old audio from Cloudinary:', publicId);
-            await cloudinary.uploader.destroy(publicId, { resource_type: 'video' }); // audio files are 'video' resource type in Cloudinary
+            console.log('Deleting old audio from R2:', key);
+            await r2.send(new DeleteObjectCommand({
+              Bucket: process.env.R2_BUCKET_AUDIOS,
+              Key: key
+            }));
           } catch (deleteError) {
-            console.error('Failed to delete old audio from Cloudinary:', deleteError);
+            console.error('Failed to delete old audio from R2:', deleteError);
             // Continue with update even if delete fails
           }
         }
@@ -306,7 +360,7 @@ const deleteLesson = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // First, get the audio URL to delete from Cloudinary
+    // First, get the audio URL to delete from R2
     const lessonResult = await pool.query(
       'SELECT audio_url FROM lessons WHERE id = $1',
       [id]
@@ -318,16 +372,19 @@ const deleteLesson = async (req, res) => {
 
     const audioUrl = lessonResult.rows[0].audio_url;
 
-    // Delete audio from Cloudinary if it exists
+    // Delete audio from R2 if it exists
     if (audioUrl) {
-      const publicId = getCloudinaryPublicId(audioUrl);
-      if (publicId) {
+      const key = getR2KeyFromUrl(audioUrl);
+      if (key) {
         try {
-          console.log('Deleting audio from Cloudinary on lesson delete:', publicId);
-          await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+          console.log('Deleting audio from R2 on lesson delete:', key);
+          await r2.send(new DeleteObjectCommand({
+            Bucket: process.env.R2_BUCKET_AUDIOS,
+            Key: key
+          }));
         } catch (deleteError) {
-          console.error('Failed to delete audio from Cloudinary:', deleteError);
-          // Continue with lesson deletion even if Cloudinary delete fails
+          console.error('Failed to delete audio from R2:', deleteError);
+          // Continue with lesson deletion even if R2 delete fails
         }
       }
     }
@@ -462,7 +519,7 @@ const toggleAccessCode = async (req, res) => {
         const result = await pool.query(
           `UPDATE lessons 
            SET access_code_enabled = true, access_code = $1, access_code_type = 'permanent', 
-               access_code_expires_at = NULL, access_code_generated_at = $2
+           access_code_expires_at = NULL, access_code_generated_at = $2
            WHERE id = $3
            RETURNING id, title, access_code_enabled, access_code, access_code_type, access_code_expires_at`,
           [code, now, lessonId]

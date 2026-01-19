@@ -1,5 +1,29 @@
 const pool = require('../config/db.js');
 const crypto = require('crypto');
+const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+
+// Configure Cloudflare R2 (S3 Client) for signing URLs
+const r2 = new S3Client({
+    region: 'auto',
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    }
+});
+
+// Helper function to extract Key from R2 URL
+const getR2KeyFromUrl = (url) => {
+    if (!url) return null;
+    try {
+        const urlObj = new URL(url);
+        // Remove leading slash
+        return urlObj.pathname.substring(1);
+    } catch (e) {
+        return null;
+    }
+};
 
 // Secret for key derivation (should be in env)
 const ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'shadanga-kriya-audio-encryption-secret-2024';
@@ -157,6 +181,24 @@ const authorizeDownload = async (req, res) => {
             [userId, deviceId]
         );
 
+        let audioUrl = lesson.audio_url;
+
+        // Sign the audio URL if it's an R2 URL
+        if (audioUrl) {
+            const key = getR2KeyFromUrl(audioUrl);
+            if (key) {
+                try {
+                    const command = new GetObjectCommand({
+                        Bucket: process.env.R2_BUCKET_AUDIOS,
+                        Key: key
+                    });
+                    audioUrl = await getSignedUrl(r2, command, { expiresIn: 1800 }); // Valid for 30 minutes
+                } catch (e) {
+                    console.error('Failed to sign download audio URL:', e);
+                }
+            }
+        }
+
         res.json({
             message: 'Download authorized',
             lesson: {
@@ -164,7 +206,7 @@ const authorizeDownload = async (req, res) => {
                 title: lesson.title,
                 courseTitle: lesson.course_title,
                 durationSeconds: lesson.duration_seconds,
-                audioUrl: lesson.audio_url
+                audioUrl: audioUrl
             },
             encryption: {
                 key: encryptionKey,
