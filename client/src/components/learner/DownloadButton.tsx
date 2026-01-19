@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from "react";
-import { Download, Check, Loader2, Trash2, AlertCircle } from "lucide-react";
+import { Download, Check, Loader2, Trash2, AlertCircle, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -27,6 +27,7 @@ import {
 import { useDownloads, useLessonDownloadStatus } from "@/hooks/useDownloads";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Capacitor } from "@capacitor/core";
 
 interface DownloadButtonProps {
   lessonId: string;
@@ -51,6 +52,9 @@ export function DownloadButton({
   const { startDownload, downloadProgress, removeDownload } = useDownloads();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // Check if running on native platform (APK/iOS)
+  const isNativePlatform = Capacitor.isNativePlatform();
+
   const progress = downloadProgress[lessonId];
   const isDownloading =
     progress &&
@@ -67,6 +71,54 @@ export function DownloadButton({
       onDownloadComplete?.();
     }
   }, [progress?.status, onDownloadComplete, refresh]);
+
+  // SECURITY: Block downloads on web browsers - only allow on native apps
+  if (!isNativePlatform) {
+    // On browsers, show a disabled button with app required message
+    if (variant === "icon") {
+      return (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" disabled className={className}>
+                <Smartphone className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Download available in app only</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    }
+
+    if (variant === "compact") {
+      return (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled
+          className={cn("opacity-50", className)}
+        >
+          <Smartphone className="h-4 w-4 mr-2" />
+          <span className="text-xs">App Only</span>
+        </Button>
+      );
+    }
+
+    // Default variant
+    return (
+      <div className={cn("space-y-2", className)}>
+        <Button variant="outline" className="w-full" disabled>
+          <Smartphone className="h-4 w-4 mr-2" />
+          Download Available in App
+        </Button>
+        <p className="text-xs text-muted-foreground text-center">
+          Install the Shadanga Kriya app to download lessons
+        </p>
+      </div>
+    );
+  }
 
   const handleDownload = async () => {
     try {

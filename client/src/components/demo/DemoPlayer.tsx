@@ -9,10 +9,12 @@ import {
     CheckCircle2,
     Loader2,
     AlertTriangle,
+    Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { demoApi } from "@/lib/api";
 import { useMarkDemoCompleted } from "@/hooks/useApi";
+import { Capacitor } from "@capacitor/core";
 
 interface DemoPlayerProps {
     onComplete: () => void;
@@ -28,6 +30,9 @@ interface PlaybackState {
 
 export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
     const markDemoCompletedMutation = useMarkDemoCompleted();
+
+    // Check if running on native platform (APK/iOS)
+    const isNativePlatform = Capacitor.isNativePlatform();
 
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -47,6 +52,29 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
         total: 0,
         percent: 0,
     });
+
+    // SECURITY: Block audio playback on web browsers
+    if (!isNativePlatform) {
+        return (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
+                <div className="text-center max-w-md">
+                    <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-destructive/15 text-destructive mb-6">
+                        <Smartphone className="h-10 w-10" />
+                    </div>
+                    <h2 className="font-serif text-2xl font-semibold text-foreground mb-3">
+                        App Required
+                    </h2>
+                    <p className="text-muted-foreground mb-6">
+                        The demo meditation can only be played on the official Shadanga Kriya mobile app.
+                        Please download and install the app on your Android or iOS device.
+                    </p>
+                    <Button variant="premium" onClick={onBack}>
+                        Go Back
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     // Format bytes to human readable size
     const formatBytes = (bytes: number) => {

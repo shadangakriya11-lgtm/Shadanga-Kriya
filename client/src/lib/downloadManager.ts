@@ -15,7 +15,7 @@ import {
   EncryptedAudioPackage,
 } from "./audioEncryption";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
+const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api`;
 const STORAGE_PREFIX = "sk_audio_";
 const KEY_STORAGE_PREFIX = "sk_key_";
 const DEVICE_ID_KEY = "sk_device_id";

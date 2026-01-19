@@ -232,7 +232,7 @@ export function DownloadsPage() {
                 Download lessons from your enrolled courses to listen offline
                 during your practice sessions.
               </p>
-              <Button onClick={() => navigate("/learner/my-courses")}>
+              <Button onClick={() => navigate("/home")}>
                 Browse My Courses
               </Button>
             </CardContent>
