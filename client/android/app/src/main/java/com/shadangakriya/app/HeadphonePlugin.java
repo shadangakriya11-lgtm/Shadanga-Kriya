@@ -57,4 +57,20 @@ public class HeadphonePlugin extends Plugin {
             call.reject("Error detecting headphones: " + e.getMessage());
         }
     }
+
+    @PluginMethod
+    public void isAirplaneModeEnabled(PluginCall call) {
+        try {
+            Context context = getContext();
+            boolean isEnabled = android.provider.Settings.Global.getInt(
+                context.getContentResolver(), 
+                android.provider.Settings.Global.AIRPLANE_MODE_ON, 0) != 0;
+            
+            JSObject result = new JSObject();
+            result.put("isEnabled", isEnabled);
+            call.resolve(result);
+        } catch (Exception e) {
+            call.reject("Error checking airplane mode: " + e.getMessage());
+        }
+    }
 }

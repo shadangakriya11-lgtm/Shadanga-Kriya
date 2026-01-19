@@ -22,9 +22,11 @@ import {
   loadEncryptedAudio,
   revokeAudioBlobUrl,
 } from "@/lib/downloadManager";
+import { isAirplaneModeEnabled } from "@/lib/deviceChecks";
 import { useToast } from "@/hooks/use-toast";
 import { usePlaybackSettings } from "@/hooks/useApi";
 import { Capacitor } from "@capacitor/core";
+import { useFocusMode } from "@/hooks/useFocusMode";
 
 interface AudioPlayerProps {
   lesson: Lesson;
@@ -57,7 +59,8 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     pausesRemaining: lesson.maxPauses - (lesson.pausesUsed || 0),
     isPaused: false,
   });
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  // We treat 'isOffline' as 'isAirplaneModeEnabled' effectively
+  const [isOffline, setIsOffline] = useState(false); // Default to false, will update on mount
   const [isComplete, setIsComplete] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(true);
@@ -68,6 +71,23 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     string | null
   >(null);
   const [isDownloaded, setIsDownloaded] = useState(false);
+
+  // Focus Mode Hook (Keep Awake + Immersive Mode)
+  useFocusMode(playback.isPlaying);
+
+  // Poll for Airplane Mode Status (Global for this component)
+  useEffect(() => {
+    const checkStatus = async () => {
+      const airplaneOn = await isAirplaneModeEnabled();
+      // If Airplane Mode is ON, we are "offline" (good).
+      // If Airplane Mode is OFF, we are "online" (bad).
+      setIsOffline(airplaneOn);
+    };
+
+    checkStatus(); // Initial check
+    const interval = setInterval(checkStatus, 2000); // UI updates every 2s
+    return () => clearInterval(interval);
+  }, []);
 
   // SECURITY: Block audio playback on web browsers
   if (!isNativePlatform) {
@@ -150,30 +170,42 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     });
   }, [toast, releaseWakeLock, autoSkipOnMaxPauses, autoSkipDelaySeconds]);
 
-  // Monitor online status and enforce offline-only playback
+  // ENFORCEMENT: Monitor Airplane Mode (Strict) during playback
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOffline(false);
-      // If playing and went online, pause and show warning (only if offline mode required)
-      if (offlineModeRequired && playback.isPlaying && audioRef.current) {
-        audioRef.current.pause();
-        setPlayback((prev) => ({ ...prev, isPlaying: false }));
-        setOfflineEnforcementError(
-          "Internet connection detected. Please disconnect to continue playback."
-        );
-        releaseWakeLock();
+    if (!offlineModeRequired) return;
+
+    let intervalId: NodeJS.Timeout;
+
+    const checkCompliance = async () => {
+      // If we are playing, we MUST be in Airplane Mode
+      if (playback.isPlaying) {
+        const isAirplaneOn = await isAirplaneModeEnabled();
+
+        if (!isAirplaneOn) {
+          // Violation detected! Stop everything.
+          if (audioRef.current) {
+            audioRef.current.pause();
+          }
+          setPlayback((prev) => ({ ...prev, isPlaying: false }));
+          setOfflineEnforcementError(
+            "Airplane Mode Disabled! Playback stopped. Please enable Airplane Mode strictly."
+          );
+          releaseWakeLock();
+        } else {
+          // Clear error if compliance returns
+          setOfflineEnforcementError(null);
+        }
       }
     };
-    const handleOffline = () => {
-      setIsOffline(true);
-      // Clear offline enforcement error when going offline
-      setOfflineEnforcementError(null);
-    };
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+
+    // Run check immediately and then poll
+    if (playback.isPlaying) {
+      checkCompliance();
+      intervalId = setInterval(checkCompliance, 2000); // Check every 2 seconds
+    }
+
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      if (intervalId) clearInterval(intervalId);
     };
   }, [playback.isPlaying, releaseWakeLock, offlineModeRequired]);
 
@@ -442,35 +474,20 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {audioSource === "offline" && isOffline && (
-              <Badge
-                variant="secondary"
-                className="flex items-center gap-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300"
-              >
-                <WifiOff className="h-3 w-3" />
-                Offline Ready
-              </Badge>
-            )}
-            {!isOffline && (
-              <Badge variant="destructive" className="flex items-center gap-1">
-                <Wifi className="h-3 w-3" />
-                Online - Go Offline
-              </Badge>
-            )}
-          </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
         {/* Offline Enforcement Warning */}
-        {offlineEnforcementError && (
-          <div className="mb-6 flex items-center gap-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg max-w-md text-center">
-            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
-            <span className="text-sm">{offlineEnforcementError}</span>
-          </div>
-        )}
+        {
+          offlineEnforcementError && (
+            <div className="mb-6 flex items-center gap-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg max-w-md text-center">
+              <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm">{offlineEnforcementError}</span>
+            </div>
+          )
+        }
 
         {/* Visualization */}
         <div className="relative mb-12">
@@ -512,19 +529,23 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         </div>
 
         {/* Error Message */}
-        {audioError && (
-          <div className="mb-4 text-destructive font-medium bg-destructive/10 px-4 py-2 rounded-lg">
-            {audioError}
-          </div>
-        )}
+        {
+          audioError && (
+            <div className="mb-4 text-destructive font-medium bg-destructive/10 px-4 py-2 rounded-lg">
+              {audioError}
+            </div>
+          )
+        }
 
         {/* Loading State */}
-        {isLoadingAudio && !audioError && (
-          <div className="mb-4 flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span>Loading audio...</span>
-          </div>
-        )}
+        {
+          isLoadingAudio && !audioError && (
+            <div className="mb-4 flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Loading audio...</span>
+            </div>
+          )
+        }
 
         {/* Time Display */}
         <div className="text-center mb-8">
@@ -592,14 +613,15 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
               )}
           </div>
         </div>
-      </main>
+      </main >
 
-      {/* Footer Notice */}
       <footer className="py-4 px-4 text-center">
         <p className="text-xs text-muted-foreground">
           Seeking is disabled. Please listen continuously for best results.
         </p>
       </footer>
-    </div>
+
+
+    </div >
   );
 }

@@ -64,6 +64,7 @@ export interface PlaybackState {
 export interface PreLessonChecklist {
   flightModeEnabled: boolean;
   earbudsConnected: boolean;
+  focusModeEnabled: boolean;
   focusAcknowledged: boolean;
 }
 

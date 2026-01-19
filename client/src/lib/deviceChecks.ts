@@ -2,6 +2,7 @@ import { Capacitor } from "@capacitor/core";
 
 interface HeadphoneDetectionPlugin {
   isConnected: () => Promise<{ isConnected: boolean }>;
+  isAirplaneModeEnabled?: () => Promise<{ isEnabled: boolean }>;
 }
 
 /**
@@ -20,11 +21,23 @@ export async function isAirplaneModeEnabled(): Promise<boolean> {
   try {
     // On Android, we can check network connectivity
     // If all network types are unavailable, likely in airplane mode
+    // On Android, use our native plugin if available
     if (Capacitor.getPlatform() === "android") {
+      try {
+        const { registerPlugin } = await import("@capacitor/core");
+        const HeadphoneDetection = registerPlugin<HeadphoneDetectionPlugin>("HeadphoneDetection");
+
+        if (HeadphoneDetection.isAirplaneModeEnabled) {
+          const result = await HeadphoneDetection.isAirplaneModeEnabled();
+          return result.isEnabled === true;
+        }
+      } catch (nativeError) {
+        console.warn("Native airplane check failed, trying network status:", nativeError);
+      }
+
+      // Fallback to network status
       const { Network } = await import("@capacitor/network");
       const status = await Network.getStatus();
-
-      // If not connected to any network type, likely in airplane mode
       return !status.connected;
     }
 

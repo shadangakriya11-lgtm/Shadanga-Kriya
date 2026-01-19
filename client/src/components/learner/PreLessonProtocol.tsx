@@ -11,6 +11,7 @@ import {
   Shield,
   RefreshCw,
   Settings,
+  BellOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -45,6 +46,13 @@ const checklistItems = [
       "Use quality earphones or headphones for optimal audio experience.",
   },
   {
+    id: "focusModeEnabled",
+    icon: BellOff,
+    title: "Do Not Disturb Enabled",
+    description:
+      "Silence calls and notifications from your quick settings.",
+  },
+  {
     id: "focusAcknowledged",
     icon: Brain,
     title: "Focus Commitment",
@@ -69,6 +77,7 @@ export function PreLessonProtocol({
   const [checklist, setChecklist] = useState<PreLessonChecklist>({
     flightModeEnabled: !flightModeCheckEnabled, // Auto-check if disabled
     earbudsConnected: !earphoneCheckEnabled, // Auto-check if disabled
+    focusModeEnabled: false,
     focusAcknowledged: false,
   });
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
@@ -94,38 +103,7 @@ export function PreLessonProtocol({
   }, [flightModeCheckEnabled, earphoneCheckEnabled]);
 
   // Auto-check device status on mount
-  useEffect(() => {
-    checkDeviceStatus();
-
-    // Monitor network status for airplane mode changes (only if flight mode check enabled)
-    if (!flightModeCheckEnabled) return;
-
-    const cleanup = onNetworkStatusChange((isConnected) => {
-      setAutoCheckResults((prev) => ({
-        ...prev,
-        airplaneMode: !isConnected,
-      }));
-
-      if (!isConnected) {
-        setChecklist((prev) => ({ ...prev, flightModeEnabled: true }));
-        toast({
-          title: "Airplane mode detected",
-          description: "Flight mode is now enabled",
-        });
-      } else {
-        setChecklist((prev) => ({ ...prev, flightModeEnabled: false }));
-        toast({
-          title: "Network detected",
-          description: "Please enable airplane mode for optimal experience",
-          variant: "destructive",
-        });
-      }
-    });
-
-    return cleanup;
-  }, [toast, flightModeCheckEnabled]);
-
-  const checkDeviceStatus = async () => {
+  const checkDeviceStatus = async (): Promise<boolean> => {
     setIsCheckingDevices(true);
     try {
       const [airplaneMode, earphones] = await Promise.all([
@@ -143,6 +121,9 @@ export function PreLessonProtocol({
       // Auto-check items if conditions are met
       if (airplaneMode) {
         setChecklist((prev) => ({ ...prev, flightModeEnabled: true }));
+      } else {
+        // Ensure it is unchecked if check fails
+        setChecklist((prev) => ({ ...prev, flightModeEnabled: false }));
       }
 
       if (earphones) {
@@ -153,7 +134,16 @@ export function PreLessonProtocol({
             description: "Audio device is connected",
           });
         }
+      } else {
+        setChecklist((prev) => ({ ...prev, earbudsConnected: false }));
       }
+
+      // Return validity status
+      const isAirplaneValid = !flightModeCheckEnabled || (airplaneMode === true);
+      const isEarphonesValid = !earphoneCheckEnabled || (earphones === true);
+
+      return isAirplaneValid && isEarphonesValid;
+
     } catch (error) {
       console.error("Error checking device status:", error);
       toast({
@@ -161,13 +151,143 @@ export function PreLessonProtocol({
         description: "Please manually confirm the checklist items",
         variant: "destructive",
       });
+      return false;
     } finally {
       setIsCheckingDevices(false);
     }
   };
 
-  const toggleItem = (id: keyof PreLessonChecklist) => {
-    setChecklist((prev) => ({ ...prev, [id]: !prev[id] }));
+  const handleStartSession = async () => {
+    // 1. Re-verify Hardware
+    const hardwareValid = await checkDeviceStatus();
+
+    // 2. Verify Manual Checks (using current state is fine as they are manual)
+    // Note: We use the *latest* checklist state if possible, but inside this closure 'checklist' is stale?
+    // Actually, since we just updated hardware state, let's rely on the return value for hardware
+    // and the closure state for manual (since they didn't change in the last ms).
+
+    if (hardwareValid && checklist.focusAcknowledged && checklist.focusModeEnabled) {
+      onStart();
+    } else {
+      toast({
+        title: "Check Failed",
+        description: "Please ensure all conditions are still met.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Auto-check device status on mount
+  useEffect(() => {
+    checkDeviceStatus();
+  }, []);
+
+  // Monitor audio device changes (Earphones) - REAL TIME
+  useEffect(() => {
+    if (!earphoneCheckEnabled) return;
+
+    const handleDeviceChange = async () => {
+      try {
+        const isConnected = await areEarphonesConnected();
+
+        setAutoCheckResults((prev) => ({
+          ...prev,
+          earphones: isConnected,
+        }));
+
+        if (isConnected) {
+          setChecklist((prev) => ({ ...prev, earbudsConnected: true }));
+        } else {
+          setChecklist((prev) => ({ ...prev, earbudsConnected: false }));
+        }
+      } catch (err) {
+        console.error("Device change error:", err);
+      }
+    };
+
+    // Listen for hardware changes (plug/unplug)
+    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+
+    // Initial check
+    handleDeviceChange();
+
+    return () => {
+      navigator.mediaDevices.removeEventListener(
+        "devicechange",
+        handleDeviceChange
+      );
+    };
+  }, [earphoneCheckEnabled]);
+
+  const toggleItem = async (id: keyof PreLessonChecklist) => {
+    // For manual commitment items (DND and Focus Commitment)
+    // We cannot reliably verify DND without advanced plugins, so we trust the user here.
+    if (id === "focusAcknowledged" || id === "focusModeEnabled") {
+      setChecklist((prev) => ({ ...prev, [id]: !prev[id] }));
+      return;
+    }
+
+    // For Hardware items (Flight Mode, Earphones), we STRICTLY enforce verification.
+    // Clicking the item triggers a real sensor check.
+    setIsCheckingDevices(true);
+    try {
+      if (id === "flightModeEnabled") {
+        // If checking (enabling), verify hardware. If unchecking, just allow it.
+        const targetState = !checklist.flightModeEnabled;
+        if (targetState) {
+          const isEnabled = await isAirplaneModeEnabled();
+          if (isEnabled) {
+            setChecklist((prev) => ({ ...prev, flightModeEnabled: true }));
+            toast({
+              title: "Verified",
+              description: "Airplane mode verified successfully.",
+              variant: "default", // Success
+            });
+          } else {
+            setChecklist((prev) => ({ ...prev, flightModeEnabled: false }));
+            toast({
+              title: "Verification Failed",
+              description: "Airplane mode NOT detected. Please enable it in Settings.",
+              variant: "destructive",
+            });
+            openAirplaneModeSettings();
+          }
+        } else {
+          setChecklist((prev) => ({ ...prev, flightModeEnabled: false }));
+        }
+      } else if (id === "earbudsConnected") {
+        const targetState = !checklist.earbudsConnected;
+        if (targetState) {
+          const isConnected = await areEarphonesConnected();
+          if (isConnected) {
+            setChecklist((prev) => ({ ...prev, earbudsConnected: true }));
+            toast({
+              title: "Verified",
+              description: "Audio device detected.",
+              variant: "default",
+            });
+          } else {
+            setChecklist((prev) => ({ ...prev, earbudsConnected: false }));
+            toast({
+              title: "Verification Failed",
+              description: "No earphones/headphones detected. Please connect them.",
+              variant: "destructive",
+            });
+          }
+        } else {
+          setChecklist((prev) => ({ ...prev, earbudsConnected: false }));
+        }
+      }
+    } catch (error) {
+      console.error("Verification error:", error);
+      toast({
+        title: "Error",
+        description: "Could not verify device status.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingDevices(false);
+    }
   };
 
   const handleAirplaneModeHelp = () => {
@@ -247,8 +367,8 @@ export function PreLessonProtocol({
                 item.id === "flightModeEnabled"
                   ? autoCheckResults.airplaneMode
                   : item.id === "earbudsConnected"
-                  ? autoCheckResults.earphones
-                  : null;
+                    ? autoCheckResults.earphones
+                    : null;
 
               return (
                 <div
@@ -346,11 +466,11 @@ export function PreLessonProtocol({
           variant={allChecked ? "therapy" : "locked"}
           size="xl"
           className="w-full"
-          disabled={!allChecked}
-          onClick={onStart}
+          disabled={!allChecked || isCheckingDevices}
+          onClick={handleStartSession}
         >
           <Play className="h-5 w-5 mr-2" />
-          {allChecked ? "Begin Session" : "Complete Checklist to Continue"}
+          {isCheckingDevices ? "Verifying..." : (allChecked ? "Begin Session" : "Complete Checklist to Continue")}
         </Button>
 
         {!allChecked && (
