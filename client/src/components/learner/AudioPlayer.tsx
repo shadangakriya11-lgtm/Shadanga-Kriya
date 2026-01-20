@@ -22,7 +22,7 @@ import {
   loadEncryptedAudio,
   revokeAudioBlobUrl,
 } from "@/lib/downloadManager";
-import { isAirplaneModeEnabled } from "@/lib/deviceChecks";
+import { isAirplaneModeEnabled, requestExclusiveAudioFocus, abandonAudioFocus, isRingerSilent, getSilentModeInstructions } from "@/lib/deviceChecks";
 import { useToast } from "@/hooks/use-toast";
 import { usePlaybackSettings } from "@/hooks/useApi";
 import { Capacitor } from "@capacitor/core";
@@ -115,6 +115,16 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
   // Request wake lock to prevent screen from sleeping during playback
   const requestWakeLock = useCallback(async () => {
     if (!screenLockEnabled) return;
+
+    // Request exclusive audio focus (Android) - silences other apps
+    const focusResult = await requestExclusiveAudioFocus();
+    if (focusResult.granted) {
+      console.log("Exclusive audio focus granted");
+    } else {
+      console.warn("Audio focus not granted:", focusResult.message);
+    }
+
+    // Request screen wake lock
     if ("wakeLock" in navigator) {
       try {
         wakeLockRef.current = await navigator.wakeLock.request("screen");
@@ -125,8 +135,13 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     }
   }, [screenLockEnabled]);
 
-  // Release wake lock
-  const releaseWakeLock = useCallback(() => {
+  // Release wake lock and audio focus
+  const releaseWakeLock = useCallback(async () => {
+    // Abandon audio focus
+    await abandonAudioFocus();
+    console.log("Audio focus released");
+
+    // Release screen wake lock
     if (wakeLockRef.current) {
       wakeLockRef.current
         .release()
@@ -137,6 +152,22 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         .catch(console.warn);
     }
   }, []);
+
+  // Check ringer mode on mount and warn if not silent
+  useEffect(() => {
+    const checkRingerMode = async () => {
+      const ringerStatus = await isRingerSilent();
+      if (!ringerStatus.isSilent && ringerStatus.mode !== "unknown") {
+        toast({
+          title: "📱 Silent Mode Recommended",
+          description: getSilentModeInstructions(),
+          variant: "destructive",
+          duration: 8000,
+        });
+      }
+    };
+    checkRingerMode();
+  }, [toast]);
 
   // Auto-skip lesson when max pauses exhausted while paused
   const startAutoSkipTimer = useCallback(() => {
@@ -372,17 +403,29 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         }
       }
     } else {
-      // Playing - request wake lock
+      // Starting playback - request wake lock first
       requestWakeLock();
-      audioRef.current.play().catch((err) => {
-        console.error("Play error:", err);
-        releaseWakeLock();
-      });
-      setPlayback((prev) => ({
-        ...prev,
-        isPlaying: true,
-        isPaused: false,
-      }));
+
+      // Only update state AFTER play() succeeds
+      audioRef.current.play()
+        .then(() => {
+          // Play succeeded - now update the UI state
+          setPlayback((prev) => ({
+            ...prev,
+            isPlaying: true,
+            isPaused: false,
+          }));
+        })
+        .catch((err) => {
+          console.error("Play error:", err);
+          releaseWakeLock();
+          // Play failed - do NOT change state, show error
+          toast({
+            title: "Playback Failed",
+            description: "Unable to start audio. Please try again.",
+            variant: "destructive",
+          });
+        });
     }
   }, [
     playback.isPlaying,
@@ -395,6 +438,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     requestWakeLock,
     releaseWakeLock,
     startAutoSkipTimer,
+    toast,
   ]);
 
   const formatTime = (seconds: number) => {

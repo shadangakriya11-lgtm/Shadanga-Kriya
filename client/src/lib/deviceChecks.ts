@@ -1,8 +1,11 @@
 import { Capacitor } from "@capacitor/core";
 
 interface HeadphoneDetectionPlugin {
-  isConnected: () => Promise<{ isConnected: boolean }>;
+  isConnected: () => Promise<{ isConnected: boolean; deviceType?: string }>;
   isAirplaneModeEnabled?: () => Promise<{ isEnabled: boolean }>;
+  requestExclusiveAudioFocus?: () => Promise<{ granted: boolean; message: string }>;
+  abandonAudioFocus?: () => Promise<{ released: boolean }>;
+  isRingerSilent?: () => Promise<{ isSilent: boolean; mode: string }>;
 }
 
 /**
@@ -210,5 +213,91 @@ export async function openAirplaneModeSettings() {
   } catch (error) {
     console.error("Error opening settings:", error);
     alert(getAirplaneModeInstructions());
+  }
+}
+
+/**
+ * Request exclusive audio focus (Android & iOS)
+ * Android: Uses AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE to pause other apps
+ * iOS: Configures AVAudioSession with .duckOthers and .interruptSpokenAudio
+ */
+export async function requestExclusiveAudioFocus(): Promise<{ granted: boolean; message: string }> {
+  if (!Capacitor.isNativePlatform()) {
+    return { granted: false, message: "Audio focus control is only available on native platforms" };
+  }
+
+  try {
+    const { registerPlugin } = await import("@capacitor/core");
+    const HeadphoneDetection = registerPlugin<HeadphoneDetectionPlugin>("HeadphoneDetection");
+
+    if (HeadphoneDetection.requestExclusiveAudioFocus) {
+      return await HeadphoneDetection.requestExclusiveAudioFocus();
+    }
+    return { granted: false, message: "Audio focus method not available" };
+  } catch (error) {
+    console.error("Error requesting audio focus:", error);
+    return { granted: false, message: "Failed to request audio focus" };
+  }
+}
+
+/**
+ * Release/abandon audio focus (Android & iOS)
+ */
+export async function abandonAudioFocus(): Promise<boolean> {
+  if (!Capacitor.isNativePlatform()) {
+    return true; // No-op on web platforms
+  }
+
+  try {
+    const { registerPlugin } = await import("@capacitor/core");
+    const HeadphoneDetection = registerPlugin<HeadphoneDetectionPlugin>("HeadphoneDetection");
+
+    if (HeadphoneDetection.abandonAudioFocus) {
+      const result = await HeadphoneDetection.abandonAudioFocus();
+      return result.released;
+    }
+    return true;
+  } catch (error) {
+    console.error("Error abandoning audio focus:", error);
+    return false;
+  }
+}
+
+/**
+ * Check if the device ringer is in silent/vibrate mode
+ * Returns true if silent or vibrate, false if normal ringer
+ */
+export async function isRingerSilent(): Promise<{ isSilent: boolean; mode: string }> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "android") {
+    // On iOS or web, we cannot check ringer status
+    return { isSilent: false, mode: "unknown" };
+  }
+
+  try {
+    const { registerPlugin } = await import("@capacitor/core");
+    const HeadphoneDetection = registerPlugin<HeadphoneDetectionPlugin>("HeadphoneDetection");
+
+    if (HeadphoneDetection.isRingerSilent) {
+      return await HeadphoneDetection.isRingerSilent();
+    }
+    return { isSilent: false, mode: "unknown" };
+  } catch (error) {
+    console.error("Error checking ringer mode:", error);
+    return { isSilent: false, mode: "unknown" };
+  }
+}
+
+/**
+ * Get silent mode instructions based on platform
+ */
+export function getSilentModeInstructions(): string {
+  const platform = Capacitor.getPlatform();
+
+  if (platform === "android") {
+    return "Use the volume buttons to switch to Vibrate or Silent mode, or go to Settings > Sound > Do Not Disturb";
+  } else if (platform === "ios") {
+    return "Use the physical mute switch on the side of your device, or enable Focus Mode from Control Center";
+  } else {
+    return "Please put your device on silent or vibrate mode to prevent interruptions";
   }
 }
