@@ -355,7 +355,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     };
   }, [lesson.id, token, isOffline, offlineModeRequired]);
 
-  const togglePlayback = useCallback(() => {
+  const togglePlayback = useCallback(async () => {
     if (isComplete || !audioRef.current || audioError) return;
 
     // Check offline enforcement before playing (only if offline mode required)
@@ -403,11 +403,15 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         }
       }
     } else {
-      // Starting playback - request wake lock first
-      requestWakeLock();
+      // Starting playback - request wake lock and audio focus FIRST, then play
+      // This prevents race conditions with audio focus interfering with playback
+      await requestWakeLock();
+
+      // Small delay to let the audio system settle after focus is granted
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Only update state AFTER play() succeeds
-      audioRef.current.play()
+      audioRef.current?.play()
         .then(() => {
           // Play succeeded - now update the UI state
           setPlayback((prev) => ({
@@ -584,9 +588,12 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         {/* Loading State */}
         {
           isLoadingAudio && !audioError && (
-            <div className="mb-4 flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Loading audio...</span>
+            <div className="mb-6 flex flex-col items-center gap-2 text-primary animate-pulse">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                <span className="font-medium">Preparing Session...</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Decrypting secure audio (may take a moment)</p>
             </div>
           )
         }
