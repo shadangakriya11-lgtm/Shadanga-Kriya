@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DemoQuestionnaire } from "@/components/demo/DemoQuestionnaire";
 import { DemoConfirmation } from "@/components/demo/DemoConfirmation";
+import { DemoDownload } from "@/components/demo/DemoDownload";
 import { DemoProtocol } from "@/components/demo/DemoProtocol";
 import { DemoPlayer } from "@/components/demo/DemoPlayer";
 import { useDemoStatus, useSubmitQuestionnaire, useSkipDemo } from "@/hooks/useApi";
 import { QuestionnaireResponse } from "@/lib/api";
 import { Loader2 } from "lucide-react";
 
-type DemoStep = "questionnaire" | "confirmation" | "protocol" | "player";
+type DemoStep = "questionnaire" | "confirmation" | "download" | "protocol" | "player";
 
 export default function Demo() {
     const navigate = useNavigate();
@@ -18,6 +19,7 @@ export default function Demo() {
 
     const [currentStep, setCurrentStep] = useState<DemoStep>("questionnaire");
     const [questionnaireResponses, setQuestionnaireResponses] = useState<QuestionnaireResponse | null>(null);
+    const [cachedAudioUrl, setCachedAudioUrl] = useState<string | null>(null);
 
     // Redirect if demo already watched or skipped
     useEffect(() => {
@@ -25,6 +27,15 @@ export default function Demo() {
             navigate("/home", { replace: true });
         }
     }, [demoStatus, navigate]);
+
+    // Cleanup cached audio on unmount
+    useEffect(() => {
+        return () => {
+            if (cachedAudioUrl) {
+                URL.revokeObjectURL(cachedAudioUrl);
+            }
+        };
+    }, [cachedAudioUrl]);
 
     // Loading state
     if (statusLoading) {
@@ -51,8 +62,14 @@ export default function Demo() {
         navigate("/home", { replace: true });
     };
 
-    // Confirmation done, move to protocol
+    // Confirmation done, move to download
     const handleConfirmationComplete = () => {
+        setCurrentStep("download");
+    };
+
+    // Download complete, move to protocol (with cached audio URL)
+    const handleDownloadComplete = (audioBlobUrl: string) => {
+        setCachedAudioUrl(audioBlobUrl);
         setCurrentStep("protocol");
     };
 
@@ -63,6 +80,11 @@ export default function Demo() {
 
     // Demo completed, redirect to home
     const handleDemoComplete = () => {
+        // Clean up cached audio
+        if (cachedAudioUrl) {
+            URL.revokeObjectURL(cachedAudioUrl);
+            setCachedAudioUrl(null);
+        }
         navigate("/home", { replace: true });
     };
 
@@ -71,9 +93,20 @@ export default function Demo() {
         setCurrentStep("questionnaire");
     };
 
-    // Back from protocol to confirmation
+    // Back from download to confirmation
     const handleBackToConfirmation = () => {
         setCurrentStep("confirmation");
+    };
+
+    // Back from protocol to download (but audio is already cached, so go to confirmation)
+    const handleBackToDownload = () => {
+        // If audio is already cached, just go back to confirmation
+        // since we don't need to re-download
+        if (cachedAudioUrl) {
+            setCurrentStep("confirmation");
+        } else {
+            setCurrentStep("download");
+        }
     };
 
     // Back from player to protocol
@@ -100,17 +133,26 @@ export default function Demo() {
                 />
             );
 
+        case "download":
+            return (
+                <DemoDownload
+                    onComplete={handleDownloadComplete}
+                    onBack={handleBackToConfirmation}
+                />
+            );
+
         case "protocol":
             return (
                 <DemoProtocol
                     onStart={handleProtocolComplete}
-                    onBack={handleBackToConfirmation}
+                    onBack={handleBackToDownload}
                 />
             );
 
         case "player":
             return (
                 <DemoPlayer
+                    cachedAudioUrl={cachedAudioUrl}
                     onComplete={handleDemoComplete}
                     onBack={handleBackToProtocol}
                 />

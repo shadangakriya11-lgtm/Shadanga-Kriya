@@ -14,6 +14,9 @@ import {
   Loader2,
   AlertTriangle,
   Smartphone,
+  Headphones,
+  Plane,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCachedToken } from "@/lib/api";
@@ -22,7 +25,7 @@ import {
   loadEncryptedAudio,
   revokeAudioBlobUrl,
 } from "@/lib/downloadManager";
-import { isAirplaneModeEnabled, requestExclusiveAudioFocus, abandonAudioFocus, isRingerSilent, getSilentModeInstructions } from "@/lib/deviceChecks";
+import { isAirplaneModeEnabled, areEarphonesConnected, requestExclusiveAudioFocus, abandonAudioFocus, isRingerSilent, getSilentModeInstructions, openAirplaneModeSettings } from "@/lib/deviceChecks";
 import { useToast } from "@/hooks/use-toast";
 import { usePlaybackSettings } from "@/hooks/useApi";
 import { Capacitor } from "@capacitor/core";
@@ -48,6 +51,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
 
   // Get settings with defaults
   const offlineModeRequired = playbackSettings?.offlineModeRequired ?? true;
+  const earphoneCheckEnabled = playbackSettings?.earphoneCheckEnabled ?? true;
   const autoSkipOnMaxPauses = playbackSettings?.autoSkipOnMaxPauses ?? true;
   const autoSkipDelaySeconds = playbackSettings?.autoSkipDelaySeconds ?? 30;
   const screenLockEnabled = playbackSettings?.screenLockEnabled ?? true;
@@ -70,6 +74,13 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
   const [offlineEnforcementError, setOfflineEnforcementError] = useState<
     string | null
   >(null);
+
+  // Compliance violation state for forced pause modal
+  const [complianceViolation, setComplianceViolation] = useState<{
+    type: "airplane" | "earphones" | null;
+    message: string;
+  }>({ type: null, message: "" });
+  const [isCheckingCompliance, setIsCheckingCompliance] = useState(false);
   const [isDownloaded, setIsDownloaded] = useState(false);
 
   // Focus Mode Hook (Keep Awake + Immersive Mode)
@@ -201,44 +212,186 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     });
   }, [toast, releaseWakeLock, autoSkipOnMaxPauses, autoSkipDelaySeconds]);
 
-  // ENFORCEMENT: Monitor Airplane Mode (Strict) during playback
+  // ENFORCEMENT: Monitor Airplane Mode AND Earphones (Strict) during playback
   useEffect(() => {
-    if (!offlineModeRequired) return;
-
     let intervalId: NodeJS.Timeout;
 
     const checkCompliance = async () => {
-      // If we are playing, we MUST be in Airplane Mode
-      if (playback.isPlaying) {
-        const isAirplaneOn = await isAirplaneModeEnabled();
+      // Only check if we are playing
+      if (!playback.isPlaying) return;
 
+      // Check Airplane Mode (if required)
+      if (offlineModeRequired) {
+        const isAirplaneOn = await isAirplaneModeEnabled();
         if (!isAirplaneOn) {
-          // Violation detected! Stop everything.
+          // Violation detected! Pause and show warning
           if (audioRef.current) {
             audioRef.current.pause();
           }
-          setPlayback((prev) => ({ ...prev, isPlaying: false }));
-          setOfflineEnforcementError(
-            "Airplane Mode Disabled! Playback stopped. Please enable Airplane Mode strictly."
-          );
+
+          // Reduce pause count for forced pause
+          const newPausesRemaining = Math.max(0, playback.pausesRemaining - 1);
+
+          setPlayback((prev) => ({
+            ...prev,
+            isPlaying: false,
+            isPaused: true,
+            pausesRemaining: newPausesRemaining,
+          }));
+          setComplianceViolation({
+            type: "airplane",
+            message: "Airplane Mode disabled! Please enable Airplane Mode to resume playback.",
+          });
           releaseWakeLock();
-        } else {
-          // Clear error if compliance returns
-          setOfflineEnforcementError(null);
+
+          toast({
+            title: "⚠️ Airplane Mode Disabled",
+            description: `Playback paused. ${newPausesRemaining} pause(s) remaining.`,
+            variant: "destructive",
+          });
+          return;
         }
+      }
+
+      // Check Earphones (if required)
+      if (earphoneCheckEnabled) {
+        const earphonesConnected = await areEarphonesConnected();
+        if (!earphonesConnected) {
+          // Violation detected! Pause and show warning
+          if (audioRef.current) {
+            audioRef.current.pause();
+          }
+
+          // Reduce pause count for forced pause
+          const newPausesRemaining = Math.max(0, playback.pausesRemaining - 1);
+
+          setPlayback((prev) => ({
+            ...prev,
+            isPlaying: false,
+            isPaused: true,
+            pausesRemaining: newPausesRemaining,
+          }));
+          setComplianceViolation({
+            type: "earphones",
+            message: "Earphones disconnected! Please reconnect your earphones to resume playback.",
+          });
+          releaseWakeLock();
+
+          toast({
+            title: "⚠️ Earphones Disconnected",
+            description: `Playback paused. ${newPausesRemaining} pause(s) remaining.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // All conditions met - clear any violation
+      if (complianceViolation.type) {
+        setComplianceViolation({ type: null, message: "" });
+        setOfflineEnforcementError(null);
       }
     };
 
-    // Run check immediately and then poll
+    // Run check immediately and then poll every 2 seconds
     if (playback.isPlaying) {
       checkCompliance();
-      intervalId = setInterval(checkCompliance, 2000); // Check every 2 seconds
+      intervalId = setInterval(checkCompliance, 2000);
     }
 
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [playback.isPlaying, releaseWakeLock, offlineModeRequired]);
+  }, [playback.isPlaying, playback.pausesRemaining, releaseWakeLock, offlineModeRequired, earphoneCheckEnabled, complianceViolation.type, toast]);
+
+  // Listen for earphone disconnect events (real-time)
+  useEffect(() => {
+    if (!earphoneCheckEnabled) return;
+
+    const handleDeviceChange = async () => {
+      // Only matters if we're playing
+      if (!playback.isPlaying) return;
+
+      const isConnected = await areEarphonesConnected();
+      if (!isConnected) {
+        // Earphones disconnected during playback!
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+
+        const newPausesRemaining = Math.max(0, playback.pausesRemaining - 1);
+
+        setPlayback((prev) => ({
+          ...prev,
+          isPlaying: false,
+          isPaused: true,
+          pausesRemaining: newPausesRemaining,
+        }));
+        setComplianceViolation({
+          type: "earphones",
+          message: "Earphones disconnected! Please reconnect your earphones to resume playback.",
+        });
+        releaseWakeLock();
+
+        toast({
+          title: "⚠️ Earphones Disconnected",
+          description: `Playback paused. ${newPausesRemaining} pause(s) remaining.`,
+          variant: "destructive",
+        });
+      }
+    };
+
+    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+    return () => {
+      navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+    };
+  }, [playback.isPlaying, playback.pausesRemaining, earphoneCheckEnabled, releaseWakeLock, toast]);
+
+  // Handler to check compliance and resume
+  const handleComplianceResume = async () => {
+    setIsCheckingCompliance(true);
+
+    try {
+      // Check all conditions
+      const airplaneOk = !offlineModeRequired || await isAirplaneModeEnabled();
+      const earphonesOk = !earphoneCheckEnabled || await areEarphonesConnected();
+
+      if (airplaneOk && earphonesOk) {
+        // All conditions met - clear violation and allow resume
+        setComplianceViolation({ type: null, message: "" });
+        setOfflineEnforcementError(null);
+
+        toast({
+          title: "✓ Conditions Met",
+          description: "You can now resume playback.",
+        });
+      } else {
+        // Still not compliant
+        if (!airplaneOk) {
+          toast({
+            title: "Airplane Mode Required",
+            description: "Please enable Airplane Mode first.",
+            variant: "destructive",
+          });
+        } else if (!earphonesOk) {
+          toast({
+            title: "Earphones Required",
+            description: "Please connect your earphones first.",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Compliance check error:", error);
+      toast({
+        title: "Check Failed",
+        description: "Could not verify device status.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCheckingCompliance(false);
+    }
+  };
 
   // Cleanup wake lock and auto-skip timer on unmount
   useEffect(() => {
@@ -527,9 +680,78 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
+        {/* Compliance Violation Warning Modal */}
+        {complianceViolation.type && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-elevated animate-scale-in">
+              <div className="text-center">
+                <div className={cn(
+                  "inline-flex items-center justify-center h-16 w-16 rounded-full mb-4",
+                  complianceViolation.type === "airplane"
+                    ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                    : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                )}>
+                  {complianceViolation.type === "airplane" ? (
+                    <Plane className="h-8 w-8" />
+                  ) : (
+                    <Headphones className="h-8 w-8" />
+                  )}
+                </div>
+
+                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+                  {complianceViolation.type === "airplane"
+                    ? "Airplane Mode Required"
+                    : "Earphones Required"}
+                </h3>
+
+                <p className="text-muted-foreground text-sm mb-4">
+                  {complianceViolation.message}
+                </p>
+
+                <div className="bg-destructive/10 rounded-lg px-3 py-2 mb-6">
+                  <p className="text-destructive text-sm font-medium">
+                    ⚠️ Pause count reduced! {playback.pausesRemaining} pause(s) remaining.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {complianceViolation.type === "airplane" && (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => openAirplaneModeSettings()}
+                    >
+                      Open Airplane Mode Settings
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="therapy"
+                    className="w-full"
+                    onClick={handleComplianceResume}
+                    disabled={isCheckingCompliance}
+                  >
+                    {isCheckingCompliance ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Checking...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Check & Resume
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Offline Enforcement Warning */}
         {
-          offlineEnforcementError && (
+          offlineEnforcementError && !complianceViolation.type && (
             <div className="mb-6 flex items-center gap-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg max-w-md text-center">
               <AlertTriangle className="h-5 w-5 flex-shrink-0" />
               <span className="text-sm">{offlineEnforcementError}</span>

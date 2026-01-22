@@ -10,13 +10,23 @@ import {
     Loader2,
     AlertTriangle,
     Smartphone,
+    Headphones,
+    Plane,
+    RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { demoApi } from "@/lib/api";
-import { useMarkDemoCompleted } from "@/hooks/useApi";
+import { useMarkDemoCompleted, usePlaybackSettings } from "@/hooks/useApi";
 import { Capacitor } from "@capacitor/core";
+import {
+    isAirplaneModeEnabled,
+    areEarphonesConnected,
+    openAirplaneModeSettings,
+} from "@/lib/deviceChecks";
+import { useToast } from "@/hooks/use-toast";
+import { useFocusMode } from "@/hooks/useFocusMode";
 
 interface DemoPlayerProps {
+    cachedAudioUrl: string | null;
     onComplete: () => void;
     onBack: () => void;
 }
@@ -26,10 +36,20 @@ interface PlaybackState {
     currentTime: number;
     duration: number;
     isPaused: boolean;
+    pausesRemaining: number;
 }
 
-export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
+// Demo has limited pauses (can be configured)
+const DEMO_MAX_PAUSES = 3;
+
+export function DemoPlayer({ cachedAudioUrl, onComplete, onBack }: DemoPlayerProps) {
+    const { toast } = useToast();
     const markDemoCompletedMutation = useMarkDemoCompleted();
+    const { data: playbackSettings } = usePlaybackSettings();
+
+    // Get settings with defaults
+    const offlineModeRequired = playbackSettings?.offlineModeRequired ?? true;
+    const earphoneCheckEnabled = playbackSettings?.earphoneCheckEnabled ?? true;
 
     // Check if running on native platform (APK/iOS)
     const isNativePlatform = Capacitor.isNativePlatform();
@@ -42,16 +62,22 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
         currentTime: 0,
         duration: 0,
         isPaused: false,
+        pausesRemaining: DEMO_MAX_PAUSES,
     });
     const [isComplete, setIsComplete] = useState(false);
     const [audioError, setAudioError] = useState<string | null>(null);
-    const [isLoadingAudio, setIsLoadingAudio] = useState(true);
+    const [isLoadingAudio, setIsLoadingAudio] = useState(false);
     const [isAudioReady, setIsAudioReady] = useState(false);
-    const [loadingProgress, setLoadingProgress] = useState<{ loaded: number; total: number; percent: number }>({
-        loaded: 0,
-        total: 0,
-        percent: 0,
-    });
+
+    // Compliance violation state for forced pause modal
+    const [complianceViolation, setComplianceViolation] = useState<{
+        type: "airplane" | "earphones" | null;
+        message: string;
+    }>({ type: null, message: "" });
+    const [isCheckingCompliance, setIsCheckingCompliance] = useState(false);
+
+    // Focus Mode Hook (Keep Awake + Immersive Mode)
+    useFocusMode(playback.isPlaying);
 
     // SECURITY: Block audio playback on web browsers
     if (!isNativePlatform) {
@@ -75,13 +101,6 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
             </div>
         );
     }
-
-    // Format bytes to human readable size
-    const formatBytes = (bytes: number) => {
-        if (bytes === 0) return "0 MB";
-        const mb = bytes / (1024 * 1024);
-        return `${mb.toFixed(1)} MB`;
-    };
 
     // Request wake lock to prevent screen from sleeping
     const requestWakeLock = useCallback(async () => {
@@ -120,93 +139,200 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
         };
     }, [releaseWakeLock]);
 
-    // Initialize demo audio from Cloudinary (plain MP3, no encryption)
-    const initializeDemoAudio = useCallback(async () => {
-        setIsLoadingAudio(true);
-        setAudioError(null);
-        setLoadingProgress({ loaded: 0, total: 0, percent: 0 });
+    // ENFORCEMENT: Monitor Airplane Mode AND Earphones during playback
+    useEffect(() => {
+        let intervalId: NodeJS.Timeout;
 
-        try {
-            // Get demo audio info from backend
-            const audioInfo = await demoApi.getAudioInfo();
+        const checkCompliance = async () => {
+            // Only check if we are playing
+            if (!playback.isPlaying) return;
 
-            if (!audioInfo.audioUrl) {
-                throw new Error("Demo audio not configured yet. Please contact support.");
+            // Check Airplane Mode (if required)
+            if (offlineModeRequired) {
+                const isAirplaneOn = await isAirplaneModeEnabled();
+                if (!isAirplaneOn) {
+                    // Violation detected! Pause and show warning
+                    if (audioRef.current) {
+                        audioRef.current.pause();
+                    }
+
+                    // Reduce pause count for forced pause
+                    const newPausesRemaining = Math.max(0, playback.pausesRemaining - 1);
+
+                    setPlayback((prev) => ({
+                        ...prev,
+                        isPlaying: false,
+                        isPaused: true,
+                        pausesRemaining: newPausesRemaining,
+                    }));
+                    setComplianceViolation({
+                        type: "airplane",
+                        message: "Airplane Mode disabled! Please enable Airplane Mode to resume playback.",
+                    });
+                    releaseWakeLock();
+
+                    toast({
+                        title: "⚠️ Airplane Mode Disabled",
+                        description: `Playback paused. ${newPausesRemaining} pause(s) remaining.`,
+                        variant: "destructive",
+                    });
+                    return;
+                }
             }
 
-            console.log("Demo audio URL:", audioInfo.audioUrl);
-
-            // Use XMLHttpRequest for better progress tracking in Android WebView
-            const audioBlob = await new Promise<Blob>((resolve, reject) => {
-                const xhr = new XMLHttpRequest();
-                xhr.open("GET", audioInfo.audioUrl, true);
-                xhr.responseType = "blob";
-
-                // Required for ngrok free tier to skip browser warning
-                xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
-
-                // Expected file size (fallback): ~54MB
-                const expectedSize = 56274000; // approximate bytes
-
-                xhr.onloadstart = () => {
-                    console.log("Download started...");
-                    setLoadingProgress({
-                        loaded: 0,
-                        total: expectedSize,
-                        percent: 1, // Show 1% to indicate connection established
-                    });
-                };
-
-                xhr.onprogress = (event) => {
-                    const total = event.lengthComputable ? event.total : expectedSize;
-                    const loaded = event.loaded;
-                    const percent = Math.round((loaded / total) * 100);
-
-                    console.log(`Download progress: ${loaded} / ${total} (${percent}%)`);
-
-                    setLoadingProgress({
-                        loaded,
-                        total,
-                        percent: Math.min(Math.max(percent, 1), 100), // Keep between 1-100%
-                    });
-                };
-
-                xhr.onload = () => {
-                    console.log("Download complete, status:", xhr.status);
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        setLoadingProgress({
-                            loaded: xhr.response.size,
-                            total: xhr.response.size,
-                            percent: 100,
-                        });
-                        resolve(xhr.response);
-                    } else {
-                        reject(new Error(`Failed to fetch audio: ${xhr.status} ${xhr.statusText}`));
+            // Check Earphones (if required)
+            if (earphoneCheckEnabled) {
+                const earphonesConnected = await areEarphonesConnected();
+                if (!earphonesConnected) {
+                    // Violation detected! Pause and show warning
+                    if (audioRef.current) {
+                        audioRef.current.pause();
                     }
-                };
 
-                xhr.onerror = () => {
-                    console.error("XHR error occurred");
-                    reject(new Error("Network error while downloading audio. Please check your connection."));
-                };
+                    // Reduce pause count for forced pause
+                    const newPausesRemaining = Math.max(0, playback.pausesRemaining - 1);
 
-                xhr.ontimeout = () => {
-                    console.error("XHR timeout");
-                    reject(new Error("Download timed out. Please try again."));
-                };
+                    setPlayback((prev) => ({
+                        ...prev,
+                        isPlaying: false,
+                        isPaused: true,
+                        pausesRemaining: newPausesRemaining,
+                    }));
+                    setComplianceViolation({
+                        type: "earphones",
+                        message: "Earphones disconnected! Please reconnect your earphones to resume playback.",
+                    });
+                    releaseWakeLock();
 
-                // Start download
-                console.log("Starting download from:", audioInfo.audioUrl);
-                xhr.send();
+                    toast({
+                        title: "⚠️ Earphones Disconnected",
+                        description: `Playback paused. ${newPausesRemaining} pause(s) remaining.`,
+                        variant: "destructive",
+                    });
+                    return;
+                }
+            }
+
+            // All conditions met - clear any violation
+            if (complianceViolation.type) {
+                setComplianceViolation({ type: null, message: "" });
+            }
+        };
+
+        // Run check immediately and then poll every 2 seconds
+        if (playback.isPlaying) {
+            checkCompliance();
+            intervalId = setInterval(checkCompliance, 2000);
+        }
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [playback.isPlaying, playback.pausesRemaining, releaseWakeLock, offlineModeRequired, earphoneCheckEnabled, complianceViolation.type, toast]);
+
+    // Listen for earphone disconnect events (real-time)
+    useEffect(() => {
+        if (!earphoneCheckEnabled) return;
+
+        const handleDeviceChange = async () => {
+            // Only matters if we're playing
+            if (!playback.isPlaying) return;
+
+            const isConnected = await areEarphonesConnected();
+            if (!isConnected) {
+                // Earphones disconnected during playback!
+                if (audioRef.current) {
+                    audioRef.current.pause();
+                }
+
+                const newPausesRemaining = Math.max(0, playback.pausesRemaining - 1);
+
+                setPlayback((prev) => ({
+                    ...prev,
+                    isPlaying: false,
+                    isPaused: true,
+                    pausesRemaining: newPausesRemaining,
+                }));
+                setComplianceViolation({
+                    type: "earphones",
+                    message: "Earphones disconnected! Please reconnect your earphones to resume playback.",
+                });
+                releaseWakeLock();
+
+                toast({
+                    title: "⚠️ Earphones Disconnected",
+                    description: `Playback paused. ${newPausesRemaining} pause(s) remaining.`,
+                    variant: "destructive",
+                });
+            }
+        };
+
+        navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+        return () => {
+            navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+        };
+    }, [playback.isPlaying, playback.pausesRemaining, earphoneCheckEnabled, releaseWakeLock, toast]);
+
+    // Handler to check compliance and resume
+    const handleComplianceResume = async () => {
+        setIsCheckingCompliance(true);
+
+        try {
+            // Check all conditions
+            const airplaneOk = !offlineModeRequired || await isAirplaneModeEnabled();
+            const earphonesOk = !earphoneCheckEnabled || await areEarphonesConnected();
+
+            if (airplaneOk && earphonesOk) {
+                // All conditions met - clear violation and allow resume
+                setComplianceViolation({ type: null, message: "" });
+
+                toast({
+                    title: "✓ Conditions Met",
+                    description: "You can now resume playback.",
+                });
+            } else {
+                // Still not compliant
+                if (!airplaneOk) {
+                    toast({
+                        title: "Airplane Mode Required",
+                        description: "Please enable Airplane Mode first.",
+                        variant: "destructive",
+                    });
+                } else if (!earphonesOk) {
+                    toast({
+                        title: "Earphones Required",
+                        description: "Please connect your earphones first.",
+                        variant: "destructive",
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Compliance check error:", error);
+            toast({
+                title: "Check Failed",
+                description: "Could not verify device status.",
+                variant: "destructive",
             });
+        } finally {
+            setIsCheckingCompliance(false);
+        }
+    };
 
-            console.log("Audio blob created, size:", audioBlob.size);
+    // Initialize audio from cached URL (already downloaded)
+    const initializeDemoAudio = useCallback(async () => {
+        if (!cachedAudioUrl) {
+            setAudioError("Demo audio not pre-loaded. Please go back and download first.");
+            return;
+        }
 
-            // Create object URL from blob
-            const audioUrl = URL.createObjectURL(audioBlob);
+        setIsLoadingAudio(true);
+        setAudioError(null);
 
-            // Create audio element with blob URL
-            const audio = new Audio(audioUrl);
+        try {
+            console.log("Using cached audio URL:", cachedAudioUrl);
+
+            // Create audio element with cached blob URL
+            const audio = new Audio(cachedAudioUrl);
             audioRef.current = audio;
 
             audio.addEventListener("loadedmetadata", () => {
@@ -235,18 +361,15 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
                 releaseWakeLock();
                 // Mark demo as completed
                 markDemoCompletedMutation.mutate();
-                // Revoke the blob URL when done
-                URL.revokeObjectURL(audioUrl);
             });
 
             audio.addEventListener("error", (e) => {
                 console.error("Audio playback error:", e);
-                setAudioError("Failed to load demo audio. Please check your connection.");
+                setAudioError("Failed to load demo audio. Please go back and re-download.");
                 setIsLoadingAudio(false);
-                URL.revokeObjectURL(audioUrl);
             });
 
-            // Preload the audio (should be instant since data is already loaded)
+            // Preload the audio (should be instant since data is already cached)
             audio.load();
 
         } catch (err) {
@@ -255,7 +378,7 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
             setAudioError(message);
             setIsLoadingAudio(false);
         }
-    }, [releaseWakeLock]); // Removed markDemoCompletedMutation from deps to prevent infinite loop
+    }, [cachedAudioUrl, releaseWakeLock]);
 
     // Track if we've already started initialization
     const hasInitialized = useRef(false);
@@ -268,35 +391,67 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const togglePlayback = useCallback(() => {
+    const togglePlayback = useCallback(async () => {
         if (isComplete || !audioRef.current || audioError) return;
 
+        // Check if pauses remaining (for manual pause)
         if (playback.isPlaying) {
-            audioRef.current.pause();
-            releaseWakeLock();
-            setPlayback((prev) => ({
-                ...prev,
-                isPlaying: false,
-                isPaused: true,
-            }));
-        } else {
-            requestWakeLock();
-            audioRef.current.play().catch((err) => {
-                console.error("Play error:", err);
+            // Pausing
+            if (playback.pausesRemaining > 0) {
+                audioRef.current.pause();
                 releaseWakeLock();
-            });
-            setPlayback((prev) => ({
-                ...prev,
-                isPlaying: true,
-                isPaused: false,
-            }));
+                const newPausesRemaining = playback.pausesRemaining - 1;
+                setPlayback((prev) => ({
+                    ...prev,
+                    isPlaying: false,
+                    isPaused: true,
+                    pausesRemaining: newPausesRemaining,
+                }));
+
+                toast({
+                    title: "Paused",
+                    description: `${newPausesRemaining} pause(s) remaining.`,
+                });
+            } else {
+                toast({
+                    title: "No Pauses Left",
+                    description: "You have used all your pauses for this demo.",
+                    variant: "destructive",
+                });
+            }
+        } else {
+            // Starting/Resuming playback
+            await requestWakeLock();
+
+            // Small delay to let the audio system settle
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            audioRef.current?.play()
+                .then(() => {
+                    setPlayback((prev) => ({
+                        ...prev,
+                        isPlaying: true,
+                        isPaused: false,
+                    }));
+                })
+                .catch((err) => {
+                    console.error("Play error:", err);
+                    releaseWakeLock();
+                    toast({
+                        title: "Playback Failed",
+                        description: "Unable to start audio. Please try again.",
+                        variant: "destructive",
+                    });
+                });
         }
     }, [
         playback.isPlaying,
+        playback.pausesRemaining,
         isComplete,
         audioError,
         requestWakeLock,
         releaseWakeLock,
+        toast,
     ]);
 
     const formatTime = (seconds: number) => {
@@ -313,7 +468,7 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
     // Completion Screen
     if (isComplete) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+            <div className="min-h-screen bg-background flex flex-col">
                 <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
                     <div className="flex items-center gap-4 px-4 py-4 max-w-2xl mx-auto">
                         <Button variant="ghost" size="icon" onClick={onComplete}>
@@ -345,7 +500,7 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
                         <Button
                             variant="therapy"
                             size="xl"
-                            className="w-full bg-gradient-to-r from-primary to-primary/80"
+                            className="w-full"
                             onClick={onComplete}
                         >
                             Continue to Dashboard
@@ -358,7 +513,7 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
 
     // Main Player Screen
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex flex-col">
+        <div className="min-h-screen bg-background flex flex-col">
             {/* Header */}
             <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
                 <div className="flex items-center justify-between px-4 py-4 max-w-2xl mx-auto">
@@ -381,61 +536,80 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-                {/* Loading State with Progress */}
+                {/* Compliance Violation Warning Modal */}
+                {complianceViolation.type && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                        <div className="bg-card border border-border rounded-2xl p-6 max-w-sm w-full shadow-elevated animate-scale-in">
+                            <div className="text-center">
+                                <div className={cn(
+                                    "inline-flex items-center justify-center h-16 w-16 rounded-full mb-4",
+                                    complianceViolation.type === "airplane"
+                                        ? "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                                        : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
+                                )}>
+                                    {complianceViolation.type === "airplane" ? (
+                                        <Plane className="h-8 w-8" />
+                                    ) : (
+                                        <Headphones className="h-8 w-8" />
+                                    )}
+                                </div>
+
+                                <h3 className="font-serif text-xl font-semibold text-foreground mb-2">
+                                    {complianceViolation.type === "airplane"
+                                        ? "Airplane Mode Required"
+                                        : "Earphones Required"}
+                                </h3>
+
+                                <p className="text-muted-foreground text-sm mb-4">
+                                    {complianceViolation.message}
+                                </p>
+
+                                <div className="bg-destructive/10 rounded-lg px-3 py-2 mb-6">
+                                    <p className="text-destructive text-sm font-medium">
+                                        ⚠️ Pause count reduced! {playback.pausesRemaining} pause(s) remaining.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {complianceViolation.type === "airplane" && (
+                                        <Button
+                                            variant="outline"
+                                            className="w-full"
+                                            onClick={() => openAirplaneModeSettings()}
+                                        >
+                                            Open Airplane Mode Settings
+                                        </Button>
+                                    )}
+
+                                    <Button
+                                        variant="therapy"
+                                        className="w-full"
+                                        onClick={handleComplianceResume}
+                                        disabled={isCheckingCompliance}
+                                    >
+                                        {isCheckingCompliance ? (
+                                            <>
+                                                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                                                Checking...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <RefreshCw className="h-4 w-4 mr-2" />
+                                                Check & Resume
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Loading State */}
                 {isLoadingAudio && !audioError && (
-                    <div className="mb-8 text-center w-full max-w-sm">
-                        {/* Circular Progress Indicator */}
-                        <div className="relative inline-flex items-center justify-center h-28 w-28 mb-6">
-                            {/* Background circle */}
-                            <svg className="absolute h-28 w-28 -rotate-90" viewBox="0 0 100 100">
-                                <circle
-                                    cx="50"
-                                    cy="50"
-                                    r="45"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="8"
-                                    className="text-muted/30"
-                                />
-                                {/* Progress circle */}
-                                <circle
-                                    cx="50"
-                                    cy="50"
-                                    r="45"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="8"
-                                    strokeLinecap="round"
-                                    className="text-primary transition-all duration-300"
-                                    strokeDasharray={`${2 * Math.PI * 45}`}
-                                    strokeDashoffset={`${2 * Math.PI * 45 * (1 - loadingProgress.percent / 100)}`}
-                                />
-                            </svg>
-                            {/* Percentage text */}
-                            <span className="text-2xl font-bold text-primary">
-                                {loadingProgress.percent}%
-                            </span>
-                        </div>
-
-                        <p className="text-foreground font-medium mb-2">Loading Demo Audio...</p>
-
-                        {/* Progress bar */}
-                        <div className="w-full bg-muted/30 rounded-full h-2 mb-3 overflow-hidden">
-                            <div
-                                className="h-full bg-gradient-to-r from-primary to-success rounded-full transition-all duration-300"
-                                style={{ width: `${loadingProgress.percent}%` }}
-                            />
-                        </div>
-
-                        {/* Size info */}
-                        {loadingProgress.total > 0 && (
-                            <p className="text-sm text-muted-foreground">
-                                {formatBytes(loadingProgress.loaded)} / {formatBytes(loadingProgress.total)}
-                            </p>
-                        )}
-                        {loadingProgress.total === 0 && loadingProgress.percent === 0 && (
-                            <p className="text-sm text-muted-foreground">Connecting...</p>
-                        )}
+                    <div className="mb-8 text-center">
+                        <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+                        <p className="text-foreground font-medium">Preparing audio...</p>
                     </div>
                 )}
 
@@ -485,11 +659,19 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
                     <div className="mb-4 text-destructive font-medium bg-destructive/10 px-4 py-3 rounded-lg max-w-md text-center">
                         <AlertTriangle className="h-5 w-5 inline mr-2" />
                         {audioError}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3 w-full"
+                            onClick={onBack}
+                        >
+                            Go Back & Re-download
+                        </Button>
                     </div>
                 )}
 
                 {/* Time Display & Controls */}
-                {isAudioReady && !isLoadingAudio && (
+                {isAudioReady && !isLoadingAudio && !audioError && (
                     <>
                         <div className="text-center mb-8">
                             <p className="font-serif text-5xl font-bold text-foreground mb-2">
@@ -517,12 +699,14 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
                             <Button
                                 variant={playback.isPlaying ? "soft" : "therapy"}
                                 size="icon-xl"
-                                className={cn(
-                                    "rounded-full",
-                                    !playback.isPlaying && "bg-gradient-to-r from-primary to-primary/80 shadow-lg"
-                                )}
+                                className="rounded-full"
                                 onClick={togglePlayback}
-                                disabled={!!audioError || isLoadingAudio}
+                                disabled={
+                                    !!audioError ||
+                                    isLoadingAudio ||
+                                    (!playback.isPlaying && playback.pausesRemaining === 0 && playback.isPaused) ||
+                                    complianceViolation.type !== null
+                                }
                             >
                                 {isLoadingAudio ? (
                                     <Loader2 className="h-8 w-8 animate-spin" />
@@ -533,9 +717,12 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
                                 )}
                             </Button>
 
-                            {/* One-time notice */}
-                            <Badge variant="secondary" className="px-4 py-1.5">
-                                One-time Demo
+                            {/* Pause Counter */}
+                            <Badge
+                                variant={playback.pausesRemaining > 0 ? "secondary" : "locked"}
+                                className="px-4 py-1.5"
+                            >
+                                {playback.pausesRemaining} pause{playback.pausesRemaining !== 1 ? "s" : ""} remaining
                             </Badge>
                         </div>
                     </>
@@ -551,4 +738,3 @@ export function DemoPlayer({ onComplete, onBack }: DemoPlayerProps) {
         </div>
     );
 }
-

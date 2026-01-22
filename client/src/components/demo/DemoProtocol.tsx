@@ -10,6 +10,7 @@ import {
     Shield,
     RefreshCw,
     Settings,
+    BellOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -30,6 +31,7 @@ interface DemoProtocolProps {
 interface ChecklistState {
     flightModeEnabled: boolean;
     earbudsConnected: boolean;
+    focusModeEnabled: boolean;
     focusAcknowledged: boolean;
 }
 
@@ -51,6 +53,14 @@ const checklistItems = [
         descriptionHi: "बेहतर ऑडियो अनुभव के लिए अच्छी गुणवत्ता वाले इयरफ़ोन का उपयोग करें।",
     },
     {
+        id: "focusModeEnabled" as keyof ChecklistState,
+        icon: BellOff,
+        title: "Do Not Disturb Enabled",
+        titleHi: "डू नॉट डिस्टर्ब चालू करें",
+        description: "Silence calls and notifications from your quick settings.",
+        descriptionHi: "अपनी क्विक सेटिंग्स से कॉल और नोटिफिकेशन बंद करें।",
+    },
+    {
         id: "focusAcknowledged" as keyof ChecklistState,
         icon: Brain,
         title: "Focus Commitment",
@@ -70,7 +80,8 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
 
     const [checklist, setChecklist] = useState<ChecklistState>({
         flightModeEnabled: !flightModeCheckEnabled, // Auto-checked if disabled
-        earbudsConnected: !earphoneCheckEnabled,   // Auto-checked if disabled
+        earbudsConnected: !earphoneCheckEnabled,    // Auto-checked if disabled
+        focusModeEnabled: false,
         focusAcknowledged: false,
     });
 
@@ -95,10 +106,119 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
     }, [flightModeCheckEnabled, earphoneCheckEnabled]);
 
     // Auto-check device status on mount
+    const checkDeviceStatus = async (): Promise<boolean> => {
+        setIsCheckingDevices(true);
+        try {
+            const [airplaneMode, earphones] = await Promise.all([
+                flightModeCheckEnabled ? isAirplaneModeEnabled() : Promise.resolve(true),
+                earphoneCheckEnabled ? areEarphonesConnected() : Promise.resolve(true),
+            ]);
+
+            setAutoCheckResults({
+                airplaneMode: flightModeCheckEnabled ? airplaneMode : null,
+                earphones: earphoneCheckEnabled ? earphones : null,
+            });
+
+            // Auto-check items if conditions are met
+            if (airplaneMode) {
+                setChecklist((prev) => ({ ...prev, flightModeEnabled: true }));
+            } else {
+                // Ensure it is unchecked if check fails
+                setChecklist((prev) => ({ ...prev, flightModeEnabled: false }));
+            }
+
+            if (earphones) {
+                setChecklist((prev) => ({ ...prev, earbudsConnected: true }));
+                if (earphoneCheckEnabled) {
+                    toast({
+                        title: "Earphones detected",
+                        description: "Audio device is connected",
+                    });
+                }
+            } else {
+                setChecklist((prev) => ({ ...prev, earbudsConnected: false }));
+            }
+
+            // Return validity status
+            const isAirplaneValid = !flightModeCheckEnabled || (airplaneMode === true);
+            const isEarphonesValid = !earphoneCheckEnabled || (earphones === true);
+
+            return isAirplaneValid && isEarphonesValid;
+
+        } catch (error) {
+            console.error("Error checking device status:", error);
+            toast({
+                title: "Auto-check failed",
+                description: "Please manually confirm the checklist items",
+                variant: "destructive",
+            });
+            return false;
+        } finally {
+            setIsCheckingDevices(false);
+        }
+    };
+
+    // Final re-verification before starting demo
+    const handleStartSession = async () => {
+        // 1. Re-verify Hardware
+        const hardwareValid = await checkDeviceStatus();
+
+        // 2. Verify manual checks
+        if (hardwareValid && checklist.focusAcknowledged && checklist.focusModeEnabled) {
+            onStart();
+        } else {
+            toast({
+                title: "Check Failed",
+                description: "Please ensure all conditions are still met.",
+                variant: "destructive"
+            });
+        }
+    };
+
+    // Auto-check device status on mount
     useEffect(() => {
         checkDeviceStatus();
+    }, []);
 
-        // Monitor network status for airplane mode changes
+    // Monitor audio device changes (Earphones) - REAL TIME
+    useEffect(() => {
+        if (!earphoneCheckEnabled) return;
+
+        const handleDeviceChange = async () => {
+            try {
+                const isConnected = await areEarphonesConnected();
+
+                setAutoCheckResults((prev) => ({
+                    ...prev,
+                    earphones: isConnected,
+                }));
+
+                if (isConnected) {
+                    setChecklist((prev) => ({ ...prev, earbudsConnected: true }));
+                } else {
+                    setChecklist((prev) => ({ ...prev, earbudsConnected: false }));
+                }
+            } catch (err) {
+                console.error("Device change error:", err);
+            }
+        };
+
+        // Listen for hardware changes (plug/unplug)
+        navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+
+        // Initial check
+        handleDeviceChange();
+
+        return () => {
+            navigator.mediaDevices.removeEventListener(
+                "devicechange",
+                handleDeviceChange
+            );
+        };
+    }, [earphoneCheckEnabled]);
+
+    // Monitor network status for airplane mode changes
+    useEffect(() => {
         if (!flightModeCheckEnabled) return;
 
         const cleanup = onNetworkStatusChange((isConnected) => {
@@ -126,46 +246,76 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
         return cleanup;
     }, [toast, flightModeCheckEnabled]);
 
-    const checkDeviceStatus = async () => {
+    // Strict hardware verification on toggle
+    const toggleItem = async (id: keyof ChecklistState) => {
+        // For manual commitment items (DND and Focus Commitment)
+        // We cannot reliably verify DND without advanced plugins, so we trust the user here.
+        if (id === "focusAcknowledged" || id === "focusModeEnabled") {
+            setChecklist((prev) => ({ ...prev, [id]: !prev[id] }));
+            return;
+        }
+
+        // For Hardware items (Flight Mode, Earphones), we STRICTLY enforce verification.
+        // Clicking the item triggers a real sensor check.
         setIsCheckingDevices(true);
         try {
-            const [airplaneMode, earphones] = await Promise.all([
-                flightModeCheckEnabled ? isAirplaneModeEnabled() : Promise.resolve(true),
-                earphoneCheckEnabled ? areEarphonesConnected() : Promise.resolve(true),
-            ]);
-
-            setAutoCheckResults({
-                airplaneMode: flightModeCheckEnabled ? airplaneMode : null,
-                earphones: earphoneCheckEnabled ? earphones : null,
-            });
-
-            if (airplaneMode) {
-                setChecklist((prev) => ({ ...prev, flightModeEnabled: true }));
-            }
-
-            if (earphones) {
-                setChecklist((prev) => ({ ...prev, earbudsConnected: true }));
-                if (earphoneCheckEnabled) {
-                    toast({
-                        title: "Earphones detected",
-                        description: "Audio device is connected",
-                    });
+            if (id === "flightModeEnabled") {
+                // If checking (enabling), verify hardware. If unchecking, just allow it.
+                const targetState = !checklist.flightModeEnabled;
+                if (targetState) {
+                    const isEnabled = await isAirplaneModeEnabled();
+                    if (isEnabled) {
+                        setChecklist((prev) => ({ ...prev, flightModeEnabled: true }));
+                        toast({
+                            title: "Verified",
+                            description: "Airplane mode verified successfully.",
+                            variant: "default",
+                        });
+                    } else {
+                        setChecklist((prev) => ({ ...prev, flightModeEnabled: false }));
+                        toast({
+                            title: "Verification Failed",
+                            description: "Airplane mode NOT detected. Please enable it in Settings.",
+                            variant: "destructive",
+                        });
+                        openAirplaneModeSettings();
+                    }
+                } else {
+                    setChecklist((prev) => ({ ...prev, flightModeEnabled: false }));
+                }
+            } else if (id === "earbudsConnected") {
+                const targetState = !checklist.earbudsConnected;
+                if (targetState) {
+                    const isConnected = await areEarphonesConnected();
+                    if (isConnected) {
+                        setChecklist((prev) => ({ ...prev, earbudsConnected: true }));
+                        toast({
+                            title: "Verified",
+                            description: "Audio device detected.",
+                            variant: "default",
+                        });
+                    } else {
+                        setChecklist((prev) => ({ ...prev, earbudsConnected: false }));
+                        toast({
+                            title: "Verification Failed",
+                            description: "No earphones/headphones detected. Please connect them.",
+                            variant: "destructive",
+                        });
+                    }
+                } else {
+                    setChecklist((prev) => ({ ...prev, earbudsConnected: false }));
                 }
             }
         } catch (error) {
-            console.error("Error checking device status:", error);
+            console.error("Verification error:", error);
             toast({
-                title: "Auto-check failed",
-                description: "Please manually confirm the checklist items",
+                title: "Error",
+                description: "Could not verify device status.",
                 variant: "destructive",
             });
         } finally {
             setIsCheckingDevices(false);
         }
-    };
-
-    const toggleItem = (id: keyof ChecklistState) => {
-        setChecklist((prev) => ({ ...prev, [id]: !prev[id] }));
     };
 
     const handleAirplaneModeHelp = () => {
@@ -179,7 +329,7 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+        <div className="min-h-screen bg-background">
             {/* Header */}
             <header className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/50">
                 <div className="flex items-center gap-4 px-4 py-4 max-w-2xl mx-auto">
@@ -190,7 +340,9 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
                         <p className="text-xs text-muted-foreground uppercase tracking-wide">
                             Pre-Session Protocol
                         </p>
-                        <h1 className="font-serif text-lg font-semibold">Demo Meditation</h1>
+                        <h1 className="font-serif text-lg font-semibold truncate">
+                            Demo Meditation
+                        </h1>
                     </div>
                 </div>
             </header>
@@ -199,7 +351,7 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
             <main className="px-4 py-8 max-w-2xl mx-auto">
                 {/* Introduction */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 text-primary mb-4">
+                    <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 text-primary mb-4">
                         <Shield className="h-8 w-8" />
                     </div>
                     <h2 className="font-serif text-2xl font-semibold text-foreground mb-3">
@@ -217,8 +369,10 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
                         disabled={isCheckingDevices}
                         className="gap-2"
                     >
-                        <RefreshCw className={cn("h-4 w-4", isCheckingDevices && "animate-spin")} />
-                        {isCheckingDevices ? "Checking..." : "Auto-check Device"}
+                        <RefreshCw
+                            className={cn("h-4 w-4", isCheckingDevices && "animate-spin")}
+                        />
+                        {isCheckingDevices ? "Checking..." : "Auto-check/Recheck Device"}
                     </Button>
                 </div>
 
@@ -226,8 +380,11 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
                 <div className="space-y-4 mb-10">
                     {checklistItems
                         .filter((item) => {
-                            if (item.id === "flightModeEnabled" && !flightModeCheckEnabled) return false;
-                            if (item.id === "earbudsConnected" && !earphoneCheckEnabled) return false;
+                            // Filter out disabled checks
+                            if (item.id === "flightModeEnabled" && !flightModeCheckEnabled)
+                                return false;
+                            if (item.id === "earbudsConnected" && !earphoneCheckEnabled)
+                                return false;
                             return true;
                         })
                         .map((item, index) => {
@@ -264,7 +421,9 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-medium text-foreground">{item.titleHi}</h3>
+                                            <h3 className="font-medium text-foreground">
+                                                {item.titleHi}
+                                            </h3>
                                             {autoCheckStatus !== null && (
                                                 <span
                                                     className={cn(
@@ -278,7 +437,9 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
                                                 </span>
                                             )}
                                         </div>
-                                        <p className="text-sm text-muted-foreground">{item.descriptionHi}</p>
+                                        <p className="text-sm text-muted-foreground">
+                                            {item.descriptionHi}
+                                        </p>
                                         {item.id === "flightModeEnabled" && !isChecked && (
                                             <Button
                                                 variant="ghost"
@@ -306,7 +467,9 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
 
                 {/* Session Info */}
                 <div className="bg-muted/50 rounded-xl p-5 mb-8">
-                    <h4 className="font-medium text-foreground mb-2">Session Information</h4>
+                    <h4 className="font-medium text-foreground mb-2">
+                        Session Information
+                    </h4>
                     <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Duration</span>
@@ -323,15 +486,12 @@ export function DemoProtocol({ onBack, onStart }: DemoProtocolProps) {
                 <Button
                     variant={allChecked ? "therapy" : "locked"}
                     size="xl"
-                    className={cn(
-                        "w-full",
-                        allChecked && "bg-gradient-to-r from-primary to-primary/80 shadow-lg"
-                    )}
-                    disabled={!allChecked}
-                    onClick={onStart}
+                    className="w-full"
+                    disabled={!allChecked || isCheckingDevices}
+                    onClick={handleStartSession}
                 >
                     <Play className="h-5 w-5 mr-2" />
-                    {allChecked ? "▶ Demo Meditation शुरू करें" : "Complete Checklist to Continue"}
+                    {isCheckingDevices ? "Verifying..." : (allChecked ? "▶ Demo Meditation शुरू करें" : "Complete Checklist to Continue")}
                 </Button>
 
                 {!allChecked && (
