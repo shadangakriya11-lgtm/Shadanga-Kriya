@@ -959,4 +959,51 @@ export const demoApi = {
       method: "POST",
       body: JSON.stringify({ audioUrl }),
     }),
+
+  // Upload demo audio file with progress tracking
+  uploadAudio: (
+    file: File,
+    onProgress: (progress: number) => void,
+  ): Promise<{ message: string; audioUrl: string }> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const token = getCachedToken();
+      const formData = new FormData();
+      formData.append("audio", file);
+
+      xhr.upload.addEventListener("progress", (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          onProgress(progress);
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            reject(new Error("Invalid response from server"));
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText);
+            reject(new Error(error.error || error.message || "Upload failed"));
+          } catch {
+            reject(new Error("Upload failed"));
+          }
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Network error")));
+      xhr.addEventListener("abort", () =>
+        reject(new Error("Upload cancelled")),
+      );
+
+      xhr.open("POST", `${API_BASE_URL}/demo/upload-audio`);
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("ngrok-skip-browser-warning", "true");
+      xhr.send(formData);
+    });
+  },
 };

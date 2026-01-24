@@ -1,14 +1,33 @@
 const pool = require('../config/db.js');
 const { notifyAdmins } = require('./notification.controller.js');
-const cloudinary = require('cloudinary').v2;
+const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 
-// Helper function to extract public_id from Cloudinary URL
-const getCloudinaryPublicId = (url) => {
+// Configure Cloudflare R2 (S3 Client) for deleting audio files
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+  }
+});
+
+// Helper function to extract Key from R2 URL
+// R2 URL format: https://{account_id}.r2.cloudflarestorage.com/{bucket}/{key}
+const getR2KeyFromUrl = (url) => {
   if (!url) return null;
   try {
-    // Cloudinary URLs look like: https://res.cloudinary.com/cloud_name/resource_type/upload/v123/folder/public_id.ext
-    const matches = url.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-    return matches ? matches[1] : null;
+    const urlObj = new URL(url);
+    // Check if this is an R2 URL
+    if (!urlObj.hostname.includes('r2.cloudflarestorage.com')) {
+      return null;
+    }
+    // pathname is /{bucket}/{key}, we need to remove the bucket part
+    const pathParts = urlObj.pathname.substring(1).split('/');
+    if (pathParts.length > 1) {
+      return pathParts.slice(1).join('/');
+    }
+    return null;
   } catch (e) {
     return null;
   }
@@ -304,16 +323,20 @@ const deleteCourse = async (req, res) => {
       [id]
     );
 
-    // Delete all audio files from Cloudinary
+    // Delete all audio files from R2
     if (lessonsResult.rows.length > 0) {
-      console.log(`Deleting ${lessonsResult.rows.length} audio files from Cloudinary for course ${id}`);
+      console.log(`Deleting ${lessonsResult.rows.length} audio files from R2 for course ${id}`);
       for (const lesson of lessonsResult.rows) {
-        const publicId = getCloudinaryPublicId(lesson.audio_url);
-        if (publicId) {
+        const key = getR2KeyFromUrl(lesson.audio_url);
+        if (key) {
           try {
-            await cloudinary.uploader.destroy(publicId, { resource_type: 'video' });
+            console.log('Deleting audio from R2:', key);
+            await r2.send(new DeleteObjectCommand({
+              Bucket: process.env.R2_BUCKET_AUDIOS,
+              Key: key
+            }));
           } catch (deleteError) {
-            console.error('Failed to delete audio from Cloudinary:', deleteError);
+            console.error('Failed to delete audio from R2:', deleteError);
             // Continue with other deletions
           }
         }

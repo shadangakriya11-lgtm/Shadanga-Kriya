@@ -15,14 +15,24 @@ const r2 = new S3Client({
 const R2_PUBLIC_URL_BASE = process.env.R2_PUBLIC_URL || ''; // Add R2_PUBLIC_URL to .env if you have a custom domain/worker
 
 // Helper function to extract Key from R2 URL
+// R2 URL format: https://{account_id}.r2.cloudflarestorage.com/{bucket}/{key}
+// We need to extract just the {key} part (without bucket)
 const getR2KeyFromUrl = (url) => {
   if (!url) return null;
   try {
-    // If using custom domain: https://pub-xxx.r2.dev/therapy-lms/audio/filename.mp3
-    // We need 'therapy-lms/audio/filename.mp3'
     const urlObj = new URL(url);
-    // Remove leading slash
-    return urlObj.pathname.substring(1);
+    // Check if this is an R2 URL
+    if (!urlObj.hostname.includes('r2.cloudflarestorage.com')) {
+      return null;
+    }
+    // pathname is /{bucket}/{key}, we need to remove the bucket part
+    const pathParts = urlObj.pathname.substring(1).split('/');
+    // First part is the bucket name, rest is the key
+    if (pathParts.length > 1) {
+      // Remove bucket name (first part) and join the rest
+      return pathParts.slice(1).join('/');
+    }
+    return null;
   } catch (e) {
     return null;
   }

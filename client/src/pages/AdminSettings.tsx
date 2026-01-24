@@ -24,6 +24,8 @@ import {
   Loader2,
   Play,
   Music,
+  Upload,
+  CheckCircle2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { settingsApi, demoApi } from "@/lib/api";
@@ -54,6 +56,9 @@ export default function AdminSettings() {
   const [demoAudioUrl, setDemoAudioUrl] = useState("");
   const [isSavingMedia, setIsSavingMedia] = useState(false);
   const [isLoadingMedia, setIsLoadingMedia] = useState(false);
+  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -742,50 +747,138 @@ export default function AdminSettings() {
                 <CardHeader>
                   <CardTitle className="font-serif">Demo Audio Settings</CardTitle>
                   <CardDescription>
-                    Configure the demo meditation audio URL. This URL is used for the
-                    demo audio that new users can listen to before enrolling.
+                    Upload or configure the demo meditation audio. New users listen to this
+                    before enrolling in courses.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="demoAudioUrl">Demo Audio URL</Label>
-                    <Input
-                      id="demoAudioUrl"
-                      placeholder="https://example.com/demo.mp3"
-                      value={demoAudioUrl}
-                      onChange={(e) => setDemoAudioUrl(e.target.value)}
-                      disabled={isLoadingMedia}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Enter the full URL to your demo meditation audio file (MP3 format recommended).
-                      This can be hosted on your backend server, Cloudinary, or any CDN.
-                    </p>
+                <CardContent className="space-y-6">
+                  {/* Upload Section */}
+                  <div className="space-y-4">
+                    <Label className="text-base font-medium">Upload Demo Audio</Label>
+                    <div className="border-2 border-dashed border-border rounded-lg p-6">
+                      <div className="flex flex-col items-center justify-center gap-4">
+                        <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Music className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-medium">
+                            {selectedFile ? selectedFile.name : "Choose audio file to upload"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            MP3 format recommended (max 150MB)
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="audio/*"
+                          id="demoAudioFile"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setSelectedFile(file);
+                            }
+                          }}
+                          disabled={isUploadingAudio}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById("demoAudioFile")?.click()}
+                            disabled={isUploadingAudio}
+                          >
+                            Select File
+                          </Button>
+                          {selectedFile && (
+                            <Button
+                              variant="premium"
+                              size="sm"
+                              onClick={async () => {
+                                if (!selectedFile) return;
+                                setIsUploadingAudio(true);
+                                setUploadProgress(0);
+                                try {
+                                  const result = await demoApi.uploadAudio(
+                                    selectedFile,
+                                    (progress) => setUploadProgress(progress)
+                                  );
+                                  setDemoAudioUrl(result.audioUrl);
+                                  setSelectedFile(null);
+                                  toast({
+                                    title: "Upload Successful",
+                                    description: "Demo audio has been uploaded and saved.",
+                                  });
+                                } catch (error) {
+                                  console.error("Upload error:", error);
+                                  toast({
+                                    title: "Upload Failed",
+                                    description: error instanceof Error ? error.message : "Failed to upload audio",
+                                    variant: "destructive",
+                                  });
+                                } finally {
+                                  setIsUploadingAudio(false);
+                                  setUploadProgress(0);
+                                }
+                              }}
+                              disabled={isUploadingAudio}
+                            >
+                              {isUploadingAudio ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Uploading {uploadProgress}%
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="mr-2 h-4 w-4" />
+                                  Upload
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Upload Progress */}
+                      {isUploadingAudio && (
+                        <div className="mt-4">
+                          <div className="w-full bg-muted/30 rounded-full h-2 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-primary to-success rounded-full transition-all duration-300"
+                              style={{ width: `${uploadProgress}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground text-center mt-2">
+                            Uploading... {uploadProgress}%
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  {demoAudioUrl && (
-                    <div className="p-3 bg-muted rounded-lg">
-                      <p className="text-sm font-medium mb-1">Current URL:</p>
-                      <p className="text-xs text-muted-foreground break-all">{demoAudioUrl}</p>
+                  {/* Current Status Display */}
+                  {demoAudioUrl && !isUploadingAudio && (
+                    <div className="p-4 bg-success/10 border border-success/20 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle2 className="h-5 w-5 text-success" />
+                        <p className="text-sm font-medium text-success">Demo Audio Configured</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Demo audio is uploaded and ready for learners. Upload a new file to replace it.
+                      </p>
                     </div>
                   )}
 
-                  <Button
-                    variant="premium"
-                    onClick={handleSaveMedia}
-                    disabled={isSavingMedia || isLoadingMedia}
-                  >
-                    {isSavingMedia ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Media Settings
-                      </>
-                    )}
-                  </Button>
+                  {!demoAudioUrl && !isUploadingAudio && (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                      <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                        ⚠️ No demo audio configured
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Please upload a demo audio file for new users.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

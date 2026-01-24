@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const demoController = require('../controllers/demo.controller.js');
 const { verifyToken, isAdmin } = require('../middleware/auth.middleware.js');
+const uploadDemo = require('../middleware/uploadDemo.middleware.js');
 
 // User routes (authenticated)
 router.get('/status', verifyToken, demoController.getDemoStatus);
@@ -14,5 +15,7 @@ router.get('/audio-info', verifyToken, demoController.getDemoAudioInfo);
 // Admin routes
 router.get('/analytics', verifyToken, isAdmin, demoController.getDemoAnalytics);
 router.post('/audio-url', verifyToken, isAdmin, demoController.setDemoAudioUrl);
+router.post('/upload-audio', verifyToken, isAdmin, uploadDemo.single('audio'), demoController.uploadDemoAudio);
 
 module.exports = router;
+
