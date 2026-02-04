@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 
 type Theme = 'dark' | 'light' | 'system';
 
@@ -10,11 +12,13 @@ type ThemeProviderProps = {
 
 type ThemeProviderState = {
   theme: Theme;
+  resolvedTheme: 'dark' | 'light';
   setTheme: (theme: Theme) => void;
 };
 
 const initialState: ThemeProviderState = {
   theme: 'system',
+  resolvedTheme: 'light',
   setTheme: () => null,
 };
 
@@ -29,27 +33,49 @@ export function ThemeProvider({
   const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
   );
+  const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>('light');
 
   useEffect(() => {
     const root = window.document.documentElement;
 
     root.classList.remove('light', 'dark');
 
+    let effectiveTheme: 'dark' | 'light';
+
     if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
-        .matches
+      effectiveTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
         ? 'dark'
         : 'light';
-
-      root.classList.add(systemTheme);
-      return;
+    } else {
+      effectiveTheme = theme;
     }
 
-    root.classList.add(theme);
+    root.classList.add(effectiveTheme);
+    setResolvedTheme(effectiveTheme);
+
+    // Force the browser/WebView to use the selected color scheme
+    // This overrides the system preference
+    root.style.colorScheme = effectiveTheme;
+
+    // Update status bar for native platforms
+    if (Capacitor.isNativePlatform()) {
+      try {
+        if (effectiveTheme === 'dark') {
+          StatusBar.setStyle({ style: Style.Dark });
+          StatusBar.setBackgroundColor({ color: '#0a0a0a' }); // Dark background
+        } else {
+          StatusBar.setStyle({ style: Style.Light });
+          StatusBar.setBackgroundColor({ color: '#0d4744' }); // Teal background for light mode
+        }
+      } catch (error) {
+        console.error('Failed to update status bar:', error);
+      }
+    }
   }, [theme]);
 
   const value = {
     theme,
+    resolvedTheme,
     setTheme: (theme: Theme) => {
       localStorage.setItem(storageKey, theme);
       setTheme(theme);

@@ -21,6 +21,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { ConsentFormDialog } from "@/components/ConsentFormDialog";
+import { Capacitor } from "@capacitor/core";
 
 type UserRole = "learner" | "admin" | "facilitator";
 type AuthMode = "login" | "signup";
@@ -72,6 +73,9 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [referralCode, setReferralCode] = useState("");
+
+  // Native platform detection
+  const isNativePlatform = Capacitor.isNativePlatform();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -293,8 +297,8 @@ export default function Auth() {
           }}
         />
 
-        {/* Header */}
-        <header className="sticky top-0 z-50 p-4 sm:p-6 flex items-center justify-between bg-background/80 backdrop-blur-md border-b border-border/50">
+        {/* Header - Simpler for native */}
+        <header className={`sticky top-0 z-50 p-4 flex items-center justify-between ${isNativePlatform ? 'bg-background' : 'sm:p-6 bg-background/80 backdrop-blur-md border-b border-border/50'}`}>
           <Button
             variant="ghost"
             size="sm"
@@ -302,47 +306,51 @@ export default function Auth() {
             className="hover:bg-primary/10 hover:text-primary"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Back to Home</span>
-            <span className="sm:hidden">Back</span>
+            {isNativePlatform ? "Back" : (
+              <>
+                <span className="hidden sm:inline">Back to Home</span>
+                <span className="sm:hidden">Back</span>
+              </>
+            )}
           </Button>
           <ThemeToggle />
         </header>
 
         {/* Form */}
-        <main className="flex-1 flex items-center justify-center px-6 pb-12">
+        <main className={`flex-1 flex items-center justify-center px-4 ${isNativePlatform ? 'pt-2 pb-4' : 'px-6 pb-12'}`}>
           <div className="w-full max-w-md animate-fade-in">
-            {/* Mobile Logo */}
-            <div className="lg:hidden flex items-center gap-3 mb-8 justify-center">
+            {/* Mobile Logo - Smaller on native */}
+            <div className={`lg:hidden flex items-center gap-3 justify-center ${isNativePlatform ? 'mb-4' : 'mb-8'}`}>
               <img
                 src="/shadanga-kriya-logo.png"
                 alt="Shadanga Kriya"
-                className="h-16 w-auto"
+                className={isNativePlatform ? "h-12 w-auto" : "h-16 w-auto"}
               />
             </div>
 
-            {/* Mode Toggle */}
-            <div className="flex rounded-2xl bg-muted/50 p-1.5 mb-8 backdrop-blur-sm border border-border/50">
+            {/* Mode Toggle - More compact on native */}
+            <div className={`flex rounded-xl bg-muted/50 p-1 backdrop-blur-sm border border-border/50 ${isNativePlatform ? 'mb-4' : 'mb-8 rounded-2xl p-1.5'}`}>
               <button
                 onClick={() => setMode("login")}
-                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === "login"
+                className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${mode === "login"
                   ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
                   : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  } ${isNativePlatform ? 'py-2.5 rounded-lg' : 'py-3.5 rounded-xl'}`}
               >
                 Sign In
               </button>
               <button
                 onClick={() => setMode("signup")}
-                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === "signup"
+                className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${mode === "signup"
                   ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
                   : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  } ${isNativePlatform ? 'py-2.5 rounded-lg' : 'py-3.5 rounded-xl'}`}
               >
                 Sign Up
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className={isNativePlatform ? "space-y-3" : "space-y-5"}>
               {mode === "signup" && (
                 <div className="space-y-2 animate-fade-in">
                   <Label htmlFor="fullName" className="text-foreground">
@@ -481,32 +489,8 @@ export default function Auth() {
               </Button>
             </form>
 
-            {/* Demo Credentials */}
-            {mode === "login" && (
-              <div className="mt-6 p-5 bg-gradient-to-br from-primary/10 to-teal-500/10 rounded-2xl border border-primary/20 animate-fade-in">
-                <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  Demo Credentials
-                </p>
-                <div className="text-xs text-muted-foreground space-y-1.5">
-                  <p className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    Admin: admin@therapy.com / Admin@123!
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-teal-600"></span>
-                    Facilitator: facilitator@therapy.com / Facilitator@123!
-                  </p>
-                  <p className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-teal-500"></span>
-                    Learner: sarah@example.com / Learner@123!
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Help section for new users */}
-            {mode === "signup" && (
+            {/* Help section for new users - Hidden on native */}
+            {mode === "signup" && !isNativePlatform && (
               <div className="mt-8 p-5 bg-muted/50 rounded-2xl border border-border/50 animate-fade-in">
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -526,7 +510,7 @@ export default function Auth() {
             )}
 
             {/* Switch mode */}
-            <p className="text-center text-sm text-muted-foreground mt-6">
+            <p className={`text-center text-sm text-muted-foreground ${isNativePlatform ? 'mt-4' : 'mt-6'}`}>
               {mode === "login"
                 ? "New to Shadanga Kriya? "
                 : "Already have an account? "}
@@ -541,12 +525,14 @@ export default function Auth() {
           </div>
         </main>
 
-        {/* Footer */}
-        <footer className="py-6 text-center">
-          <p className="text-xs text-muted-foreground">
-            © 2024 Shadanga Kriya. All rights reserved.
-          </p>
-        </footer>
+        {/* Footer - Hidden on native */}
+        {!isNativePlatform && (
+          <footer className="py-6 text-center">
+            <p className="text-xs text-muted-foreground">
+              © 2024 Shadanga Kriya. All rights reserved.
+            </p>
+          </footer>
+        )}
       </div>
 
       {/* Consent Form Dialog for Registration */}

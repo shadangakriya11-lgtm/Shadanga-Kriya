@@ -209,28 +209,28 @@ export default function AdminSettings() {
 
         <main className="p-4 lg:p-6">
           <Tabs defaultValue="organization" className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="organization" className="gap-2">
+            <TabsList className="w-full overflow-x-auto flex flex-nowrap justify-start scrollbar-hide">
+              <TabsTrigger value="organization" className="gap-2 flex-shrink-0">
                 <Building className="h-4 w-4" />
                 Organization
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="gap-2">
+              <TabsTrigger value="notifications" className="gap-2 flex-shrink-0">
                 <Bell className="h-4 w-4" />
                 Notifications
               </TabsTrigger>
-              <TabsTrigger value="playback" className="gap-2">
+              <TabsTrigger value="playback" className="gap-2 flex-shrink-0">
                 <Play className="h-4 w-4" />
                 Playback
               </TabsTrigger>
-              <TabsTrigger value="security" className="gap-2">
+              <TabsTrigger value="security" className="gap-2 flex-shrink-0">
                 <Shield className="h-4 w-4" />
                 Security
               </TabsTrigger>
-              <TabsTrigger value="payments" className="gap-2">
+              <TabsTrigger value="payments" className="gap-2 flex-shrink-0">
                 <CreditCard className="h-4 w-4" />
                 Payments
               </TabsTrigger>
-              <TabsTrigger value="media" className="gap-2">
+              <TabsTrigger value="media" className="gap-2 flex-shrink-0">
                 <Music className="h-4 w-4" />
                 Media
               </TabsTrigger>

@@ -54,16 +54,14 @@ import VisionMission from "./pages/VisionMission";
 import Gallery from "./pages/Gallery";
 import Contact from "./pages/Contact";
 
-import { StatusBar, Style } from "@capacitor/status-bar";
+import { StatusBar } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp, BackButtonListenerEvent } from "@capacitor/app";
 
-// Configure status bar for native platforms
+// Configure status bar for native platforms - don't overlay webview
 if (Capacitor.isNativePlatform()) {
-  // Don't overlay webview - this prevents content from going behind status bar
   StatusBar.setOverlaysWebView({ overlay: false });
-  StatusBar.setStyle({ style: Style.Light });
-  StatusBar.setBackgroundColor({ color: "#0d4744" }); // Teal background
+  // Theme-based styling is handled by ThemeProvider
 }
 
 const queryClient = new QueryClient();
