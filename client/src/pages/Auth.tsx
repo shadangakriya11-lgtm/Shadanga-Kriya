@@ -61,23 +61,19 @@ export default function Auth() {
   const [mode, setMode] = useState<AuthMode>(
     (searchParams.get("mode") as AuthMode) || "login"
   );
-  // Signup is always for learners - admins/facilitators are created by admin
   const selectedRole: UserRole = "learner";
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showConsentDialog, setShowConsentDialog] = useState(false);
 
-  // Form fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
-  // Native platform detection
   const isNativePlatform = Capacitor.isNativePlatform();
 
-  // Redirect if already logged in
   useEffect(() => {
     if (isLoggedIn && user) {
       navigate(roleConfig[user.role]?.redirectTo || "/home");
@@ -110,24 +106,20 @@ export default function Auth() {
       return;
     }
 
-    // For signup, show consent form first
     if (mode === "signup") {
       setShowConsentDialog(true);
       return;
     }
 
-    // For login, proceed directly
     await performAuth();
   };
 
-  // Handle consent acceptance
   const handleConsentAccepted = async () => {
     setShowConsentDialog(false);
     await performAuth();
   };
 
   const performAuth = async () => {
-
     setIsLoading(true);
 
     try {
@@ -135,8 +127,7 @@ export default function Auth() {
         const loggedInUser = await login(email, password);
         toast({
           title: "Namaste! Welcome back 🙏",
-          description: `Signed in as ${roleConfig[loggedInUser.role]?.title || loggedInUser.role
-            }`,
+          description: `Signed in as ${roleConfig[loggedInUser.role]?.title || loggedInUser.role}`,
         });
         navigate(roleConfig[loggedInUser.role]?.redirectTo || "/home");
       } else {
@@ -173,40 +164,252 @@ export default function Auth() {
 
   const RoleIcon = roleConfig[selectedRole].icon;
 
+  // Native App - Custom Design
+  if (isNativePlatform) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col overflow-hidden">
+        {/* Fixed Header Buttons - Outside curved area for proper touch */}
+        <div className="absolute top-4 left-4 z-50">
+          <button
+            onClick={() => navigate("/")}
+            className="p-2.5 rounded-full bg-white/30 backdrop-blur-sm text-white shadow-lg active:scale-95 transition-transform"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="absolute top-4 right-4 z-50">
+          <ThemeToggle />
+        </div>
+
+        {/* Curved Header with Gradient */}
+        <div className="relative">
+          <div
+            className="h-44 bg-gradient-to-br from-teal-600 via-teal-500 to-cyan-500"
+            style={{
+              borderBottomLeftRadius: '50% 30%',
+              borderBottomRightRadius: '50% 30%',
+            }}
+          >
+            <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{
+              borderBottomLeftRadius: '50% 30%',
+              borderBottomRightRadius: '50% 30%',
+            }}>
+              <div className="absolute top-10 left-10 w-20 h-20 rounded-full bg-white/10 blur-xl" />
+              <div className="absolute top-20 right-16 w-16 h-16 rounded-full bg-white/10 blur-xl" />
+              <div className="absolute bottom-8 left-1/4 w-24 h-24 rounded-full bg-teal-400/20 blur-2xl" />
+            </div>
+
+            {/* Logo - Inside gradient */}
+            <div className="absolute inset-x-0 top-10 flex items-center justify-center pointer-events-none">
+              <div className="bg-card/90 dark:bg-card/80 backdrop-blur-sm rounded-full p-2 shadow-xl border border-border/20">
+                <img
+                  src="/shadanga-kriya-logo.png"
+                  alt="Shadanga Kriya"
+                  className="h-20 w-20 object-contain"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 px-6 pt-4 relative z-10">
+          {/* Welcome Text - Below header */}
+          <div className="text-center mb-5">
+            <h1 className="text-2xl font-bold text-foreground mb-1">
+              {mode === "login" ? "Welcome Back" : "Get Started Free"}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {mode === "login"
+                ? "Enter your details below"
+                : "Create your account to begin"}
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {mode === "signup" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="fullName" className="text-sm text-muted-foreground">
+                  Full Name
+                </Label>
+                <div className="relative">
+                  <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="fullName"
+                    type="text"
+                    placeholder="Enter your full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-sm text-muted-foreground">
+                Email Address
+              </Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="password" className="text-sm text-muted-foreground">
+                Password
+              </Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-12 pl-10 pr-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            {mode === "signup" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="confirmPassword" className="text-sm text-muted-foreground">
+                  Confirm Password
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Confirm your password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+
+            {mode === "signup" && (
+              <div className="space-y-1.5">
+                <Label htmlFor="referralCode" className="text-sm text-muted-foreground">
+                  Referral Code (Optional)
+                </Label>
+                <div className="relative">
+                  <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="referralCode"
+                    type="text"
+                    placeholder="Enter referral code"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value)}
+                    className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+            )}
+
+            {mode === "login" && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => navigate("/forgot-password")}
+                  className="text-sm text-primary font-medium"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full h-12 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white rounded-xl font-semibold text-base shadow-lg shadow-teal-500/25 mt-2"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-5 w-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {mode === "login" ? "Signing in..." : "Creating account..."}
+                </span>
+              ) : (
+                mode === "login" ? "Sign In" : "Sign Up"
+              )}
+            </Button>
+          </form>
+
+          {/* Switch Mode */}
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+            <button
+              type="button"
+              onClick={() => setMode(mode === "login" ? "signup" : "login")}
+              className="text-primary font-semibold"
+            >
+              {mode === "login" ? "Sign Up" : "Sign In"}
+            </button>
+          </p>
+        </div>
+
+        <ConsentFormDialog
+          open={showConsentDialog}
+          onClose={() => setShowConsentDialog(false)}
+          onAccept={handleConsentAccepted}
+        />
+      </div>
+    );
+  }
+
+  // Web Design
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        {/* Gradient Background - Teal to darker teal */}
         <div className="absolute inset-0 bg-gradient-to-br from-teal-800 via-teal-700 to-cyan-800" />
 
-        {/* Animated Orbs */}
         <div className="absolute inset-0 overflow-hidden">
           <div
             className="absolute top-20 left-10 w-72 h-72 rounded-full blur-3xl opacity-30 animate-float-slow"
             style={{
-              background:
-                "radial-gradient(circle, hsl(174 65% 50% / 0.5) 0%, transparent 70%)",
+              background: "radial-gradient(circle, hsl(174 65% 50% / 0.5) 0%, transparent 70%)",
             }}
           />
           <div
             className="absolute bottom-20 right-10 w-96 h-96 rounded-full blur-3xl opacity-20 animate-float"
             style={{
-              background:
-                "radial-gradient(circle, hsl(38 85% 55% / 0.5) 0%, transparent 70%)",
+              background: "radial-gradient(circle, hsl(38 85% 55% / 0.5) 0%, transparent 70%)",
               animationDelay: "2s",
             }}
           />
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-3xl opacity-25 animate-pulse-gentle"
             style={{
-              background:
-                "radial-gradient(circle, hsl(180 50% 45% / 0.4) 0%, transparent 70%)",
+              background: "radial-gradient(circle, hsl(180 50% 45% / 0.4) 0%, transparent 70%)",
             }}
           />
         </div>
 
-        {/* Content */}
         <div className="relative z-10 p-12 flex flex-col justify-between w-full">
           <div>
             <div
@@ -224,9 +427,7 @@ export default function Auth() {
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-6">
                 <Sparkles className="h-4 w-4 text-amber-300" />
                 <span className="text-sm font-medium text-white/90">
-                  {mode === "login"
-                    ? "Continue Your Journey"
-                    : "Begin Your Transformation"}
+                  {mode === "login" ? "Continue Your Journey" : "Begin Your Transformation"}
                 </span>
               </div>
 
@@ -255,7 +456,6 @@ export default function Auth() {
             </div>
           </div>
 
-          {/* Feature highlights */}
           <div className="space-y-4 animate-fade-in-up animation-fill-both animate-delay-300">
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
               <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center">
@@ -263,9 +463,7 @@ export default function Auth() {
               </div>
               <div>
                 <div className="font-semibold text-white">Guided Practice</div>
-                <div className="text-sm text-white/60">
-                  Audio-guided meditation sessions
-                </div>
+                <div className="text-sm text-white/60">Audio-guided meditation sessions</div>
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
@@ -273,12 +471,8 @@ export default function Auth() {
                 <Lock className="h-6 w-6 text-white" />
               </div>
               <div>
-                <div className="font-semibold text-white">
-                  Focused Experience
-                </div>
-                <div className="text-sm text-white/60">
-                  Zero distractions for deep practice
-                </div>
+                <div className="font-semibold text-white">Focused Experience</div>
+                <div className="text-sm text-white/60">Zero distractions for deep practice</div>
               </div>
             </div>
           </div>
@@ -287,18 +481,15 @@ export default function Auth() {
 
       {/* Right Panel - Auth Form */}
       <div className="flex-1 flex flex-col relative">
-        {/* Background decoration */}
         <div className="absolute inset-0 -z-10 brand-gradient-bg" />
         <div
           className="absolute top-20 right-10 w-64 h-64 rounded-full blur-3xl opacity-10"
           style={{
-            background:
-              "radial-gradient(circle, hsl(174 65% 40%) 0%, transparent 70%)",
+            background: "radial-gradient(circle, hsl(174 65% 40%) 0%, transparent 70%)",
           }}
         />
 
-        {/* Header - Simpler for native */}
-        <header className={`sticky top-0 z-50 p-4 flex items-center justify-between ${isNativePlatform ? 'bg-background' : 'sm:p-6 bg-background/80 backdrop-blur-md border-b border-border/50'}`}>
+        <header className="sticky top-0 z-50 p-4 sm:p-6 bg-background/80 backdrop-blur-md border-b border-border/50 flex items-center justify-between">
           <Button
             variant="ghost"
             size="sm"
@@ -306,56 +497,47 @@ export default function Auth() {
             className="hover:bg-primary/10 hover:text-primary"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            {isNativePlatform ? "Back" : (
-              <>
-                <span className="hidden sm:inline">Back to Home</span>
-                <span className="sm:hidden">Back</span>
-              </>
-            )}
+            <span className="hidden sm:inline">Back to Home</span>
+            <span className="sm:hidden">Back</span>
           </Button>
           <ThemeToggle />
         </header>
 
-        {/* Form */}
-        <main className={`flex-1 flex items-center justify-center px-4 ${isNativePlatform ? 'pt-2 pb-4' : 'px-6 pb-12'}`}>
+        <main className="flex-1 flex items-center justify-center px-6 pb-12">
           <div className="w-full max-w-md animate-fade-in">
-            {/* Mobile Logo - Smaller on native */}
-            <div className={`lg:hidden flex items-center gap-3 justify-center ${isNativePlatform ? 'mb-4' : 'mb-8'}`}>
+            <div className="lg:hidden flex items-center gap-3 justify-center mb-8">
               <img
                 src="/shadanga-kriya-logo.png"
                 alt="Shadanga Kriya"
-                className={isNativePlatform ? "h-12 w-auto" : "h-16 w-auto"}
+                className="h-16 w-auto"
               />
             </div>
 
-            {/* Mode Toggle - More compact on native */}
-            <div className={`flex rounded-xl bg-muted/50 p-1 backdrop-blur-sm border border-border/50 ${isNativePlatform ? 'mb-4' : 'mb-8 rounded-2xl p-1.5'}`}>
+            <div className="flex rounded-2xl bg-muted/50 p-1.5 backdrop-blur-sm border border-border/50 mb-8">
               <button
                 onClick={() => setMode("login")}
-                className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${mode === "login"
+                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === "login"
                   ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
                   : "text-muted-foreground hover:text-foreground"
-                  } ${isNativePlatform ? 'py-2.5 rounded-lg' : 'py-3.5 rounded-xl'}`}
+                  }`}
               >
                 Sign In
               </button>
               <button
                 onClick={() => setMode("signup")}
-                className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all duration-300 ${mode === "signup"
+                className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === "signup"
                   ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
                   : "text-muted-foreground hover:text-foreground"
-                  } ${isNativePlatform ? 'py-2.5 rounded-lg' : 'py-3.5 rounded-xl'}`}
+                  }`}
               >
                 Sign Up
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className={isNativePlatform ? "space-y-3" : "space-y-5"}>
+            <form onSubmit={handleSubmit} className="space-y-5">
               {mode === "signup" && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="fullName" className="text-foreground">
-                    Full Name
-                  </Label>
+                  <Label htmlFor="fullName" className="text-foreground">Full Name</Label>
                   <div className="relative group">
                     <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
@@ -372,9 +554,7 @@ export default function Auth() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground">
-                  Email Address
-                </Label>
+                <Label htmlFor="email" className="text-foreground">Email Address</Label>
                 <div className="relative group">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
@@ -390,9 +570,7 @@ export default function Auth() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-foreground">
-                  Password
-                </Label>
+                <Label htmlFor="password" className="text-foreground">Password</Label>
                 <div className="relative group">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
@@ -409,20 +587,14 @@ export default function Auth() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
 
               {mode === "signup" && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="confirmPassword" className="text-foreground">
-                    Confirm Password
-                  </Label>
+                  <Label htmlFor="confirmPassword" className="text-foreground">Confirm Password</Label>
                   <div className="relative group">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
@@ -440,9 +612,7 @@ export default function Auth() {
 
               {mode === "signup" && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="referralCode" className="text-foreground">
-                    Referral Code (Optional)
-                  </Label>
+                  <Label htmlFor="referralCode" className="text-foreground">Referral Code (Optional)</Label>
                   <div className="relative group">
                     <Sparkles className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
@@ -489,31 +659,24 @@ export default function Auth() {
               </Button>
             </form>
 
-            {/* Help section for new users - Hidden on native */}
-            {mode === "signup" && !isNativePlatform && (
+            {mode === "signup" && (
               <div className="mt-8 p-5 bg-muted/50 rounded-2xl border border-border/50 animate-fade-in">
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                     <HelpCircle className="h-5 w-5 text-primary" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground mb-1">
-                      Need guidance?
-                    </p>
+                    <p className="text-sm font-medium text-foreground mb-1">Need guidance?</p>
                     <p className="text-sm text-muted-foreground">
-                      Contact your facilitator or administrator for personalized
-                      access to courses.
+                      Contact your facilitator or administrator for personalized access to courses.
                     </p>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Switch mode */}
-            <p className={`text-center text-sm text-muted-foreground ${isNativePlatform ? 'mt-4' : 'mt-6'}`}>
-              {mode === "login"
-                ? "New to Shadanga Kriya? "
-                : "Already have an account? "}
+            <p className="text-center text-sm text-muted-foreground mt-6">
+              {mode === "login" ? "New to Shadanga Kriya? " : "Already have an account? "}
               <button
                 type="button"
                 onClick={() => setMode(mode === "login" ? "signup" : "login")}
@@ -525,17 +688,11 @@ export default function Auth() {
           </div>
         </main>
 
-        {/* Footer - Hidden on native */}
-        {!isNativePlatform && (
-          <footer className="py-6 text-center">
-            <p className="text-xs text-muted-foreground">
-              © 2024 Shadanga Kriya. All rights reserved.
-            </p>
-          </footer>
-        )}
+        <footer className="py-6 text-center">
+          <p className="text-xs text-muted-foreground">© 2024 Shadanga Kriya. All rights reserved.</p>
+        </footer>
       </div>
 
-      {/* Consent Form Dialog for Registration */}
       <ConsentFormDialog
         open={showConsentDialog}
         onClose={() => setShowConsentDialog(false)}
