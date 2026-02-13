@@ -9,10 +9,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   ArrowLeft,
   Sparkles,
-  MapPin,
-  Phone,
   Mail,
-  Clock,
   Send,
   MessageSquare,
 } from "lucide-react";
@@ -23,7 +20,6 @@ export default function Contact() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    phone: "",
     subject: "",
     message: "",
   });
@@ -43,36 +39,11 @@ export default function Contact() {
     setFormData({
       name: "",
       email: "",
-      phone: "",
       subject: "",
       message: "",
     });
     setIsSubmitting(false);
   };
-
-  const contactInfo = [
-    {
-      icon: MapPin,
-      title: "Address",
-      content:
-        "Flat No. 101, Plot No. 2, Navnirman Society, Ranapratap Nagar, Nagpur - 440 022 (MS), India",
-    },
-    {
-      icon: Phone,
-      title: "Phone",
-      content: "+91 895 639 1919 / +91 915 685 1919",
-    },
-    {
-      icon: Mail,
-      title: "Email",
-      content: "contact@shadangakriya.com",
-    },
-    {
-      icon: Clock,
-      title: "Working Hours",
-      content: "Mon - Fri: 9:00 AM - 5:00 PM | Sat: 10:00 AM - 6:00 PM",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -94,7 +65,7 @@ export default function Contact() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-12 max-w-6xl">
+      <main className="container mx-auto px-4 py-12 max-w-3xl">
         {/* Hero */}
         <section className="text-center mb-12 animate-fade-in-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-6">
@@ -102,167 +73,120 @@ export default function Contact() {
             <span className="text-sm font-medium text-primary">Contact Us</span>
           </div>
           <h1 className="font-serif text-4xl md:text-5xl font-bold text-foreground mb-6">
-            Connect with Us for Your
+            Get in
             <span className="block gradient-text-brand">
-              Inner Transformation
+              Touch
             </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Have questions about Shadanga Kriya or our scientific meditation
-            programs? Reach out to us and begin your journey toward clarity,
-            focus, and emotional balance.
+            Have questions about Shadanga Kriya? We'd love to hear from you.
+            Send us a message and we'll get back to you as soon as possible.
           </p>
         </section>
 
-        <div className="grid lg:grid-cols-2 gap-12">
-          {/* Contact Form */}
-          <section>
-            <div className="bg-card rounded-2xl border border-border/50 p-6 md:p-8 shadow-soft">
-              <div className="flex items-center gap-3 mb-6">
-                <MessageSquare className="h-6 w-6 text-primary" />
-                <h2 className="font-serif text-2xl font-bold text-foreground">
-                  Send a Message
-                </h2>
-              </div>
+        {/* Email Info */}
+        <section className="mb-8">
+          <div className="bg-card rounded-xl border border-border/50 p-5 shadow-soft flex gap-4 items-center justify-center">
+            <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Mail className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-foreground mb-0.5">
+                Email Us
+              </h3>
+              <a
+                href="mailto:contact.shadangakriya@gmail.com"
+                className="text-primary hover:underline text-sm"
+              >
+                contact.shadangakriya@gmail.com
+              </a>
+            </div>
+          </div>
+        </section>
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name *</Label>
-                    <Input
-                      id="name"
-                      placeholder="Your name"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                </div>
+        {/* Contact Form */}
+        <section>
+          <div className="bg-card rounded-2xl border border-border/50 p-6 md:p-8 shadow-soft">
+            <div className="flex items-center gap-3 mb-6">
+              <MessageSquare className="h-6 w-6 text-primary" />
+              <h2 className="font-serif text-2xl font-bold text-foreground">
+                Send a Message
+              </h2>
+            </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+91 XXXXX XXXXX"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="subject">Subject *</Label>
-                    <Input
-                      id="subject"
-                      placeholder="How can we help?"
-                      value={formData.subject}
-                      onChange={(e) =>
-                        setFormData({ ...formData, subject: e.target.value })
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="message">Message *</Label>
-                  <Textarea
-                    id="message"
-                    placeholder="Tell us more about your inquiry..."
-                    rows={5}
-                    value={formData.message}
+                  <Label htmlFor="name">Full Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="Your name"
+                    value={formData.name}
                     onChange={(e) =>
-                      setFormData({ ...formData, message: e.target.value })
+                      setFormData({ ...formData, name: e.target.value })
                     }
                     required
                   />
                 </div>
-
-                <Button
-                  type="submit"
-                  className="w-full brand-button-primary text-white"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    "Sending..."
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Send Message
-                    </>
-                  )}
-                </Button>
-              </form>
-            </div>
-          </section>
-
-          {/* Contact Info */}
-          <section>
-            <div className="space-y-6">
-              {contactInfo.map((info, index) => (
-                <div
-                  key={index}
-                  className="bg-card rounded-xl border border-border/50 p-5 shadow-soft flex gap-4"
-                >
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <info.icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground mb-1">
-                      {info.title}
-                    </h3>
-                    <p className="text-muted-foreground text-sm">
-                      {info.content}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Map Placeholder */}
-            <div className="mt-6 bg-card rounded-xl border border-border/50 overflow-hidden shadow-soft">
-              <div className="aspect-video bg-muted flex items-center justify-center">
-                <div className="text-center">
-                  <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-muted-foreground">
-                    Nagpur, Maharashtra, India
-                  </p>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="your@email.com"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    required
+                  />
                 </div>
               </div>
-            </div>
 
-            {/* FAQ Link */}
-            <div className="mt-6 bg-gradient-to-br from-primary/10 to-amber-500/10 rounded-xl border border-primary/20 p-6 text-center">
-              <h3 className="font-semibold text-foreground mb-2">
-                Have more questions?
-              </h3>
-              <p className="text-muted-foreground text-sm mb-4">
-                Check out our Help & Support section for frequently asked
-                questions.
-              </p>
-              <Button variant="outline" onClick={() => navigate("/help")}>
-                Visit Help Center
+              <div className="space-y-2">
+                <Label htmlFor="subject">Subject *</Label>
+                <Input
+                  id="subject"
+                  placeholder="How can we help?"
+                  value={formData.subject}
+                  onChange={(e) =>
+                    setFormData({ ...formData, subject: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="message">Message *</Label>
+                <Textarea
+                  id="message"
+                  placeholder="Tell us more about your inquiry..."
+                  rows={5}
+                  value={formData.message}
+                  onChange={(e) =>
+                    setFormData({ ...formData, message: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full brand-button-primary text-white"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  "Sending..."
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Message
+                  </>
+                )}
               </Button>
-            </div>
-          </section>
-        </div>
+            </form>
+          </div>
+        </section>
       </main>
     </div>
   );
