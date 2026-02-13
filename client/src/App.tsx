@@ -305,14 +305,7 @@ const AppContent = () => (
                   </ProtectedRoute>
                 }
               />
-              <Route
-                path="/privacy"
-                element={
-                  <ProtectedRoute allowedRoles={["learner"]}>
-                    <PrivacySecurity />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/privacy" element={<PrivacySecurity />} />
               <Route
                 path="/help"
                 element={
