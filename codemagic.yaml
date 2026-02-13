@@ -9,18 +9,24 @@ workflows:
       xcode: latest
 
     scripts:
-      - name: Install dependencies
-        script: npm install
-
-      - name: Build web app
-        script: npm run build
-
-      - name: Sync Capacitor
-        script: npx cap sync ios
-
-      - name: Build iOS app
+      - name: Install dependencies (client)
         script: |
-          cd ios/App
+          cd client
+          npm install
+
+      - name: Build React app
+        script: |
+          cd client
+          npm run build
+
+      - name: Sync Capacitor iOS
+        script: |
+          cd client
+          npx cap sync ios
+
+      - name: Build iOS
+        script: |
+          cd client/ios/App
           xcodebuild -workspace App.xcworkspace \
                      -scheme App \
                      -configuration Release \
@@ -28,5 +34,5 @@ workflows:
                      archive -archivePath $CM_BUILD_DIR/App.xcarchive
 
     artifacts:
+      - client/ios/App/build/**/*.ipa
       - build/ios/ipa/*.ipa
-      - ios/App/build/**/*.ipa
