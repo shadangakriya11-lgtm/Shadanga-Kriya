@@ -11,6 +11,9 @@ workflows:
         distribution_type: app_store
         bundle_identifier: com.shadangakriya.app
 
+    integrations:
+      app_store_connect: CodemagicKey
+
     scripts:
       - name: Install dependencies
         script: |
