@@ -12,7 +12,7 @@ workflows:
         bundle_identifier: com.shadangakriya.app
 
     scripts:
-      - name: Install dependencies (client)
+      - name: Install dependencies
         script: |
           cd client
           npm install
@@ -31,21 +31,12 @@ workflows:
         script: |
           xcode-project use-profiles
 
-      - name: Build iOS archive
+      - name: Build IPA
         script: |
-          cd client/ios/App
-          xcodebuild -workspace App.xcworkspace \
-                     -scheme App \
-                     -configuration Release \
-                     -sdk iphoneos \
-                     archive -archivePath $CM_BUILD_DIR/App.xcarchive
-
-      - name: Export IPA
-        script: |
-          xcodebuild -exportArchive \
-                     -archivePath $CM_BUILD_DIR/App.xcarchive \
-                     -exportOptionsPlist client/ios/App/exportOptions.plist \
-                     -exportPath $CM_BUILD_DIR/build
+          cd client
+          xcode-project build-ipa \
+            --workspace ios/App/App.xcworkspace \
+            --scheme App
 
     artifacts:
-      - $CM_BUILD_DIR/build/*.ipa
+      - client/build/ios/ipa/*.ipa
