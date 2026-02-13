@@ -53,5 +53,8 @@
 	<!-- Privacy Descriptions -->
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Shadanga Kriya needs microphone access to detect headphone connectivity for optimal meditation experience.</string>
+	<!-- Export Compliance - App only uses Apple's built-in encryption (WebKit crypto.subtle) -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>
