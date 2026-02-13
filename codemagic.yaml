@@ -40,5 +40,12 @@ workflows:
                      -sdk iphoneos \
                      archive -archivePath $CM_BUILD_DIR/App.xcarchive
 
+      - name: Export IPA
+        script: |
+          xcodebuild -exportArchive \
+                     -archivePath $CM_BUILD_DIR/App.xcarchive \
+                     -exportOptionsPlist client/ios/App/exportOptions.plist \
+                     -exportPath $CM_BUILD_DIR/build
+
     artifacts:
-      - $CM_BUILD_DIR/App.xcarchive
+      - $CM_BUILD_DIR/build/*.ipa
