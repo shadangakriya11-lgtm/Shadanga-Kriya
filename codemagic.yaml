@@ -7,6 +7,9 @@ workflows:
     environment:
       node: 18
       xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.shadangakriya.app
 
     scripts:
       - name: Install dependencies (client)
@@ -24,7 +27,11 @@ workflows:
           cd client
           npx cap sync ios
 
-      - name: Build iOS
+      - name: Set up code signing
+        script: |
+          xcode-project use-profiles
+
+      - name: Build iOS archive
         script: |
           cd client/ios/App
           xcodebuild -workspace App.xcworkspace \
@@ -34,5 +41,4 @@ workflows:
                      archive -archivePath $CM_BUILD_DIR/App.xcarchive
 
     artifacts:
-      - client/ios/App/build/**/*.ipa
-      - build/ios/ipa/*.ipa
+      - $CM_BUILD_DIR/App.xcarchive
