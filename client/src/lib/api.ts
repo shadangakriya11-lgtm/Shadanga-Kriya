@@ -248,6 +248,11 @@ export const authApi = {
       method: "PUT",
       body: JSON.stringify(data),
     }),
+
+  deleteAccount: () =>
+    apiRequest<{ message: string }>("/auth/delete-account", {
+      method: "DELETE",
+    }),
 };
 
 // Users API (Admin)

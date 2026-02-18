@@ -230,6 +230,56 @@ export default function PrivacySecurity() {
                     </Card>
                 </section>
 
+                {/* Account Deletion */}
+                <section className="mb-8">
+                    <div className="flex items-center gap-3 mb-4">
+                        <Shield className="h-6 w-6 text-destructive" />
+                        <h2 className="font-serif text-xl font-semibold text-foreground">Account Deletion & Data Removal</h2>
+                    </div>
+                    <Card className="p-6 border-destructive/20">
+                        <div className="space-y-4">
+                            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                                <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                                    <span className="text-destructive">⚠️</span>
+                                    Complete Data Deletion
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                    When you delete your account, all your data is permanently removed from our servers. This action cannot be undone.
+                                </p>
+                            </div>
+                            
+                            <div>
+                                <h3 className="font-semibold text-foreground mb-2">What Gets Deleted:</h3>
+                                <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
+                                    <li>Your personal information (name, email, phone number)</li>
+                                    <li>All course enrollments and progress records</li>
+                                    <li>Payment history and transaction records</li>
+                                    <li>Downloaded content and offline data</li>
+                                    <li>Notifications and communication history</li>
+                                    <li>All other associated data</li>
+                                </ul>
+                            </div>
+
+                            <div>
+                                <h3 className="font-semibold text-foreground mb-2">Deletion Process:</h3>
+                                <ol className="text-sm text-muted-foreground space-y-2 ml-4 list-decimal">
+                                    <li>Go to your Profile page</li>
+                                    <li>Click the "Delete Account" button at the bottom</li>
+                                    <li>Read the warning carefully</li>
+                                    <li>Type "DELETE ACCOUNT" to confirm</li>
+                                    <li>Your account and all data will be permanently deleted</li>
+                                </ol>
+                            </div>
+
+                            <div className="bg-muted/50 rounded-lg p-4">
+                                <p className="text-sm text-muted-foreground">
+                                    <strong className="text-foreground">Important:</strong> Account deletion is immediate and permanent. We do not keep backups of deleted accounts. If you're unsure, please contact support before proceeding.
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                </section>
+
                 {/* Cookies */}
                 <section className="mb-8">
                     <div className="flex items-center gap-3 mb-4">

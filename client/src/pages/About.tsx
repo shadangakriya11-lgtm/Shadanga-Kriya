@@ -178,14 +178,8 @@ export default function About() {
             <h2 className="font-serif text-xl font-bold text-foreground mb-4">
               Our Organization
             </h2>
-            <p className="text-muted-foreground mb-2">
-              <strong className="text-foreground">Shadanga Kriya</strong> - A
-              Unit of PL SIX TELE PI PRIVATE LIMITED
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Flat No. 101, Plot No. 2, Navanirman Society,
-              <br />
-              Ranapratap Nagar, Nagpur - 440 022 (MS), India
+            <p className="text-muted-foreground">
+              <strong className="text-foreground">Shadanga Kriya</strong> - Your journey to inner peace and wellness
             </p>
           </div>
         </section>

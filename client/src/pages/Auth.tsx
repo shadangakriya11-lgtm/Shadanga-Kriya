@@ -330,18 +330,6 @@ export default function Auth() {
               </div>
             )}
 
-            {mode === "login" && (
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => navigate("/forgot-password")}
-                  className="text-sm text-primary font-medium"
-                >
-                  Forgot Password?
-                </button>
-              </div>
-            )}
-
             <Button
               type="submit"
               size="lg"
@@ -627,18 +615,6 @@ export default function Auth() {
                 </div>
               )}
 
-              {mode === "login" && (
-                <div className="flex items-center justify-end">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/forgot-password")}
-                    className="text-sm text-primary hover:text-primary/80 hover:underline font-medium transition-colors"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-              )}
-
               <Button
                 type="submit"
                 size="lg"
@@ -689,7 +665,7 @@ export default function Auth() {
         </main>
 
         <footer className="py-6 text-center">
-          <p className="text-xs text-muted-foreground">© 2024 Shadanga Kriya. All rights reserved.</p>
+          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} Shadanga Kriya. All rights reserved.</p>
         </footer>
       </div>
 

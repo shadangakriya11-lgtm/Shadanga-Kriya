@@ -389,7 +389,7 @@ export default function ForgotPassword() {
       {/* Footer */}
       <footer className="py-6 text-center">
         <p className="text-xs text-muted-foreground">
-          © 2024 Shadanga Kriya. All rights reserved.
+          © {new Date().getFullYear()} Shadanga Kriya. All rights reserved.
         </p>
       </footer>
     </div>

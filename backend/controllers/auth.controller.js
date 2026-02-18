@@ -443,6 +443,81 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// Delete account (learners only)
+const deleteAccount = async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Only learners can delete their own accounts
+    if (userRole !== 'learner') {
+      return res.status(403).json({ 
+        error: 'Only learner accounts can be self-deleted. Please contact an administrator.' 
+      });
+    }
+
+    await client.query('BEGIN');
+
+    // Log security event
+    logSecurityEvent('ACCOUNT_DELETION', {
+      userId,
+      email: req.user.email,
+      role: userRole
+    }, req);
+
+    // Delete user and all related data (CASCADE will handle related records)
+    // This will permanently delete:
+    // - User record
+    // - Progress records
+    // - Enrollments
+    // - Payments
+    // - Notifications
+    // - Attendance records
+    // - Any other related data with CASCADE foreign keys
+    const result = await pool.query(
+      'DELETE FROM users WHERE id = $1 AND role = $2 RETURNING email, first_name, last_name',
+      [userId, 'learner']
+    );
+
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found or not authorized' });
+    }
+
+    const deletedUser = result.rows[0];
+
+    await client.query('COMMIT');
+
+    // Notify admins about account deletion
+    try {
+      await notifyAdmins(
+        'Account Deleted',
+        `Learner ${deletedUser.first_name} ${deletedUser.last_name} (${deletedUser.email}) has permanently deleted their account.`,
+        'info'
+      );
+    } catch (notifyError) {
+      console.error('Failed to notify admins about account deletion:', notifyError);
+      // Don't fail the deletion if notification fails
+    }
+
+    res.json({
+      message: 'Your account has been permanently deleted. We\'re sorry to see you go.'
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Delete account error:', error);
+    logSecurityEvent('ACCOUNT_DELETION_FAILED', {
+      userId: req.user?.id,
+      error: error.message
+    }, req);
+    res.status(500).json({ error: 'Failed to delete account' });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -450,5 +525,6 @@ module.exports = {
   updateProfile,
   changePassword,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  deleteAccount
 };

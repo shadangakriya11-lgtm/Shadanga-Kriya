@@ -55,4 +55,7 @@ router.post('/reset-password', [
     .withMessage('Password must contain uppercase, lowercase, number, and special character')
 ], validate, authController.resetPassword);
 
+// Delete account (learners only)
+router.delete('/delete-account', verifyToken, authController.deleteAccount);
+
 module.exports = router;

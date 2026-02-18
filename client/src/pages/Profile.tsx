@@ -23,7 +23,9 @@ import {
   LogOut,
   ChevronRight,
   HelpCircle,
-  Pencil
+  Pencil,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,6 +46,11 @@ export default function Profile() {
     lastName: '',
     phone: ''
   });
+
+  // Delete Account State
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -88,6 +95,38 @@ export default function Profile() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE ACCOUNT') {
+      toast({
+        title: "Incorrect confirmation",
+        description: "Please type 'DELETE ACCOUNT' exactly to confirm.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await authApi.deleteAccount();
+      toast({
+        title: "Account deleted",
+        description: "Your account has been permanently deleted.",
+      });
+      // Logout and redirect
+      logout();
+      navigate('/auth');
+    } catch (error: any) {
+      console.error('Delete account error:', error);
+      toast({
+        title: "Deletion failed",
+        description: error.response?.data?.error || "Could not delete account. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -190,12 +229,24 @@ export default function Profile() {
         {/* Sign Out */}
         <Button
           variant="outline"
-          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+          className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 mb-4"
           onClick={handleLogout}
         >
           <LogOut className="h-4 w-4 mr-2" />
           Sign Out
         </Button>
+
+        {/* Delete Account - Only for Learners */}
+        {user?.role === 'learner' && (
+          <Button
+            variant="outline"
+            className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/50"
+            onClick={() => setIsDeleteDialogOpen(true)}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Account
+          </Button>
+        )}
       </main>
 
       <BottomNav />
@@ -257,6 +308,75 @@ export default function Profile() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 text-destructive" />
+              </div>
+              <div>
+                <DialogTitle className="text-destructive">Delete Account</DialogTitle>
+                <DialogDescription className="text-destructive/80">
+                  This action cannot be undone
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+              <p className="text-sm text-foreground font-medium mb-2">
+                ⚠️ Warning: Permanent Deletion
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Deleting your account will permanently remove:
+              </p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside mt-2 space-y-1">
+                <li>All your personal information</li>
+                <li>Course progress and history</li>
+                <li>Downloaded content</li>
+                <li>All associated data</li>
+              </ul>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="deleteConfirmation" className="text-foreground">
+                Type <span className="font-mono font-bold text-destructive">DELETE ACCOUNT</span> to confirm
+              </Label>
+              <Input
+                id="deleteConfirmation"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                placeholder="DELETE ACCOUNT"
+                className="font-mono"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setDeleteConfirmation('');
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              type="button" 
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={isDeleting || deleteConfirmation !== 'DELETE ACCOUNT'}
+            >
+              {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

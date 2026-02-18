@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { usePlaybackSettings } from "@/hooks/useApi";
 import { Capacitor } from "@capacitor/core";
 import { useFocusMode } from "@/hooks/useFocusMode";
+import { useAudioProtection } from "@/hooks/useAudioProtection";
 
 interface AudioPlayerProps {
   lesson: Lesson;
@@ -85,6 +86,34 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
 
   // Focus Mode Hook (Keep Awake + Immersive Mode)
   useFocusMode(playback.isPlaying);
+
+  // Audio Protection Hook - Automatically pauses audio when screen recording is detected
+  useAudioProtection(audioRef, {
+    onRecordingDetected: () => {
+      toast({
+        title: "⚠️ Screen Recording Detected",
+        description: "Audio has been paused for security. Please stop screen recording.",
+        variant: "destructive",
+        duration: 5000,
+      });
+      
+      // Force pause the playback state
+      setPlayback((prev) => ({
+        ...prev,
+        isPlaying: false,
+        isPaused: true,
+      }));
+      releaseWakeLock();
+    },
+    onRecordingStopped: () => {
+      toast({
+        title: "Screen Recording Stopped",
+        description: "You can now resume audio playback.",
+        duration: 3000,
+      });
+    },
+    autoMute: true, // Automatically mute and pause audio
+  });
 
   // Poll for Airplane Mode Status (Global for this component)
   useEffect(() => {

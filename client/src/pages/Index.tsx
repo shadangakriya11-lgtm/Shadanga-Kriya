@@ -799,15 +799,10 @@ export default function Index() {
                   className="h-12 w-auto"
                 />
               </div>
-              <p className="text-sm text-muted-foreground max-w-md mb-4">
+              <p className="text-sm text-muted-foreground max-w-md">
                 A guided audio meditation app designed to bring deep relaxation,
                 mental clarity, and lasting inner peace through the ancient practice
                 of Shadanga Kriya.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Flat No. 101, Plot No. 2, Navnirman Society,
-                <br />
-                Ranapratap Nagar, Nagpur - 440 022
               </p>
             </div>
             <div>
@@ -852,27 +847,20 @@ export default function Index() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-foreground mb-4">Contact</h4>
+              <h4 className="font-semibold text-foreground mb-4">Legal</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-center gap-2">
-                  <span>📞</span> +91 895 639 1919
-                </li>
-                <li className="flex items-center gap-2">
-                  <span>📞</span> +91 915 685 1919
-                </li>
-                <li className="hover:text-primary cursor-pointer transition-colors">
+                <li 
+                  className="hover:text-primary cursor-pointer transition-colors"
+                  onClick={() => navigate('/privacy')}
+                >
                   Privacy Policy
-                </li>
-                <li className="hover:text-primary cursor-pointer transition-colors">
-                  Terms of Service
                 </li>
               </ul>
             </div>
           </div>
           <div className="border-t border-border/50 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © {new Date().getFullYear()} PL Six Tele Pi Private Limited. All
-              rights reserved.
+              © {new Date().getFullYear()} Shadanga Kriya. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               <ThemeToggle />

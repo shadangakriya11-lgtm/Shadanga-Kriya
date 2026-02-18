@@ -57,6 +57,7 @@ import Contact from "./pages/Contact";
 import { StatusBar } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp, BackButtonListenerEvent } from "@capacitor/app";
+import { useScreenProtection } from "@/hooks/useScreenProtection";
 
 // Configure status bar for native platforms - don't overlay webview
 if (Capacitor.isNativePlatform()) {
@@ -216,16 +217,20 @@ const BackButtonHandler = () => {
   return <ExitToast visible={showExitToast} />;
 };
 
-const AppContent = () => (
-  <ThemeProvider defaultTheme="light" storageKey="therapy-ui-theme">
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <BackButtonHandler />
-            <Routes>
+const AppContent = () => {
+  // Enable screen recording protection for the entire app
+  useScreenProtection();
+
+  return (
+    <ThemeProvider defaultTheme="light" storageKey="therapy-ui-theme">
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <BackButtonHandler />
+              <Routes>
               {/* Landing */}
               <Route path="/" element={<Index />} />
 
@@ -489,7 +494,8 @@ const AppContent = () => (
       </AuthProvider>
     </QueryClientProvider>
   </ThemeProvider>
-);
+  );
+};
 
 const App = () => <AppContent />;
 

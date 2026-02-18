@@ -8,7 +8,37 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
+        
+        // Start monitoring for screen recording
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenCaptureDidChange),
+            name: UIScreen.capturedDidChangeNotification,
+            object: nil
+        )
+        
         return true
+    }
+    
+    @objc func screenCaptureDidChange() {
+        if UIScreen.main.isCaptured {
+            // Show alert when screen recording is detected
+            DispatchQueue.main.async {
+                if let viewController = self.window?.rootViewController {
+                    let alert = UIAlertController(
+                        title: "Screen Recording Not Allowed",
+                        message: "Screen recording is not allowed in this app",
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    viewController.present(alert, animated: true)
+                }
+            }
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
