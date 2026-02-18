@@ -84,13 +84,19 @@ export function PaymentModal({
       const orderData = await paymentsApi.createRazorpayOrder(course.id);
 
       // 3. Open Razorpay Checkout
+      // Note: Logo only works with publicly accessible HTTPS URLs
+      // For localhost, the logo won't display due to CORS restrictions
+      const isLocalhost = window.location.hostname === 'localhost' || 
+                          window.location.hostname === '127.0.0.1';
+      
       const options = {
         key: orderData.keyId,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: "Serene Flow",
+        name: "Shadanga Kriya",
         description: `Enrollment for ${course.title}`,
-        image: "/logo.png",
+        // Only include image if not on localhost
+        ...((!isLocalhost) && { image: `${window.location.origin}/shadanga-kriya-logo.png` }),
         order_id: orderData.orderId,
         handler: async function (response: any) {
           try {
