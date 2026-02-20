@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Clock, BookOpen, Lock, CheckCircle2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { shouldShowPricing } from '@/lib/platformDetection';
 
 interface CourseCardProps {
   course: Course;

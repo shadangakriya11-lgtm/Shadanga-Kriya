@@ -22,7 +22,6 @@ const questions = [
             { value: "sometimes", label: "कभी-कभी" },
             { value: "not_sure", label: "अभी निश्चित नहीं" },
         ],
-        hint: "👉 User खुद को नए रूप में कल्पना करता है",
     },
     {
         id: "question2",
@@ -35,7 +34,6 @@ const questions = [
             { value: "sleep", label: "मेरी नींद" },
             { value: "confidence", label: "मेरा आत्मविश्वास" },
         ],
-        hint: "👉 समस्या को टालना महँगा लगने लगता है",
     },
     {
         id: "question3",
@@ -46,7 +44,6 @@ const questions = [
             { value: "difficult_alone", label: "अकेले करना मुश्किल लगता है" },
             { value: "not_found", label: "अभी तक सही तरीका नहीं मिला" },
         ],
-        hint: "👉 Course की ज़रूरत स्थापित करता है",
     },
     {
         id: "question4",
@@ -57,7 +54,6 @@ const questions = [
             { value: "understand_first", label: "पहले समझना चाहूँगा/चाहूँगी" },
             { value: "maybe", label: "शायद" },
         ],
-        hint: "👉 Paid mindset activate करता है",
     },
     {
         id: "question5",
@@ -68,7 +64,6 @@ const questions = [
             { value: "soon", label: "जल्द ही" },
             { value: "not_now", label: "अभी नहीं" },
         ],
-        hint: "👉 Buyer vs browser अलग करता है",
     },
 ];
 
@@ -182,11 +177,6 @@ export function DemoQuestionnaire({ onComplete, onSkip }: DemoQuestionnaireProps
                                 </div>
                             ))}
                         </RadioGroup>
-
-                        {/* Hint */}
-                        <p className="mt-6 text-sm text-muted-foreground italic text-center">
-                            {currentQ.hint}
-                        </p>
                     </CardContent>
                 </Card>
 

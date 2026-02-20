@@ -12,10 +12,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCourses, useMyEnrollments, useDemoStatus, useSkipDemo } from "@/hooks/useApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { shouldShowPaymentFeatures, getLockedCourseMessage } from "@/lib/platformDetection";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LearnerHome() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
@@ -62,27 +65,38 @@ export default function LearnerHome() {
     };
   });
 
-  const activeCourses = mappedCourses.filter(
+  // iOS App Store compliance: Show enrolled courses + free courses (price = 0) on iOS
+  // Hide only paid locked courses (price > 0 and not enrolled)
+  const displayCourses = shouldShowPaymentFeatures() 
+    ? mappedCourses 
+    : mappedCourses.filter((c) => 
+        c.status === "active" || 
+        c.status === "completed" || 
+        (c.status === "pending" && c.price === 0) || // Free courses
+        (c.status === "locked" && c.price === 0)     // Free but locked by prerequisites
+      );
+
+  const activeCourses = displayCourses.filter(
     (c) => c.status === "active" || c.status === "pending"
   );
-  const completedCourses = mappedCourses.filter(
+  const completedCourses = displayCourses.filter(
     (c) => c.status === "completed"
   );
-  const lockedCourses = mappedCourses.filter((c) => c.status === "locked");
+  const lockedCourses = displayCourses.filter((c) => c.status === "locked");
 
   // Filter courses by search query
   const searchFilteredCourses = useMemo(() => {
-    if (!searchQuery.trim()) return mappedCourses;
+    if (!searchQuery.trim()) return displayCourses;
     const query = searchQuery.toLowerCase();
-    return mappedCourses.filter(
+    return displayCourses.filter(
       (course) =>
         course.title.toLowerCase().includes(query) ||
         course.description?.toLowerCase().includes(query)
     );
-  }, [mappedCourses, searchQuery]);
+  }, [displayCourses, searchQuery]);
 
   const filteredCourses = useMemo(() => {
-    const baseList = searchQuery.trim() ? searchFilteredCourses : mappedCourses;
+    const baseList = searchQuery.trim() ? searchFilteredCourses : displayCourses;
 
     if (activeTab === "all") return baseList;
     if (activeTab === "active")
@@ -93,7 +107,18 @@ export default function LearnerHome() {
   }, [activeTab, searchFilteredCourses, mappedCourses, searchQuery]);
 
   const handleCourseClick = (course: Course) => {
+    // On iOS, locked courses are not displayed, so this should only handle enrolled courses
     if (course.status === "locked" && course.price) {
+      // iOS App Store compliance: Don't show payment on iOS
+      if (!shouldShowPaymentFeatures()) {
+        // This shouldn't happen on iOS since locked courses are filtered out
+        toast({
+          title: "Course Not Available",
+          description: "This course is not available in your account.",
+          variant: "default",
+        });
+        return;
+      }
       setSelectedCourse(course);
       setIsPaymentOpen(true);
     } else {
@@ -196,13 +221,15 @@ export default function LearnerHome() {
             </p>
             <p className="text-xs text-muted-foreground">Active</p>
           </div>
-          <div className="bg-card rounded-xl border border-border/50 p-4 text-center shadow-soft">
-            <Clock className="h-5 w-5 text-warning mx-auto mb-2" />
-            <p className="text-2xl font-bold text-foreground">
-              {isLoading ? "-" : lockedCourses.length}
-            </p>
-            <p className="text-xs text-muted-foreground">Available</p>
-          </div>
+          {shouldShowPaymentFeatures() && (
+            <div className="bg-card rounded-xl border border-border/50 p-4 text-center shadow-soft">
+              <Clock className="h-5 w-5 text-warning mx-auto mb-2" />
+              <p className="text-2xl font-bold text-foreground">
+                {isLoading ? "-" : lockedCourses.length}
+              </p>
+              <p className="text-xs text-muted-foreground">Available</p>
+            </div>
+          )}
           <div className="bg-card rounded-xl border border-border/50 p-4 text-center shadow-soft">
             <CheckCircle2 className="h-5 w-5 text-success mx-auto mb-2" />
             <p className="text-2xl font-bold text-foreground">
@@ -284,13 +311,15 @@ export default function LearnerHome() {
 
       <BottomNav />
 
-      {/* Payment Modal */}
-      <PaymentModal
-        course={selectedCourse}
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-        onSuccess={handlePaymentSuccess}
-      />
+      {/* Payment Modal - Only show on web/Android */}
+      {shouldShowPaymentFeatures() && (
+        <PaymentModal
+          course={selectedCourse}
+          isOpen={isPaymentOpen}
+          onClose={() => setIsPaymentOpen(false)}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 }

@@ -23,6 +23,7 @@ import { toast } from "@/hooks/use-toast";
 import { paymentsApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { shouldShowPaymentFeatures } from "@/lib/platformDetection";
 
 declare global {
   interface Window {
@@ -182,6 +183,11 @@ export function PaymentModal({
   };
 
   if (!course) return null;
+
+  // iOS App Store compliance: Don't show payment modal on iOS
+  if (!shouldShowPaymentFeatures()) {
+    return null;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>

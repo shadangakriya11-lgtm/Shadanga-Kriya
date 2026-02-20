@@ -32,6 +32,7 @@ import {
   deleteDownloadsForCourse,
   DownloadedLesson,
 } from "@/lib/downloadManager";
+import { shouldShowPricing } from "@/lib/platformDetection";
 
 type ViewState = "details" | "protocol" | "player";
 
@@ -371,7 +372,7 @@ export default function CourseDetail() {
               <Clock className="h-4 w-4" />
               <span>{course.duration || "N/A"}</span>
             </div>
-            {course.price > 0 && (
+            {shouldShowPricing() && course.price > 0 && (
               <div className="flex items-center gap-1.5">
                 <DollarSign className="h-4 w-4" />
                 <span>₹{course.price}</span>

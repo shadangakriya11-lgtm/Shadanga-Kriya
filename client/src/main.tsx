@@ -3,6 +3,11 @@ import App from "./App.tsx";
 import "./index.css";
 import { initializeAuth } from "./lib/api";
 
+// Import platform testing utilities (only in development)
+if (import.meta.env.DEV) {
+  import('./lib/platformDetection.test');
+}
+
 // Initialize auth before rendering app
 // This loads the token from persistent storage (Preferences/localStorage)
 const init = async () => {
