@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Dark Mode Gradient Background -->
+    <!-- Gradient Background -->
     <item>
         <shape android:shape="rectangle">
             <gradient
-                android:startColor="#134E4A"
-                android:centerColor="#115E59"
-                android:endColor="#164E63"
+                android:startColor="#0F766E"
+                android:centerColor="#0D9488"
+                android:endColor="#0891B2"
                 android:angle="270"
                 android:type="linear" />
         </shape>
@@ -22,7 +22,7 @@
         </shape>
     </item>
     
-    <!-- Center Logo - smaller -->
+    <!-- Center Logo -->
     <item
         android:width="80dp"
         android:height="80dp"

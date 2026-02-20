@@ -1,23 +1,27 @@
-const sharp = require('sharp');
-const fs = require('fs');
-const path = require('path');
+import sharp from 'sharp';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-const inputPath = 'public/shadanga-kriya-logo.png';
-const outputPath = 'android/app/src/main/res/drawable/splash_logo.png';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const inputPath = join(__dirname, 'public/shadanga-kriya-logo.png');
+const outputPath = join(__dirname, 'android/app/src/main/res/drawable/splash_logo.png');
 
 async function resizeLogo() {
     try {
-        // Resize to 300px width/height (high density) but "inside" to preserve aspect ratio
-        // This ensures no cropping occurs
+        // Simple resize to 300px, preserving aspect ratio
         await sharp(inputPath)
             .resize(300, 300, {
                 fit: 'inside',
-                background: { r: 0, g: 0, b: 0, alpha: 0 } // Transparent background
+                background: { r: 0, g: 0, b: 0, alpha: 0 }
             })
             .toFile(outputPath);
-        console.log('Logo resized successfully without cropping!');
+            
+        console.log('✅ Logo resized to 300x300px');
+        console.log('📱 Original logo preserved without cropping');
     } catch (error) {
-        console.error('Error resizing logo:', error);
+        console.error('❌ Error:', error);
     }
 }
 
