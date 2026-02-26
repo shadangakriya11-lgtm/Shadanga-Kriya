@@ -16,6 +16,7 @@ import {
 } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { User } from "@/types";
+import { Capacitor } from "@capacitor/core";
 
 
 
@@ -166,6 +167,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<User> => {
     console.log("[AuthContext] Logging in user:", email);
     const response = await authApi.login(email, password);
+
+    // iOS: Block admin and facilitator logins (Apple compliance)
+    const isIOS = Capacitor.getPlatform() === 'ios';
+    if (isIOS && (response.user.role === 'admin' || response.user.role === 'facilitator')) {
+      console.log("[AuthContext] iOS: Blocking non-learner login");
+      // Show generic error to avoid revealing account exists
+      throw new Error('Invalid credentials');
+    }
 
     // Save token to persistent storage (async)
     await setAuthToken(response.token);
