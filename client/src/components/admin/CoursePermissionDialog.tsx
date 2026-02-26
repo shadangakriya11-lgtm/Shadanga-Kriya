@@ -28,8 +28,8 @@ export function CoursePermissionDialog({
 }: CoursePermissionDialogProps) {
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Fetch all learners
-    const { data: usersData, isLoading: usersLoading } = useUsers({ role: 'learner' });
+    // Fetch all learners (no pagination for dropdown)
+    const { data: usersData, isLoading: usersLoading } = useUsers({ role: 'learner', noPagination: 'true' });
 
     // Fetch current enrollments for this course
     const { data: enrollmentsData, isLoading: enrollmentsLoading, refetch: refetchEnrollments } = useEnrollmentsByCourse(

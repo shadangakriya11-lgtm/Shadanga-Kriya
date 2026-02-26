@@ -124,7 +124,7 @@ export default function FacilitatorMonitoring() {
     const hasPermission = user?.role === 'admin' || user?.permissions?.includes('monitoring');
 
     const { data, isLoading } = useMonitoringStats();
-    const { data: coursesData } = useCourses();
+    const { data: coursesData } = useCourses({ noPagination: 'true' }); // Fetch all courses for filter
 
     const monitoringData = useMemo(() => {
         let list = data?.monitoring || [];

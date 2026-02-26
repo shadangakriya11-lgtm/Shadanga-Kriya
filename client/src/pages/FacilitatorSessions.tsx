@@ -43,7 +43,7 @@ export default function FacilitatorSessions() {
   const endMutation = useEndSession();
   const updateMutation = useUpdateSession();
   const { data: monitoringData } = useMonitoringStats();
-  const { data: coursesData } = useCourses();
+  const { data: coursesData } = useCourses({ noPagination: 'true' }); // Fetch all courses for dropdown
   const createSessionMutation = useCreateSession();
 
   const handleQuickStart = () => {

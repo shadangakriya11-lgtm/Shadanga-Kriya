@@ -35,6 +35,7 @@ import { toast } from '@/hooks/use-toast';
 
 export default function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
   const [formData, setFormData] = useState({
@@ -47,9 +48,13 @@ export default function AdminUsers() {
     assignedCourseIds: [] as string[]
   });
 
-  const { data: usersData, isLoading } = useUsers({ search: searchQuery });
+  const { data: usersData, isLoading } = useUsers({ 
+    search: searchQuery,
+    page: currentPage.toString(),
+    limit: '100' // Show up to 100 users per page
+  });
   const { data: statsData } = useUserStats();
-  const { data: coursesData } = useCourses(); // Fetch all courses
+  const { data: coursesData } = useCourses({ noPagination: 'true' }); // Fetch all courses for assignment
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();

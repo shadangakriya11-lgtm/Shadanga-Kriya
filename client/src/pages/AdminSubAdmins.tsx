@@ -70,8 +70,8 @@ export default function AdminSubAdmins() {
   const [selectedCourseId, setSelectedCourseId] = useState<string>('all_courses');
   const [selectedLessonId, setSelectedLessonId] = useState<string>('all_lessons');
 
-  const { data: usersData, isLoading } = useUsers({ role: 'facilitator' });
-  const { data: coursesData } = useCourses();
+  const { data: usersData, isLoading } = useUsers({ role: 'facilitator', noPagination: 'true' });
+  const { data: coursesData } = useCourses({ noPagination: 'true' }); // Fetch all courses for dropdown
   const { data: lessonsData } = useLessonsByCourse(selectedCourseId !== 'all_courses' ? selectedCourseId : '');
 
   const createUser = useCreateUser();

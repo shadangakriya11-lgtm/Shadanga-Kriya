@@ -22,24 +22,64 @@ const arrayBufferToHex = (buffer: ArrayBuffer): string => {
     .join("");
 };
 
-// Convert ArrayBuffer to Base64
+// Convert ArrayBuffer to Base64 in chunks to avoid memory issues
 const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
-  let binary = "";
-  bytes.forEach((byte) => {
-    binary += String.fromCharCode(byte);
-  });
-  return btoa(binary);
+  const chunkSize = 8192; // 8KB chunks
+  let result = '';
+  
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    let binary = '';
+    for (let j = 0; j < chunk.length; j++) {
+      binary += String.fromCharCode(chunk[j]);
+    }
+    result += btoa(binary);
+  }
+  
+  return result;
 };
 
-// Convert Base64 to ArrayBuffer
+// Convert Base64 to ArrayBuffer in chunks to avoid memory issues
+// Base64 must be decoded in multiples of 4 characters
 const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  // Ensure base64 string length is multiple of 4
+  const paddedBase64 = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
+  
+  // For very large strings, decode in chunks
+  const CHUNK_SIZE = 1024 * 1024; // 1MB of base64 = ~750KB binary
+  const chunks: Uint8Array[] = [];
+  
+  for (let i = 0; i < paddedBase64.length; i += CHUNK_SIZE) {
+    // Ensure chunk size is multiple of 4
+    let chunkEnd = Math.min(i + CHUNK_SIZE, paddedBase64.length);
+    chunkEnd = chunkEnd - (chunkEnd % 4); // Align to 4-byte boundary
+    if (chunkEnd === i) chunkEnd = paddedBase64.length; // Last chunk
+    
+    const chunk = paddedBase64.substring(i, chunkEnd);
+    try {
+      const binary = atob(chunk);
+      const bytes = new Uint8Array(binary.length);
+      for (let j = 0; j < binary.length; j++) {
+        bytes[j] = binary.charCodeAt(j);
+      }
+      chunks.push(bytes);
+    } catch (e) {
+      console.error(`Failed to decode base64 chunk at position ${i}:`, e);
+      throw new Error("Failed to decode base64 data");
+    }
   }
-  return bytes.buffer;
+  
+  // Combine all chunks
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+  
+  return result.buffer;
 };
 
 /**
@@ -57,11 +97,12 @@ const importKey = async (hexKey: string): Promise<CryptoKey> => {
 
 /**
  * Encrypt audio data using AES-256-CBC
- * Returns: IV (16 bytes hex) + encrypted data (base64)
+ * Encrypts the entire file at once to maintain data integrity
  */
 export const encryptAudio = async (
   audioData: ArrayBuffer,
-  hexKey: string
+  hexKey: string,
+  onProgress?: (progress: number) => void
 ): Promise<{ iv: string; encryptedData: string }> => {
   try {
     const key = await importKey(hexKey);
@@ -69,16 +110,34 @@ export const encryptAudio = async (
     // Generate random IV (16 bytes for AES-CBC)
     const iv = crypto.getRandomValues(new Uint8Array(16));
 
-    // Encrypt
+    console.log(`Encrypting audio data, size: ${audioData.byteLength} bytes`);
+    
+    // Encrypt the entire audio at once
+    // AES-CBC can handle large files, and this maintains data integrity
     const encryptedBuffer = await crypto.subtle.encrypt(
       { name: "AES-CBC", iv },
       key,
       audioData
     );
+    
+    if (onProgress) {
+      onProgress(50);
+    }
+    
+    console.log(`Encryption complete, encrypted size: ${encryptedBuffer.byteLength} bytes`);
+    
+    // Convert to base64 in chunks to avoid memory issues
+    const base64Data = arrayBufferToBase64(encryptedBuffer);
+    
+    if (onProgress) {
+      onProgress(100);
+    }
+    
+    console.log(`Base64 encoding complete, size: ${base64Data.length} bytes`);
 
     return {
       iv: arrayBufferToHex(iv.buffer),
-      encryptedData: arrayBufferToBase64(encryptedBuffer),
+      encryptedData: base64Data,
     };
   } catch (error) {
     console.error("Encryption error:", error);
@@ -92,18 +151,39 @@ export const encryptAudio = async (
 export const decryptAudio = async (
   encryptedData: string,
   iv: string,
-  hexKey: string
+  hexKey: string,
+  onProgress?: (progress: number) => void
 ): Promise<ArrayBuffer> => {
   try {
+    console.log(`Starting decryption, encrypted data size: ${encryptedData.length} bytes`);
     const key = await importKey(hexKey);
     const ivBuffer = hexToArrayBuffer(iv);
+    
+    if (onProgress) {
+      onProgress(25);
+    }
+    
+    // Convert base64 to ArrayBuffer
+    console.log(`Converting base64 to ArrayBuffer`);
     const dataBuffer = base64ToArrayBuffer(encryptedData);
+    console.log(`Converted to ArrayBuffer, size: ${dataBuffer.byteLength} bytes`);
 
+    if (onProgress) {
+      onProgress(50);
+    }
+
+    // Decrypt the entire buffer at once
+    console.log(`Decrypting data`);
     const decryptedBuffer = await crypto.subtle.decrypt(
       { name: "AES-CBC", iv: ivBuffer },
       key,
       dataBuffer
     );
+    console.log(`Decryption complete, size: ${decryptedBuffer.byteLength} bytes`);
+    
+    if (onProgress) {
+      onProgress(100);
+    }
 
     return decryptedBuffer;
   } catch (error) {
@@ -150,9 +230,10 @@ const generateChecksum = (data: string): string => {
 export const createEncryptedPackage = async (
   audioData: ArrayBuffer,
   hexKey: string,
-  lessonId: string
+  lessonId: string,
+  onProgress?: (progress: number) => void
 ): Promise<EncryptedAudioPackage> => {
-  const { iv, encryptedData } = await encryptAudio(audioData, hexKey);
+  const { iv, encryptedData } = await encryptAudio(audioData, hexKey, onProgress);
 
   return {
     version: 1,
@@ -173,7 +254,8 @@ export const createEncryptedPackage = async (
  */
 export const decryptPackage = async (
   pkg: EncryptedAudioPackage,
-  hexKey: string
+  hexKey: string,
+  onProgress?: (progress: number) => void
 ): Promise<ArrayBuffer> => {
   // Verify checksum
   const checksum = generateChecksum(pkg.data);
@@ -183,7 +265,7 @@ export const decryptPackage = async (
     );
   }
 
-  return decryptAudio(pkg.data, pkg.iv, hexKey);
+  return decryptAudio(pkg.data, pkg.iv, hexKey, onProgress);
 };
 
 /**

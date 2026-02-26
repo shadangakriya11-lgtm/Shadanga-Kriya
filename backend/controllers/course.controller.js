@@ -36,8 +36,11 @@ const getR2KeyFromUrl = (url) => {
 // Get all courses
 const getAllCourses = async (req, res) => {
   try {
-    const { status, category, search, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const { status, category, search, page = 1, limit = 20, noPagination } = req.query;
+    
+    // If noPagination is true, fetch all courses without limit
+    const shouldPaginate = noPagination !== 'true';
+    const offset = shouldPaginate ? (page - 1) * limit : 0;
 
     let query = `
       SELECT c.*, 
@@ -89,9 +92,12 @@ const getAllCourses = async (req, res) => {
     const countResult = await pool.query(countQuery, params);
     const total = parseInt(countResult.rows[0].count);
 
-    // Get paginated results
-    query += ` ORDER BY c.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(limit, offset);
+    // Get paginated results or all results
+    query += ` ORDER BY c.created_at DESC`;
+    if (shouldPaginate) {
+      query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      params.push(limit, offset);
+    }
 
     const result = await pool.query(query, params);
 
@@ -116,15 +122,21 @@ const getAllCourses = async (req, res) => {
       updatedAt: course.updated_at
     }));
 
-    res.json({
-      courses,
-      pagination: {
+    const response = { courses };
+    
+    // Only include pagination info if paginating
+    if (shouldPaginate) {
+      response.pagination = {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
         totalPages: Math.ceil(total / limit)
-      }
-    });
+      };
+    } else {
+      response.total = total;
+    }
+
+    res.json(response);
   } catch (error) {
     console.error('Get courses error:', error);
     res.status(500).json({ error: 'Failed to get courses' });

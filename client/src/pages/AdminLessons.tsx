@@ -52,7 +52,7 @@ export default function AdminLessons() {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const { data: coursesData, isLoading: coursesLoading } = useCourses();
+  const { data: coursesData, isLoading: coursesLoading } = useCourses({ noPagination: 'true' }); // Fetch all courses for dropdown
   const courses = coursesData?.courses || [];
 
   // Fetch all lessons - depends on courses being loaded

@@ -42,8 +42,8 @@ export default function AdminPayments() {
 
   const { data: paymentsData, isLoading, refetch } = useAllPayments();
   const { data: statsData } = usePaymentStats();
-  const { data: usersData } = useUsers();
-  const { data: coursesData } = useCourses();
+  const { data: usersData } = useUsers({ noPagination: 'true' }); // Fetch all users for dropdown
+  const { data: coursesData } = useCourses({ noPagination: 'true' }); // Fetch all courses for dropdown
   const completePayment = useCompletePayment();
   const activateCourse = useActivateCourse();
   const refundPayment = useRefundPayment();

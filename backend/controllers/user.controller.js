@@ -4,8 +4,11 @@ const pool = require('../config/db.js');
 // Get all users (admin only)
 const getAllUsers = async (req, res) => {
   try {
-    const { role, status, search, page = 1, limit = 20 } = req.query;
-    const offset = (page - 1) * limit;
+    const { role, status, search, page = 1, limit = 20, noPagination } = req.query;
+    
+    // If noPagination is true, fetch all users without limit
+    const shouldPaginate = noPagination !== 'true';
+    const offset = shouldPaginate ? (page - 1) * limit : 0;
 
     let query = `
       SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.status, u.avatar_url, u.phone, u.created_at, u.last_active,
@@ -46,9 +49,12 @@ const getAllUsers = async (req, res) => {
     );
     const total = parseInt(countResult.rows[0]?.count || 0);
 
-    // Get paginated results
-    query += ` ORDER BY u.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
-    params.push(limit, offset);
+    // Get paginated results or all results
+    query += ` ORDER BY u.created_at DESC`;
+    if (shouldPaginate) {
+      query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+      params.push(limit, offset);
+    }
 
     const result = await pool.query(query, params);
 
@@ -67,15 +73,21 @@ const getAllUsers = async (req, res) => {
       assignedCourses: user.assigned_courses || []
     }));
 
-    res.json({
-      users,
-      pagination: {
+    const response = { users };
+    
+    // Only include pagination info if paginating
+    if (shouldPaginate) {
+      response.pagination = {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
         totalPages: Math.ceil(total / limit)
-      }
-    });
+      };
+    } else {
+      response.total = total;
+    }
+    
+    res.json(response);
   } catch (error) {
     console.error('Get users error:', error);
     res.status(500).json({ error: 'Failed to get users' });

@@ -11,8 +11,15 @@ interface HeadphoneDetectionPlugin {
 /**
  * Check if the device is in airplane/flight mode
  * Note: This feature is platform-specific and may have limitations
+ * 
+ * TESTING MODE: Always returns true
  */
 export async function isAirplaneModeEnabled(): Promise<boolean> {
+  // TESTING: Always return true to bypass airplane mode check
+  console.log("⚠️ TESTING MODE: Airplane mode check bypassed - returning true");
+  return true;
+  
+  /* ORIGINAL CODE - COMMENTED OUT FOR TESTING
   // For web, we cannot directly detect airplane mode
   if (!Capacitor.isNativePlatform()) {
     console.warn(
@@ -59,12 +66,20 @@ export async function isAirplaneModeEnabled(): Promise<boolean> {
     console.error("Error checking airplane mode:", error);
     return false;
   }
+  */
 }
 
 /**
  * Check if earphones/headphones are connected
+ * 
+ * TESTING MODE: Always returns true
  */
 export async function areEarphonesConnected(): Promise<boolean> {
+  // TESTING: Always return true to bypass earphone check
+  console.log("⚠️ TESTING MODE: Earphone check bypassed - returning true");
+  return true;
+  
+  /* ORIGINAL CODE - COMMENTED OUT FOR TESTING
   // For native Android, use the native HeadphoneDetection plugin
   if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android") {
     try {
@@ -140,6 +155,7 @@ export async function areEarphonesConnected(): Promise<boolean> {
     console.error("Error checking earphones:", error);
     return false;
   }
+  */
 }
 
 

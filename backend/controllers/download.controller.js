@@ -18,9 +18,19 @@ const getR2KeyFromUrl = (url) => {
     if (!url) return null;
     try {
         const urlObj = new URL(url);
-        // Remove leading slash
-        return urlObj.pathname.substring(1);
+        // Check if this is an R2 URL
+        if (!urlObj.hostname.includes('r2.cloudflarestorage.com')) {
+            return null;
+        }
+        // pathname is /{bucket}/{key}, we need to remove the bucket part
+        const pathParts = urlObj.pathname.substring(1).split('/');
+        if (pathParts.length > 1) {
+            // Remove the bucket name (first part) and return the rest as the key
+            return pathParts.slice(1).join('/');
+        }
+        return null;
     } catch (e) {
+        console.error('Failed to parse R2 URL:', e);
         return null;
     }
 };
