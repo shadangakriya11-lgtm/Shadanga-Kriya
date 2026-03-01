@@ -18,7 +18,7 @@ import {
   clearAllDownloads,
   getDownloadsStorageSize,
   formatBytes,
-  revokeAudioBlobUrl,
+  cleanupTempAudio,
   DownloadedLesson,
   DownloadProgress,
 } from "@/lib/downloadManager";
@@ -36,7 +36,7 @@ export interface UseDownloadsReturn {
   checkDownloaded: (lessonId: string) => Promise<boolean>;
   getDownloadsForCourse: (courseId: string) => Promise<DownloadedLesson[]>;
   loadAudioForPlayback: (lessonId: string) => Promise<string>;
-  releaseAudioUrl: (url: string) => void;
+  cleanupAudio: (lessonId: string) => void;
   removeDownload: (lessonId: string) => Promise<void>;
   clearAll: () => Promise<void>;
   refreshDownloads: () => Promise<void>;
@@ -166,9 +166,9 @@ export function useDownloads(): UseDownloadsReturn {
     [getToken]
   );
 
-  // Release audio blob URL
-  const releaseAudioUrl = useCallback((url: string) => {
-    revokeAudioBlobUrl(url);
+  // Cleanup temp decrypted audio file
+  const cleanupAudio = useCallback((lessonId: string) => {
+    cleanupTempAudio(lessonId).catch(console.warn);
   }, []);
 
   // Remove a download
@@ -198,7 +198,7 @@ export function useDownloads(): UseDownloadsReturn {
     checkDownloaded,
     getDownloadsForCourse,
     loadAudioForPlayback,
-    releaseAudioUrl,
+    cleanupAudio,
     removeDownload,
     clearAll,
     refreshDownloads,

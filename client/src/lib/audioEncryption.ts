@@ -1,11 +1,19 @@
 /**
- * Audio Encryption Utilities
- * AES-256-CBC encryption for offline audio files
+ * Audio Encryption Utilities — V2 Chunk-based
+ * AES-256-CBC encryption with per-chunk IVs for memory-efficient processing.
  *
- * This uses the Web Crypto API for secure encryption/decryption
+ * Each 5 MB audio chunk is encrypted independently so that decryption can
+ * happen one chunk at a time, keeping peak WebView memory usage around 10-15 MB
+ * regardless of total file size.
  */
 
-// Convert hex string to ArrayBuffer
+/** Chunk size for encryption: 5 MB of raw audio per chunk */
+export const ENCRYPTION_CHUNK_SIZE = 5 * 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// Hex helpers
+// ---------------------------------------------------------------------------
+
 const hexToArrayBuffer = (hex: string): ArrayBuffer => {
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
@@ -14,7 +22,6 @@ const hexToArrayBuffer = (hex: string): ArrayBuffer => {
   return bytes.buffer;
 };
 
-// Convert ArrayBuffer to hex string
 const arrayBufferToHex = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
   return Array.from(bytes)
@@ -22,268 +29,129 @@ const arrayBufferToHex = (buffer: ArrayBuffer): string => {
     .join("");
 };
 
-// Convert ArrayBuffer to Base64 in chunks to avoid memory issues
-const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+// ---------------------------------------------------------------------------
+// Base64 helpers (chunk-safe)
+// ---------------------------------------------------------------------------
+
+/**
+ * Convert an ArrayBuffer to a Base64 string.
+ *
+ * Sub-chunks are sized at 8190 bytes (divisible by 3) so that intermediate
+ * btoa() calls never produce padding — only the final sub-chunk may have it.
+ */
+export const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
   const bytes = new Uint8Array(buffer);
-  const chunkSize = 8192; // 8KB chunks
-  let result = '';
-  
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    let binary = '';
+  const SUB_CHUNK = 8190; // divisible by 3 → no intermediate '=' padding
+  let result = "";
+
+  for (let i = 0; i < bytes.length; i += SUB_CHUNK) {
+    const end = Math.min(i + SUB_CHUNK, bytes.length);
+    const chunk = bytes.subarray(i, end);
+    let binary = "";
     for (let j = 0; j < chunk.length; j++) {
       binary += String.fromCharCode(chunk[j]);
     }
     result += btoa(binary);
   }
-  
+
   return result;
 };
 
-// Convert Base64 to ArrayBuffer in chunks to avoid memory issues
-// Base64 must be decoded in multiples of 4 characters
-const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
-  // Ensure base64 string length is multiple of 4
-  const paddedBase64 = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-  
-  // For very large strings, decode in chunks
-  const CHUNK_SIZE = 1024 * 1024; // 1MB of base64 = ~750KB binary
-  const chunks: Uint8Array[] = [];
-  
-  for (let i = 0; i < paddedBase64.length; i += CHUNK_SIZE) {
-    // Ensure chunk size is multiple of 4
-    let chunkEnd = Math.min(i + CHUNK_SIZE, paddedBase64.length);
-    chunkEnd = chunkEnd - (chunkEnd % 4); // Align to 4-byte boundary
-    if (chunkEnd === i) chunkEnd = paddedBase64.length; // Last chunk
-    
-    const chunk = paddedBase64.substring(i, chunkEnd);
-    try {
-      const binary = atob(chunk);
-      const bytes = new Uint8Array(binary.length);
-      for (let j = 0; j < binary.length; j++) {
-        bytes[j] = binary.charCodeAt(j);
-      }
-      chunks.push(bytes);
-    } catch (e) {
-      console.error(`Failed to decode base64 chunk at position ${i}:`, e);
-      throw new Error("Failed to decode base64 data");
-    }
+/**
+ * Convert a Base64 string back to an ArrayBuffer.
+ */
+export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
+  const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
   }
-  
-  // Combine all chunks
-  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    result.set(chunk, offset);
-    offset += chunk.length;
-  }
-  
-  return result.buffer;
+  return bytes.buffer;
 };
 
-/**
- * Import a hex key string as a CryptoKey for AES-256-CBC
- */
-const importKey = async (hexKey: string): Promise<CryptoKey> => {
-  // Take first 32 bytes (256 bits) for AES-256
-  const keyBytes = hexToArrayBuffer(hexKey.substring(0, 64));
+// ---------------------------------------------------------------------------
+// AES key import
+// ---------------------------------------------------------------------------
 
+const importKey = async (hexKey: string): Promise<CryptoKey> => {
+  const keyBytes = hexToArrayBuffer(hexKey.substring(0, 64)); // 32 bytes = AES-256
   return crypto.subtle.importKey("raw", keyBytes, { name: "AES-CBC" }, false, [
     "encrypt",
     "decrypt",
   ]);
 };
 
-/**
- * Encrypt audio data using AES-256-CBC
- * Encrypts the entire file at once to maintain data integrity
- */
-export const encryptAudio = async (
-  audioData: ArrayBuffer,
-  hexKey: string,
-  onProgress?: (progress: number) => void
-): Promise<{ iv: string; encryptedData: string }> => {
-  try {
-    const key = await importKey(hexKey);
+// ---------------------------------------------------------------------------
+// Chunk manifest type
+// ---------------------------------------------------------------------------
 
-    // Generate random IV (16 bytes for AES-CBC)
-    const iv = crypto.getRandomValues(new Uint8Array(16));
-
-    console.log(`Encrypting audio data, size: ${audioData.byteLength} bytes`);
-    
-    // Encrypt the entire audio at once
-    // AES-CBC can handle large files, and this maintains data integrity
-    const encryptedBuffer = await crypto.subtle.encrypt(
-      { name: "AES-CBC", iv },
-      key,
-      audioData
-    );
-    
-    if (onProgress) {
-      onProgress(50);
-    }
-    
-    console.log(`Encryption complete, encrypted size: ${encryptedBuffer.byteLength} bytes`);
-    
-    // Convert to base64 in chunks to avoid memory issues
-    const base64Data = arrayBufferToBase64(encryptedBuffer);
-    
-    if (onProgress) {
-      onProgress(100);
-    }
-    
-    console.log(`Base64 encoding complete, size: ${base64Data.length} bytes`);
-
-    return {
-      iv: arrayBufferToHex(iv.buffer),
-      encryptedData: base64Data,
-    };
-  } catch (error) {
-    console.error("Encryption error:", error);
-    throw new Error("Failed to encrypt audio");
-  }
-};
-
-/**
- * Decrypt audio data using AES-256-CBC
- */
-export const decryptAudio = async (
-  encryptedData: string,
-  iv: string,
-  hexKey: string,
-  onProgress?: (progress: number) => void
-): Promise<ArrayBuffer> => {
-  try {
-    console.log(`Starting decryption, encrypted data size: ${encryptedData.length} bytes`);
-    const key = await importKey(hexKey);
-    const ivBuffer = hexToArrayBuffer(iv);
-    
-    if (onProgress) {
-      onProgress(25);
-    }
-    
-    // Convert base64 to ArrayBuffer
-    console.log(`Converting base64 to ArrayBuffer`);
-    const dataBuffer = base64ToArrayBuffer(encryptedData);
-    console.log(`Converted to ArrayBuffer, size: ${dataBuffer.byteLength} bytes`);
-
-    if (onProgress) {
-      onProgress(50);
-    }
-
-    // Decrypt the entire buffer at once
-    console.log(`Decrypting data`);
-    const decryptedBuffer = await crypto.subtle.decrypt(
-      { name: "AES-CBC", iv: ivBuffer },
-      key,
-      dataBuffer
-    );
-    console.log(`Decryption complete, size: ${decryptedBuffer.byteLength} bytes`);
-    
-    if (onProgress) {
-      onProgress(100);
-    }
-
-    return decryptedBuffer;
-  } catch (error) {
-    console.error("Decryption error:", error);
-    throw new Error(
-      "Failed to decrypt audio. The file may be corrupted or the key is invalid."
-    );
-  }
-};
-
-/**
- * Create an encrypted audio package
- * Format: JSON with iv, data, and metadata
- */
-export interface EncryptedAudioPackage {
-  version: number;
-  algorithm: string;
+export interface ChunkInfo {
+  /** Hex-encoded IV for this chunk */
   iv: string;
-  data: string;
+  /** Size of the encrypted base64 text stored on disk */
+  encryptedSize: number;
+}
+
+export interface ChunkManifest {
+  version: 2;
+  algorithm: "AES-256-CBC";
+  chunkSize: number;
+  totalChunks: number;
+  chunks: ChunkInfo[];
   metadata: {
     lessonId: string;
     originalSize: number;
     encryptedAt: string;
-    checksum: string;
   };
 }
 
-/**
- * Generate a simple checksum for integrity verification
- */
-const generateChecksum = (data: string): string => {
-  let hash = 0;
-  for (let i = 0; i < Math.min(data.length, 1000); i++) {
-    const char = data.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16);
-};
+// ---------------------------------------------------------------------------
+// Single-chunk encrypt / decrypt
+// ---------------------------------------------------------------------------
 
 /**
- * Package encrypted audio with metadata
+ * Encrypt a single chunk (up to ENCRYPTION_CHUNK_SIZE) with a fresh random IV.
+ * Returns the hex IV and the encrypted data as a base64 string.
  */
-export const createEncryptedPackage = async (
-  audioData: ArrayBuffer,
-  hexKey: string,
-  lessonId: string,
-  onProgress?: (progress: number) => void
-): Promise<EncryptedAudioPackage> => {
-  const { iv, encryptedData } = await encryptAudio(audioData, hexKey, onProgress);
+export const encryptChunk = async (
+  chunkData: ArrayBuffer,
+  hexKey: string
+): Promise<{ iv: string; encryptedBase64: string }> => {
+  const key = await importKey(hexKey);
+  const iv = crypto.getRandomValues(new Uint8Array(16));
+
+  const encryptedBuffer = await crypto.subtle.encrypt(
+    { name: "AES-CBC", iv },
+    key,
+    chunkData
+  );
 
   return {
-    version: 1,
-    algorithm: "AES-256-CBC",
-    iv,
-    data: encryptedData,
-    metadata: {
-      lessonId,
-      originalSize: audioData.byteLength,
-      encryptedAt: new Date().toISOString(),
-      checksum: generateChecksum(encryptedData),
-    },
+    iv: arrayBufferToHex(iv.buffer),
+    encryptedBase64: arrayBufferToBase64(encryptedBuffer),
   };
 };
 
 /**
- * Decrypt an encrypted audio package
+ * Decrypt a single encrypted chunk.
+ * @param encryptedBase64 - base64-encoded ciphertext read from disk
+ * @param iv              - hex-encoded IV used during encryption
+ * @param hexKey          - hex-encoded AES-256 key
+ * @returns the decrypted raw audio bytes
  */
-export const decryptPackage = async (
-  pkg: EncryptedAudioPackage,
-  hexKey: string,
-  onProgress?: (progress: number) => void
+export const decryptChunk = async (
+  encryptedBase64: string,
+  iv: string,
+  hexKey: string
 ): Promise<ArrayBuffer> => {
-  // Verify checksum
-  const checksum = generateChecksum(pkg.data);
-  if (checksum !== pkg.metadata.checksum) {
-    throw new Error(
-      "Audio file integrity check failed. File may be corrupted."
-    );
-  }
+  const key = await importKey(hexKey);
+  const ivBuffer = hexToArrayBuffer(iv);
+  const dataBuffer = base64ToArrayBuffer(encryptedBase64);
 
-  return decryptAudio(pkg.data, pkg.iv, hexKey, onProgress);
-};
-
-/**
- * Convert decrypted ArrayBuffer to playable Blob URL
- */
-export const createAudioBlobUrl = (
-  audioData: ArrayBuffer,
-  mimeType = "audio/mpeg"
-): string => {
-  const blob = new Blob([audioData], { type: mimeType });
-  return URL.createObjectURL(blob);
-};
-
-/**
- * Revoke a blob URL to free memory
- */
-export const revokeAudioBlobUrl = (url: string): void => {
-  if (url.startsWith("blob:")) {
-    URL.revokeObjectURL(url);
-  }
+  return crypto.subtle.decrypt(
+    { name: "AES-CBC", iv: ivBuffer },
+    key,
+    dataBuffer
+  );
 };

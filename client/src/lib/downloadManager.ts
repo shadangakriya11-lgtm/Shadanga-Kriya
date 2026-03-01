@@ -1,6 +1,10 @@
 /**
- * Offline Download Manager
- * Handles downloading, encrypting, and storing audio files for offline use
+ * Offline Download Manager — V2 Chunk-based
+ *
+ * Downloads audio, encrypts in 5 MB chunks (each with its own IV), and stores
+ * each chunk as a separate file.  During playback the chunks are decrypted one
+ * at a time and appended to a temporary .mp3 file on disk so that peak memory
+ * stays around 10-15 MB regardless of audio size.
  */
 
 import { Preferences } from "@capacitor/preferences";
@@ -8,12 +12,16 @@ import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
 import {
-  createEncryptedPackage,
-  decryptPackage,
-  createAudioBlobUrl,
-  revokeAudioBlobUrl,
-  EncryptedAudioPackage,
+  encryptChunk,
+  decryptChunk,
+  arrayBufferToBase64,
+  ENCRYPTION_CHUNK_SIZE,
+  ChunkManifest,
 } from "./audioEncryption";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
 const API_BASE = `${import.meta.env.VITE_API_URL || "http://localhost:4000"}/api`;
 const STORAGE_PREFIX = "sk_audio_";
@@ -22,20 +30,19 @@ const DEVICE_ID_KEY = "sk_device_id";
 const DOWNLOADS_INDEX_KEY = "sk_downloads_index";
 const AUDIO_FOLDER = "sk_audio_files";
 
-/**
- * Secure key storage helpers - uses native secure storage on mobile, falls back to Preferences on web
- */
+// ---------------------------------------------------------------------------
+// Secure key storage helpers
+// ---------------------------------------------------------------------------
+
 const saveSecureKey = async (key: string, value: string): Promise<void> => {
   if (Capacitor.isNativePlatform()) {
     try {
       await SecureStoragePlugin.set({ key, value });
     } catch (error) {
-      // Fallback to Preferences if secure storage fails
       console.warn("Secure storage failed, using fallback:", error);
       await Preferences.set({ key, value });
     }
   } else {
-    // Web fallback - use regular preferences
     await Preferences.set({ key, value });
   }
 };
@@ -46,7 +53,6 @@ const getSecureKey = async (key: string): Promise<string | null> => {
       const { value } = await SecureStoragePlugin.get({ key });
       return value;
     } catch (error) {
-      // Try fallback preferences
       const { value } = await Preferences.get({ key });
       return value;
     }
@@ -60,311 +66,180 @@ const removeSecureKey = async (key: string): Promise<void> => {
   if (Capacitor.isNativePlatform()) {
     try {
       await SecureStoragePlugin.remove({ key });
-    } catch (error) {
-      // Ignore errors for remove
+    } catch {
+      // Ignore
     }
   }
-  // Also remove from preferences (fallback cleanup)
   await Preferences.remove({ key });
 };
 
+// ---------------------------------------------------------------------------
+// Filesystem helpers
+// ---------------------------------------------------------------------------
+
+const ensureAudioFolder = async (): Promise<void> => {
+  try {
+    await Filesystem.mkdir({
+      path: AUDIO_FOLDER,
+      directory: Directory.Data,
+      recursive: true,
+    });
+  } catch {
+    // Directory might already exist
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Encrypt + save (download-time)
+// ---------------------------------------------------------------------------
+
 /**
- * Save encrypted audio to filesystem (for large files) or Preferences (for small files/web)
- * For native: Always use chunking for files > 50MB to avoid crashes
+ * Split raw audio into 5 MB chunks, encrypt each one independently, and write
+ * the encrypted base64 text + a manifest to the filesystem.
+ *
+ * Peak memory ≈ 2 × chunkSize (one raw + one encrypted) ≈ 10 MB.
  */
-const saveAudioData = async (
+const encryptAndSaveChunks = async (
   lessonId: string,
-  encryptedPackage: EncryptedAudioPackage
-): Promise<void> => {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      // Ensure directory exists
-      try {
-        await Filesystem.mkdir({
-          path: AUDIO_FOLDER,
-          directory: Directory.Data,
-          recursive: true,
-        });
-      } catch (e) {
-        // Directory might already exist
-      }
+  audioData: ArrayBuffer,
+  hexKey: string,
+  onProgress?: (progress: number) => void
+): Promise<ChunkManifest> => {
+  await ensureAudioFolder();
 
-      const metadata = {
-        version: encryptedPackage.version,
-        algorithm: encryptedPackage.algorithm,
-        iv: encryptedPackage.iv,
-        metadata: encryptedPackage.metadata
-      };
-      
-      // Save metadata
+  const totalSize = audioData.byteLength;
+  const numChunks = Math.ceil(totalSize / ENCRYPTION_CHUNK_SIZE);
+  const chunks: ChunkManifest["chunks"] = [];
+
+  console.log(
+    `[DL] Encrypting ${totalSize} bytes in ${numChunks} chunks of ${ENCRYPTION_CHUNK_SIZE} bytes`
+  );
+
+  try {
+    for (let i = 0; i < numChunks; i++) {
+      const start = i * ENCRYPTION_CHUNK_SIZE;
+      const end = Math.min(start + ENCRYPTION_CHUNK_SIZE, totalSize);
+      const chunkData = audioData.slice(start, end);
+
+      // Encrypt this chunk (fresh IV each time)
+      const { iv, encryptedBase64 } = await encryptChunk(chunkData, hexKey);
+
+      // Write encrypted text to its own file
       await Filesystem.writeFile({
-        path: `${AUDIO_FOLDER}/${lessonId}_meta.json`,
-        data: JSON.stringify(metadata),
+        path: `${AUDIO_FOLDER}/${lessonId}_chunk_${i}.enc`,
+        data: encryptedBase64,
         directory: Directory.Data,
         encoding: Encoding.UTF8,
       });
-      
-      const data = encryptedPackage.data;
-      const FILE_SIZE_LIMIT = 50 * 1024 * 1024; // 50 MB limit for single file
-      
-      // For large files, always use chunking to avoid crashes
-      if (data.length > FILE_SIZE_LIMIT) {
-        console.log(`File size ${data.length} bytes exceeds limit, using chunked storage`);
-        
-        const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB chunks
-        const numChunks = Math.ceil(data.length / CHUNK_SIZE);
-        
-        for (let i = 0; i < numChunks; i++) {
-          const start = i * CHUNK_SIZE;
-          let end = Math.min(start + CHUNK_SIZE, data.length);
-          
-          // IMPORTANT: Align to base64 boundary (multiple of 4)
-          // Base64 strings must be split at positions divisible by 4
-          if (end < data.length) {
-            // Align end position to nearest 4-byte boundary
-            const remainder = end % 4;
-            if (remainder !== 0) {
-              end = end - remainder;
-            }
-          }
-          
-          const chunk = data.substring(start, end);
-          
-          await Filesystem.writeFile({
-            path: `${AUDIO_FOLDER}/${lessonId}_data_${i}.b64`,
-            data: chunk,
-            directory: Directory.Data,
-            encoding: Encoding.UTF8,
-          });
-          
-          console.log(`Written chunk ${i + 1}/${numChunks}, size: ${chunk.length} bytes`);
-        }
-        
-        // Save chunk info
-        await Filesystem.writeFile({
-          path: `${AUDIO_FOLDER}/${lessonId}_chunks.json`,
-          data: JSON.stringify({ numChunks }),
-          directory: Directory.Data,
-          encoding: Encoding.UTF8,
-        });
-        
-        console.log(`File write completed in ${numChunks} chunks: ${lessonId}`);
-      } else {
-        // Small file, write directly
-        console.log(`Writing encrypted data, size: ${data.length} bytes`);
-        await Filesystem.writeFile({
-          path: `${AUDIO_FOLDER}/${lessonId}_data.b64`,
-          data: data,
-          directory: Directory.Data,
-          encoding: Encoding.UTF8,
-        });
-        console.log(`File write completed: ${lessonId}`);
-      }
-    } catch (error: any) {
-      console.error("Filesystem write failed:", error);
-      
-      // Check for storage full errors
-      if (
-        error?.message?.includes("ENOSPC") ||
-        error?.message?.includes("No space")
-      ) {
-        throw new Error(
-          "Device storage is full. Please free up some space and try again."
-        );
-      }
-      throw new Error(
-        "Failed to save audio file. Please check your device storage."
+
+      chunks.push({ iv, encryptedSize: encryptedBase64.length });
+
+      console.log(
+        `[DL] Chunk ${i + 1}/${numChunks} encrypted & saved (${encryptedBase64.length} chars)`
       );
+      onProgress?.(Math.round(((i + 1) / numChunks) * 100));
     }
-  } else {
-    // Web fallback - use Preferences (has size limits)
-    const data = JSON.stringify(encryptedPackage);
-    try {
-      const storageKey = `${STORAGE_PREFIX}${lessonId}`;
-      await Preferences.set({ key: storageKey, value: data });
-    } catch (error: any) {
-      console.error("Storage write failed:", error);
-      if (
-        error?.message?.includes("QuotaExceeded") ||
-        error?.name === "QuotaExceededError"
-      ) {
-        throw new Error(
-          "Storage limit reached. Offline downloads are only available in the mobile app. Please install the app to download lessons for offline use."
-        );
+  } catch (error) {
+    // Cleanup partial files on failure
+    for (let j = 0; j < chunks.length; j++) {
+      try {
+        await Filesystem.deleteFile({
+          path: `${AUDIO_FOLDER}/${lessonId}_chunk_${j}.enc`,
+          directory: Directory.Data,
+        });
+      } catch {
+        // Ignore
       }
-      throw new Error("Failed to save audio file. Storage may be full.");
     }
+    throw error;
   }
+
+  const manifest: ChunkManifest = {
+    version: 2,
+    algorithm: "AES-256-CBC",
+    chunkSize: ENCRYPTION_CHUNK_SIZE,
+    totalChunks: numChunks,
+    chunks,
+    metadata: {
+      lessonId,
+      originalSize: totalSize,
+      encryptedAt: new Date().toISOString(),
+    },
+  };
+
+  // Persist the manifest
+  await Filesystem.writeFile({
+    path: `${AUDIO_FOLDER}/${lessonId}_manifest.json`,
+    data: JSON.stringify(manifest),
+    directory: Directory.Data,
+    encoding: Encoding.UTF8,
+  });
+
+  return manifest;
 };
 
-/**
- * Load encrypted audio from filesystem or Preferences
- */
-const loadAudioData = async (
-  lessonId: string
-): Promise<EncryptedAudioPackage | null> => {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      // Load metadata
-      console.log(`Loading metadata for lesson ${lessonId}`);
-      const metaResult = await Filesystem.readFile({
-        path: `${AUDIO_FOLDER}/${lessonId}_meta.json`,
-        directory: Directory.Data,
-        encoding: Encoding.UTF8,
-      });
-      const metadata = JSON.parse(metaResult.data as string);
-      console.log(`Metadata loaded successfully`);
-      
-      // Check if file was saved in chunks
-      try {
-        const chunksInfo = await Filesystem.readFile({
-          path: `${AUDIO_FOLDER}/${lessonId}_chunks.json`,
-          directory: Directory.Data,
-          encoding: Encoding.UTF8,
-        });
-        const { numChunks } = JSON.parse(chunksInfo.data as string);
-        console.log(`Loading ${numChunks} chunks`);
-        
-        // Load all chunks
-        let combinedData = '';
-        for (let i = 0; i < numChunks; i++) {
-          const chunkResult = await Filesystem.readFile({
-            path: `${AUDIO_FOLDER}/${lessonId}_data_${i}.b64`,
-            directory: Directory.Data,
-            encoding: Encoding.UTF8,
-          });
-          combinedData += chunkResult.data as string;
-          console.log(`Loaded chunk ${i + 1}/${numChunks}`);
-        }
-        
-        console.log(`All chunks loaded, total size: ${combinedData.length} bytes`);
-        return {
-          ...metadata,
-          data: combinedData
-        };
-      } catch (chunkError) {
-        // Not chunked, try single file
-        console.log(`Not chunked, loading single file`);
-      }
-      
-      // Load encrypted data - try different formats
-      console.log(`Loading encrypted data for lesson ${lessonId}`);
-      const formats = ['.b64', '.dat', '.txt'];
-      
-      for (const ext of formats) {
-        try {
-          const dataResult = await Filesystem.readFile({
-            path: `${AUDIO_FOLDER}/${lessonId}_data${ext}`,
-            directory: Directory.Data,
-            encoding: Encoding.UTF8,
-          });
-          console.log(`Loaded encrypted data from ${ext} file, size: ${(dataResult.data as string).length} bytes`);
-          
-          return {
-            ...metadata,
-            data: dataResult.data as string
-          };
-        } catch (e) {
-          // Try next format
-          continue;
-        }
-      }
-      
-      throw new Error("No data file found");
-    } catch (error) {
-      console.error("Failed to load new format, trying old format:", error);
-      // Try old format for backward compatibility
-      try {
-        const result = await Filesystem.readFile({
-          path: `${AUDIO_FOLDER}/${lessonId}.json`,
-          directory: Directory.Data,
-          encoding: Encoding.UTF8,
-        });
-        return JSON.parse(result.data as string);
-      } catch (e) {
-        console.error("Failed to load old format too:", e);
-        return null;
-      }
-    }
-  } else {
-    // Web fallback
-    const storageKey = `${STORAGE_PREFIX}${lessonId}`;
-    const { value } = await Preferences.get({ key: storageKey });
-    return value ? JSON.parse(value) : null;
-  }
-};
+// ---------------------------------------------------------------------------
+// Delete helpers
+// ---------------------------------------------------------------------------
 
 /**
- * Delete audio data from filesystem or Preferences
+ * Remove all encrypted chunk files + manifest for a lesson.
  */
 const deleteAudioData = async (lessonId: string): Promise<void> => {
   if (Capacitor.isNativePlatform()) {
-    // Delete metadata
+    // Read manifest to discover chunk count
     try {
-      await Filesystem.deleteFile({
-        path: `${AUDIO_FOLDER}/${lessonId}_meta.json`,
-        directory: Directory.Data,
-      });
-    } catch (error) {
-      // File might not exist
-    }
-    
-    // Delete chunked files if they exist
-    try {
-      const chunksInfo = await Filesystem.readFile({
-        path: `${AUDIO_FOLDER}/${lessonId}_chunks.json`,
+      const manifestResult = await Filesystem.readFile({
+        path: `${AUDIO_FOLDER}/${lessonId}_manifest.json`,
         directory: Directory.Data,
         encoding: Encoding.UTF8,
       });
-      const { numChunks } = JSON.parse(chunksInfo.data as string);
-      
-      for (let i = 0; i < numChunks; i++) {
+      const manifest: ChunkManifest = JSON.parse(
+        manifestResult.data as string
+      );
+
+      for (let i = 0; i < manifest.totalChunks; i++) {
         try {
           await Filesystem.deleteFile({
-            path: `${AUDIO_FOLDER}/${lessonId}_data_${i}.b64`,
+            path: `${AUDIO_FOLDER}/${lessonId}_chunk_${i}.enc`,
             directory: Directory.Data,
           });
-        } catch (e) {
+        } catch {
           // Ignore
         }
       }
-      
+    } catch {
+      // Manifest missing — nothing to clean
+    }
+
+    // Delete manifest
+    try {
       await Filesystem.deleteFile({
-        path: `${AUDIO_FOLDER}/${lessonId}_chunks.json`,
+        path: `${AUDIO_FOLDER}/${lessonId}_manifest.json`,
         directory: Directory.Data,
       });
-    } catch (error) {
-      // Not chunked
+    } catch {
+      // Ignore
     }
-    
-    // Delete single data files (all formats)
-    const formats = ['.b64', '.dat', '.txt', '.json'];
-    for (const ext of formats) {
-      try {
-        await Filesystem.deleteFile({
-          path: `${AUDIO_FOLDER}/${lessonId}_data${ext}`,
-          directory: Directory.Data,
-        });
-      } catch (error) {
-        // File might not exist
-      }
-      
-      // Also try without _data prefix (old format)
-      try {
-        await Filesystem.deleteFile({
-          path: `${AUDIO_FOLDER}/${lessonId}${ext}`,
-          directory: Directory.Data,
-        });
-      } catch (error) {
-        // File might not exist
-      }
+
+    // Delete temp playback file if it exists
+    try {
+      await Filesystem.deleteFile({
+        path: `${AUDIO_FOLDER}/${lessonId}_temp.mp3`,
+        directory: Directory.Data,
+      });
+    } catch {
+      // Ignore
     }
   }
-  
-  // Also clean up Preferences (for migration/fallback)
-  const storageKey = `${STORAGE_PREFIX}${lessonId}`;
-  await Preferences.remove({ key: storageKey });
+
+  // Clean up from Preferences (web fallback / legacy)
+  await Preferences.remove({ key: `${STORAGE_PREFIX}${lessonId}` });
 };
+
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
 
 export interface DownloadedLesson {
   lessonId: string;
@@ -379,27 +254,24 @@ export interface DownloadedLesson {
 export interface DownloadProgress {
   lessonId: string;
   status:
-  | "pending"
-  | "downloading"
-  | "encrypting"
-  | "saving"
-  | "completed"
-  | "error";
+    | "pending"
+    | "downloading"
+    | "encrypting"
+    | "saving"
+    | "completed"
+    | "error";
   progress: number;
   error?: string;
 }
 
-/**
- * Generate or retrieve a unique device ID
- */
+// ---------------------------------------------------------------------------
+// Device helpers
+// ---------------------------------------------------------------------------
+
 export const getDeviceId = async (): Promise<string> => {
   const { value } = await Preferences.get({ key: DEVICE_ID_KEY });
+  if (value) return value;
 
-  if (value) {
-    return value;
-  }
-
-  // Generate new device ID
   const platform = Capacitor.getPlatform();
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substring(2, 10);
@@ -409,14 +281,10 @@ export const getDeviceId = async (): Promise<string> => {
   return newDeviceId;
 };
 
-/**
- * Register device with backend
- */
 export const registerDevice = async (token: string): Promise<void> => {
   const deviceId = await getDeviceId();
   const platform = Capacitor.getPlatform();
-  const deviceName = `${platform.charAt(0).toUpperCase() + platform.slice(1)
-    } Device`;
+  const deviceName = `${platform.charAt(0).toUpperCase() + platform.slice(1)} Device`;
 
   const response = await fetch(`${API_BASE}/downloads/devices`, {
     method: "POST",
@@ -433,9 +301,10 @@ export const registerDevice = async (token: string): Promise<void> => {
   }
 };
 
-/**
- * Get download authorization from backend
- */
+// ---------------------------------------------------------------------------
+// Backend helpers
+// ---------------------------------------------------------------------------
+
 const authorizeDownload = async (
   lessonId: string,
   token: string
@@ -472,9 +341,6 @@ const authorizeDownload = async (
   };
 };
 
-/**
- * Confirm download with backend
- */
 const confirmDownload = async (
   lessonId: string,
   fileSizeBytes: number,
@@ -492,9 +358,6 @@ const confirmDownload = async (
   });
 };
 
-/**
- * Get decryption key for playback
- */
 export const getDecryptionKey = async (
   lessonId: string,
   token: string
@@ -519,19 +382,15 @@ export const getDecryptionKey = async (
   return data.key;
 };
 
-/**
- * Get downloads index from storage
- */
-const getDownloadsIndex = async (): Promise<
-  Record<string, DownloadedLesson>
-> => {
+// ---------------------------------------------------------------------------
+// Downloads index (stored in Preferences, always small)
+// ---------------------------------------------------------------------------
+
+const getDownloadsIndex = async (): Promise<Record<string, DownloadedLesson>> => {
   const { value } = await Preferences.get({ key: DOWNLOADS_INDEX_KEY });
   return value ? JSON.parse(value) : {};
 };
 
-/**
- * Save downloads index to storage
- */
 const saveDownloadsIndex = async (
   index: Record<string, DownloadedLesson>
 ): Promise<void> => {
@@ -541,9 +400,10 @@ const saveDownloadsIndex = async (
   });
 };
 
-/**
- * Download and encrypt an audio file
- */
+// ---------------------------------------------------------------------------
+// Download & encrypt a lesson
+// ---------------------------------------------------------------------------
+
 export const downloadLesson = async (
   lessonId: string,
   courseId: string,
@@ -561,41 +421,40 @@ export const downloadLesson = async (
   try {
     updateProgress("pending", 0);
 
-    // 1. Get authorization and encryption key
+    // 1. Authorize
     const { audioUrl, encryptionKey, lesson } = await authorizeDownload(
       lessonId,
       token
     );
-
     updateProgress("downloading", 10);
 
-    // 2. Download the audio file with timeout
-    console.log(`Starting download from: ${audioUrl}`);
+    // 2. Stream-download the audio
+    console.log(`[DL] Starting download from: ${audioUrl}`);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
-    
+    const timeoutId = setTimeout(() => controller.abort(), 300_000); // 5 min
+
     let chunks: Uint8Array[] = [];
     let receivedBytes = 0;
-    
+
     try {
-      const audioResponse = await fetch(audioUrl, { signal: controller.signal });
+      const audioResponse = await fetch(audioUrl, {
+        signal: controller.signal,
+      });
       clearTimeout(timeoutId);
-      
+
       if (!audioResponse.ok) {
-        throw new Error(`Failed to download audio file: ${audioResponse.status} ${audioResponse.statusText}`);
+        throw new Error(
+          `Failed to download audio file: ${audioResponse.status} ${audioResponse.statusText}`
+        );
       }
 
       const contentLength = audioResponse.headers.get("content-length");
       const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-
-      // Read with progress tracking
       const reader = audioResponse.body?.getReader();
-      if (!reader) {
-        throw new Error("Failed to read audio stream");
-      }
+      if (!reader) throw new Error("Failed to read audio stream");
 
-      console.log(`Downloading audio, total size: ${totalBytes} bytes`);
-      
+      console.log(`[DL] Downloading audio, total size: ${totalBytes} bytes`);
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -604,62 +463,63 @@ export const downloadLesson = async (
         receivedBytes += value.length;
 
         if (totalBytes > 0) {
-          const downloadProgress = 10 + (receivedBytes / totalBytes) * 50;
-          updateProgress("downloading", Math.min(downloadProgress, 60));
-          
-          // Log progress every 10%
-          if (receivedBytes % Math.floor(totalBytes / 10) < value.length) {
-            console.log(`Download progress: ${Math.round((receivedBytes / totalBytes) * 100)}%`);
-          }
+          const dlProgress = 10 + (receivedBytes / totalBytes) * 50;
+          updateProgress("downloading", Math.min(dlProgress, 60));
         }
       }
-      
-      console.log(`Download completed: ${receivedBytes} bytes received`);
+      console.log(`[DL] Download completed: ${receivedBytes} bytes`);
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
-        throw new Error("Download timeout. Please check your internet connection and try again.");
+      if (fetchError.name === "AbortError") {
+        throw new Error(
+          "Download timeout. Please check your internet connection and try again."
+        );
       }
       throw fetchError;
     }
 
-    // Combine chunks into single ArrayBuffer
-    const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+    // Combine fetch chunks into one ArrayBuffer
+    const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
     const audioData = new Uint8Array(totalLength);
     let offset = 0;
-    for (const chunk of chunks) {
-      audioData.set(chunk, offset);
-      offset += chunk.length;
+    for (const c of chunks) {
+      audioData.set(c, offset);
+      offset += c.length;
     }
+    // Release fetch-chunk references
+    chunks = [];
 
     updateProgress("encrypting", 65);
 
-    // 3. Encrypt the audio with progress updates
-    console.log(`Starting encryption for lesson ${lessonId}, size: ${audioData.buffer.byteLength} bytes`);
-    const encryptedPackage = await createEncryptedPackage(
+    // 3. Encrypt in 5 MB chunks & save each to disk
+    console.log(
+      `[DL] Starting chunk encryption for lesson ${lessonId}, size: ${audioData.byteLength} bytes`
+    );
+    const manifest = await encryptAndSaveChunks(
+      lessonId,
       audioData.buffer,
       encryptionKey,
-      lessonId,
-      (encryptProgress) => {
-        // Map encryption progress from 65% to 75%
-        const overallProgress = 65 + (encryptProgress / 100) * 10;
-        updateProgress("encrypting", Math.round(overallProgress));
+      (encProgress) => {
+        // Map encryption progress 65 → 85
+        const overall = 65 + (encProgress / 100) * 20;
+        updateProgress(
+          encProgress < 100 ? "encrypting" : "saving",
+          Math.round(overall)
+        );
       }
     );
-    console.log(`Encryption completed, encrypted size: ${encryptedPackage.data.length} bytes`);
-    
-    updateProgress("saving", 80);
+    console.log(`[DL] Encryption completed: ${manifest.totalChunks} chunks`);
 
-    // 4. Save encrypted audio to storage (filesystem on native, preferences on web)
-    console.log(`Starting file save for lesson ${lessonId}`);
-    await saveAudioData(lessonId, encryptedPackage);
-    console.log(`File save completed for lesson ${lessonId}`);
+    updateProgress("saving", 88);
 
-    // 4.5. Save encryption key for offline playback (using secure storage)
-    const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
-    await saveSecureKey(keyStorageKey, encryptionKey);
+    // 4. Save encryption key for offline playback
+    await saveSecureKey(`${KEY_STORAGE_PREFIX}${lessonId}`, encryptionKey);
 
     // 5. Update downloads index
+    const totalEncryptedSize = manifest.chunks.reduce(
+      (sum, c) => sum + c.encryptedSize,
+      0
+    );
     const index = await getDownloadsIndex();
     index[lessonId] = {
       lessonId,
@@ -668,16 +528,16 @@ export const downloadLesson = async (
       courseTitle: lesson.courseTitle,
       durationSeconds: lesson.durationSeconds,
       downloadedAt: new Date().toISOString(),
-      fileSizeBytes: encryptedPackage.data.length,
+      fileSizeBytes: totalEncryptedSize,
     };
     await saveDownloadsIndex(index);
 
     // 6. Confirm with backend
-    await confirmDownload(lessonId, encryptedPackage.data.length, token);
+    await confirmDownload(lessonId, totalEncryptedSize, token);
 
     updateProgress("completed", 100);
   } catch (error) {
-    console.error(`Download failed for lesson ${lessonId}:`, error);
+    console.error(`[DL] Download failed for lesson ${lessonId}:`, error);
     const errorMessage =
       error instanceof Error ? error.message : "Download failed";
     updateProgress("error", 0, errorMessage);
@@ -685,9 +545,10 @@ export const downloadLesson = async (
   }
 };
 
-/**
- * Check if a lesson is downloaded
- */
+// ---------------------------------------------------------------------------
+// Check / list downloads
+// ---------------------------------------------------------------------------
+
 export const isLessonDownloaded = async (
   lessonId: string
 ): Promise<boolean> => {
@@ -695,17 +556,11 @@ export const isLessonDownloaded = async (
   return !!index[lessonId];
 };
 
-/**
- * Get all downloaded lessons
- */
 export const getDownloadedLessons = async (): Promise<DownloadedLesson[]> => {
   const index = await getDownloadsIndex();
   return Object.values(index);
 };
 
-/**
- * Get downloaded lessons for a specific course
- */
 export const getDownloadedLessonsForCourse = async (
   courseId: string
 ): Promise<DownloadedLesson[]> => {
@@ -713,71 +568,168 @@ export const getDownloadedLessonsForCourse = async (
   return Object.values(index).filter((d) => d.courseId === courseId);
 };
 
+// ---------------------------------------------------------------------------
+// Load & decrypt for playback  (chunk-by-chunk → temp file → native path)
+// ---------------------------------------------------------------------------
+
 /**
- * Load and decrypt audio for playback
- * Uses cached encryption key for truly offline playback
+ * Decrypt a downloaded lesson chunk-by-chunk and write the result to a temp
+ * file on disk.  Returns a web-accessible URL for the temp file that can
+ * be passed straight to `new Audio(url)`.
+ *
+ * Peak memory ≈ 2 × chunkSize ≈ 10 MB (one encrypted + one decrypted buffer
+ * exist at the same time; both are released before the next iteration).
  */
 export const loadEncryptedAudio = async (
   lessonId: string,
   token: string
 ): Promise<string> => {
-  // 1. Load encrypted package from storage
-  const encryptedPackage = await loadAudioData(lessonId);
-
-  if (!encryptedPackage) {
+  // 1. Load manifest
+  let manifest: ChunkManifest;
+  try {
+    const manifestResult = await Filesystem.readFile({
+      path: `${AUDIO_FOLDER}/${lessonId}_manifest.json`,
+      directory: Directory.Data,
+      encoding: Encoding.UTF8,
+    });
+    manifest = JSON.parse(manifestResult.data as string);
+  } catch {
     throw new Error("Audio not found. Please download the lesson first.");
   }
 
-  // 2. Get decryption key - first try cached key, then fallback to server
+  // 2. Obtain decryption key (prefer cached → fallback to server)
   let decryptionKey: string;
-
-  // Try to get cached key first (for true offline playback) - uses secure storage on mobile
   const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
   const cachedKey = await getSecureKey(keyStorageKey);
 
   if (cachedKey) {
-    // Use cached key for offline playback
     decryptionKey = cachedKey;
   } else {
-    // Fallback to server request (for backward compatibility)
     try {
       decryptionKey = await getDecryptionKey(lessonId, token);
-      // Cache the key for future offline use (using secure storage)
       await saveSecureKey(keyStorageKey, decryptionKey);
-    } catch (error) {
+    } catch {
       throw new Error(
         "Failed to get decryption key. Please re-download the lesson while online."
       );
     }
   }
 
-  // 3. Decrypt the audio
-  const decryptedData = await decryptPackage(encryptedPackage, decryptionKey);
+  // 3. Decrypt chunk-by-chunk → write to temp .mp3 on disk
+  const tempPath = `${AUDIO_FOLDER}/${lessonId}_temp.mp3`;
 
-  // 4. Create blob URL for playback
-  return createAudioBlobUrl(decryptedData);
+  // Remove stale temp file
+  try {
+    await Filesystem.deleteFile({ path: tempPath, directory: Directory.Data });
+  } catch {
+    // Ignore
+  }
+
+  try {
+    for (let i = 0; i < manifest.totalChunks; i++) {
+      // Read encrypted base64 text (~6.7 MB for a 5 MB chunk)
+      const chunkResult = await Filesystem.readFile({
+        path: `${AUDIO_FOLDER}/${lessonId}_chunk_${i}.enc`,
+        directory: Directory.Data,
+        encoding: Encoding.UTF8,
+      });
+      const encryptedBase64 = chunkResult.data as string;
+
+      // Decrypt → raw audio ArrayBuffer (~5 MB)
+      const decryptedBuffer = await decryptChunk(
+        encryptedBase64,
+        manifest.chunks[i].iv,
+        decryptionKey
+      );
+
+      // Convert to base64 so Filesystem can write as binary
+      const decryptedBase64 = arrayBufferToBase64(decryptedBuffer);
+
+      // Write / append raw binary audio to temp file
+      if (i === 0) {
+        await Filesystem.writeFile({
+          path: tempPath,
+          data: decryptedBase64,
+          directory: Directory.Data,
+          // no encoding → data is treated as base64, written as binary
+        });
+      } else {
+        await Filesystem.appendFile({
+          path: tempPath,
+          data: decryptedBase64,
+          directory: Directory.Data,
+        });
+      }
+
+      console.log(
+        `[DL] Decrypted chunk ${i + 1}/${manifest.totalChunks}`
+      );
+    }
+  } catch (error) {
+    // Clean up temp file on failure
+    try {
+      await Filesystem.deleteFile({
+        path: tempPath,
+        directory: Directory.Data,
+      });
+    } catch {
+      // Ignore
+    }
+    console.error("[DL] Decryption failed:", error);
+    throw new Error(
+      "Failed to decrypt audio. The file may be corrupted or the key is invalid."
+    );
+  }
+
+  // 4. Convert file path to a web-accessible URL
+  const fileInfo = await Filesystem.getUri({
+    path: tempPath,
+    directory: Directory.Data,
+  });
+
+  return Capacitor.convertFileSrc(fileInfo.uri);
 };
 
+// ---------------------------------------------------------------------------
+// Cleanup temp playback file
+// ---------------------------------------------------------------------------
+
 /**
- * Delete a downloaded lesson
+ * Delete the temporary decrypted .mp3 created by `loadEncryptedAudio`.
+ * Call this when the player unmounts or the user navigates away.
  */
+export const cleanupTempAudio = async (lessonId: string): Promise<void> => {
+  try {
+    await Filesystem.deleteFile({
+      path: `${AUDIO_FOLDER}/${lessonId}_temp.mp3`,
+      directory: Directory.Data,
+    });
+    console.log(`[DL] Temp audio cleaned up for lesson ${lessonId}`);
+  } catch {
+    // File might not exist — that's fine
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Delete a downloaded lesson
+// ---------------------------------------------------------------------------
+
 export const deleteDownloadedLesson = async (
   lessonId: string,
   token?: string
 ): Promise<void> => {
-  // Remove encrypted audio from storage
+  // Remove encrypted chunks + manifest + temp file
   await deleteAudioData(lessonId);
 
-  // Remove cached encryption key (from secure storage)
-  const keyStorageKey = `${KEY_STORAGE_PREFIX}${lessonId}`;
-  await removeSecureKey(keyStorageKey);
+  // Remove cached encryption key
+  await removeSecureKey(`${KEY_STORAGE_PREFIX}${lessonId}`);
 
   // Update index
   const index = await getDownloadsIndex();
   delete index[lessonId];
   await saveDownloadsIndex(index);
 
-  // Notify backend if token available
+  // Notify backend (best effort)
   if (token) {
     const deviceId = await getDeviceId();
     try {
@@ -790,22 +742,21 @@ export const deleteDownloadedLesson = async (
         body: JSON.stringify({ deviceId }),
       });
     } catch (e) {
-      // Ignore backend errors - local delete is sufficient
       console.warn("Failed to notify backend of deletion:", e);
     }
   }
 };
 
 /**
- * Delete all downloaded lessons for a specific course
+ * Delete all downloaded lessons for a specific course.
  */
 export const deleteDownloadsForCourse = async (
   courseId: string,
   token?: string
 ): Promise<number> => {
   const downloadsForCourse = await getDownloadedLessonsForCourse(courseId);
-
   let deletedCount = 0;
+
   for (const download of downloadsForCourse) {
     try {
       await deleteDownloadedLesson(download.lessonId, token);
@@ -819,33 +770,28 @@ export const deleteDownloadsForCourse = async (
 };
 
 /**
- * Clear all downloads
+ * Clear all downloads.
  */
 export const clearAllDownloads = async (token?: string): Promise<void> => {
   const index = await getDownloadsIndex();
 
-  // Delete all encrypted files
   for (const lessonId of Object.keys(index)) {
     await deleteAudioData(lessonId);
   }
 
-  // Clear index
   await Preferences.remove({ key: DOWNLOADS_INDEX_KEY });
-
-  console.log("All downloads cleared");
+  console.log("[DL] All downloads cleared");
 };
 
-/**
- * Get total storage used by downloads
- */
+// ---------------------------------------------------------------------------
+// Storage size helpers
+// ---------------------------------------------------------------------------
+
 export const getDownloadsStorageSize = async (): Promise<number> => {
   const index = await getDownloadsIndex();
   return Object.values(index).reduce((total, d) => total + d.fileSizeBytes, 0);
 };
 
-/**
- * Format bytes to human readable
- */
 export const formatBytes = (bytes: number): string => {
   if (bytes === 0) return "0 B";
   const k = 1024;
@@ -853,6 +799,3 @@ export const formatBytes = (bytes: number): string => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
-
-// Export cleanup function for blob URLs
-export { revokeAudioBlobUrl };

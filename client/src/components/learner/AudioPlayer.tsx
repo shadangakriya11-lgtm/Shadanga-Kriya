@@ -23,7 +23,7 @@ import { getCachedToken } from "@/lib/api";
 import {
   isLessonDownloaded,
   loadEncryptedAudio,
-  revokeAudioBlobUrl,
+  cleanupTempAudio,
 } from "@/lib/downloadManager";
 import { isAirplaneModeEnabled, areEarphonesConnected, requestExclusiveAudioFocus, abandonAudioFocus, isRingerSilent, getSilentModeInstructions, openAirplaneModeSettings } from "@/lib/deviceChecks";
 import { useToast } from "@/hooks/use-toast";
@@ -529,11 +529,9 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         audioRef.current.src = "";
         audioRef.current = null;
       }
-      // Revoke blob URL if we created one
-      if (audioBlobUrlRef.current) {
-        revokeAudioBlobUrl(audioBlobUrlRef.current);
-        audioBlobUrlRef.current = null;
-      }
+      // Delete temp decrypted audio file
+      cleanupTempAudio(lesson.id).catch(console.warn);
+      audioBlobUrlRef.current = null;
     };
   }, [lesson.id, token, isOffline, offlineModeRequired]);
 
