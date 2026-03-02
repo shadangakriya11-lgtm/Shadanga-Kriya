@@ -42,7 +42,7 @@ const decrypt = (encryptedText) => {
 };
 
 // List of sensitive settings that should be encrypted
-const SENSITIVE_KEYS = ['razorpay_secret_key', 'cloudinary_api_secret'];
+const SENSITIVE_KEYS = ['razorpay_secret_key'];
 
 // Default playback settings
 const DEFAULT_PLAYBACK_SETTINGS = {

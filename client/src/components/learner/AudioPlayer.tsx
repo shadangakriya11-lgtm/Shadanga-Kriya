@@ -96,7 +96,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         variant: "destructive",
         duration: 5000,
       });
-      
+
       // Force pause the playback state
       setPlayback((prev) => ({
         ...prev,
@@ -480,9 +480,15 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
         audioRef.current = audio;
 
         audio.addEventListener("loadedmetadata", () => {
-          // Update duration from actual audio file
-          if (audio.duration && audio.duration !== Infinity) {
-            setPlayback((p) => ({ ...p, duration: audio.duration }));
+          // Prefer the known duration from the backend (lesson.durationSeconds)
+          // because audio.duration from native file URLs is often wildly
+          // inaccurate for VBR MP3s (WebView estimates from first-frame bitrate).
+          const trustedDuration = lesson.durationSeconds || 0;
+          const audioDur = (audio.duration && audio.duration !== Infinity) ? audio.duration : 0;
+          const bestDuration = trustedDuration > 0 ? trustedDuration : audioDur;
+
+          if (bestDuration > 0) {
+            setPlayback((p) => ({ ...p, duration: bestDuration }));
           }
           setIsLoadingAudio(false);
         });
@@ -491,7 +497,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
           setPlayback((prev) => ({
             ...prev,
             currentTime: audio.currentTime,
-            duration: audio.duration || prev.duration,
+            // Keep the trusted duration — don't overwrite with audio.duration
           }));
         });
 
@@ -500,7 +506,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
           setPlayback((prev) => ({
             ...prev,
             isPlaying: false,
-            currentTime: audio.duration,
+            currentTime: prev.duration, // use trusted duration, not audio.duration
           }));
         });
 
@@ -632,7 +638,7 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const currentDuration = playback.duration || audioRef.current?.duration || 0;
+  const currentDuration = playback.duration || 0;
   const progress =
     currentDuration > 0 ? (playback.currentTime / currentDuration) * 100 : 0;
   const remainingTime = Math.max(0, currentDuration - playback.currentTime);

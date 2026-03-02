@@ -101,7 +101,7 @@ export default function CourseDetail() {
         title: l.title,
         description: l.description || "",
         duration: l.duration || "0 min",
-        durationSeconds: l.duration_seconds || 0,
+        durationSeconds: l.durationSeconds || l.duration_seconds || 0,
         audioUrl: l.audioUrl,
         order: l.order_index || index + 1,
         maxPauses: l.max_pauses ?? 3,

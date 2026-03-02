@@ -1,6 +1,7 @@
 const pool = require('../config/db.js');
 const { S3Client, DeleteObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { getAudioDuration } = require('../lib/audioDuration');
 
 // Configure Cloudflare R2 (S3 Client) for manual operations (deletes)
 const r2 = new S3Client({
@@ -236,9 +237,29 @@ const createLesson = async (req, res) => {
       finalOrderIndex = maxOrder.rows[0].next_order;
     }
 
-    // Calculate duration fields
-    const durationMins = durationMinutes || 0;
-    const durationSecs = durationMins * 60;
+    // Extract actual audio duration from the uploaded file (R2 stream)
+    let durationSecs = 0;
+    let durationMins = durationMinutes || 0;
+
+    if (audioUrl) {
+      try {
+        const extractedDuration = await getAudioDuration(audioUrl);
+        if (extractedDuration && extractedDuration > 0) {
+          durationSecs = extractedDuration;
+          durationMins = Math.round(durationSecs / 60);
+          console.log(`[createLesson] Auto-extracted duration: ${durationSecs}s (${durationMins}min)`);
+        } else {
+          // Fallback to manually provided durationMinutes
+          durationSecs = durationMins * 60;
+        }
+      } catch (err) {
+        console.warn('[createLesson] Duration extraction failed, using manual value:', err.message);
+        durationSecs = durationMins * 60;
+      }
+    } else {
+      durationSecs = durationMins * 60;
+    }
+
     const durationStr = durationMins > 0 ? `${durationMins} min` : '0 min';
 
     const result = await pool.query(
@@ -309,10 +330,27 @@ const updateLesson = async (req, res) => {
 
     const audioUrl = newAudioUrl || req.body.audioUrl;
 
-    // Calculate duration fields if durationMinutes is provided
+    // Extract actual audio duration if a new audio file was uploaded
     let durationStr = null;
     let durationSecs = null;
-    if (durationMinutes !== undefined) {
+    let durationMinsForUpdate = durationMinutes !== undefined ? durationMinutes : null;
+
+    if (newAudioUrl) {
+      try {
+        const extractedDuration = await getAudioDuration(newAudioUrl);
+        if (extractedDuration && extractedDuration > 0) {
+          durationSecs = extractedDuration;
+          durationMinsForUpdate = Math.round(durationSecs / 60);
+          durationStr = `${durationMinsForUpdate} min`;
+          console.log(`[updateLesson] Auto-extracted duration: ${durationSecs}s (${durationMinsForUpdate}min)`);
+        }
+      } catch (err) {
+        console.warn('[updateLesson] Duration extraction failed:', err.message);
+      }
+    }
+
+    // Fallback: use manually provided durationMinutes if no auto-extraction
+    if (durationSecs === null && durationMinutes !== undefined) {
       const durationMins = durationMinutes || 0;
       durationSecs = durationMins * 60;
       durationStr = durationMins > 0 ? `${durationMins} min` : '0 min';
@@ -335,7 +373,7 @@ const updateLesson = async (req, res) => {
            updated_at = NOW()
        WHERE id = $13
        RETURNING *`,
-      [title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMinutes, orderIndex, isLocked, maxPauses, courseId, id]
+      [title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMinsForUpdate, orderIndex, isLocked, maxPauses, courseId, id]
     );
 
     if (result.rows.length === 0) {
