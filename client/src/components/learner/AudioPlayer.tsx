@@ -861,13 +861,33 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
           <p className="text-muted-foreground">remaining</p>
         </div>
 
-        {/* Progress Bar (non-interactive) */}
+        {/* Progress Bar */}
         <div className="w-full max-w-md mb-8">
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
+          <div className="h-2 bg-muted rounded-full overflow-hidden relative">
             <div
               className="h-full bg-gradient-to-r from-primary to-success rounded-full transition-all duration-1000"
               style={{ width: `${progress}%` }}
             />
+            {lesson.allowSeeking && (
+              <input
+                type="range"
+                min="0"
+                max={currentDuration}
+                value={playback.currentTime}
+                onChange={(e) => {
+                  const newTime = parseFloat(e.target.value);
+                  if (audioRef.current) {
+                    audioRef.current.currentTime = newTime;
+                    setPlayback((prev) => ({
+                      ...prev,
+                      currentTime: newTime,
+                    }));
+                  }
+                }}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                disabled={!audioRef.current || isLoadingAudio}
+              />
+            )}
           </div>
           <div className="flex justify-between text-xs text-muted-foreground mt-2">
             <span>{formatTime(playback.currentTime)}</span>
@@ -923,7 +943,9 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
 
       <footer className="py-4 px-4 text-center">
         <p className="text-xs text-muted-foreground">
-          Seeking is disabled. Please listen continuously for best results.
+          {lesson.allowSeeking 
+            ? "You can seek forward/backward in this lesson." 
+            : "Seeking is disabled. Please listen continuously for best results."}
         </p>
       </footer>
 

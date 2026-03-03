@@ -106,6 +106,7 @@ export default function CourseDetail() {
         order: l.order_index || index + 1,
         maxPauses: l.max_pauses ?? 3,
         pausesUsed: lessonProgress?.pausesUsed || 0,
+        allowSeeking: l.allowSeeking || false,
         status: lessonProgress?.completed
           ? "completed"
           : index === 0 || prevLessonProgress?.completed

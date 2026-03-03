@@ -46,6 +46,7 @@ export interface Lesson {
   maxPauses: number;
   pausesUsed: number;
   audioUrl?: string;
+  allowSeeking?: boolean;
   // Access Code fields
   accessCodeEnabled?: boolean;
   hasAccessCode?: boolean;

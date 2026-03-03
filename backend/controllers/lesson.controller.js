@@ -98,6 +98,7 @@ const getLessonsByCourse = async (req, res) => {
         durationMinutes: l.duration_minutes,
         orderIndex: l.order_index,
         maxPauses: l.max_pauses,
+        allowSeeking: l.allow_seeking,
         isLocked: l.is_locked,
         createdAt: l.created_at,
         // Access Code fields
@@ -193,6 +194,7 @@ const getLessonById = async (req, res) => {
       durationMinutes: l.duration_minutes,
       orderIndex: l.order_index,
       maxPauses: l.max_pauses,
+      allowSeeking: l.allow_seeking,
       isLocked: l.is_locked,
       createdAt: l.created_at,
       progress: progress ? {
@@ -210,7 +212,7 @@ const getLessonById = async (req, res) => {
 // Create lesson
 const createLesson = async (req, res) => {
   try {
-    const { courseId, title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses } = req.body;
+    const { courseId, title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses, allowSeeking } = req.body;
 
     // Debug: Log the uploaded file info
     if (req.file) {
@@ -263,10 +265,10 @@ const createLesson = async (req, res) => {
     const durationStr = durationMins > 0 ? `${durationMins} min` : '0 min';
 
     const result = await pool.query(
-      `INSERT INTO lessons (course_id, title, description, content, audio_url, video_url, duration, duration_seconds, duration_minutes, order_index, is_locked, max_pauses)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO lessons (course_id, title, description, content, audio_url, video_url, duration, duration_seconds, duration_minutes, order_index, is_locked, max_pauses, allow_seeking)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [courseId, title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMins, finalOrderIndex, isLocked || false, maxPauses || 3]
+      [courseId, title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMins, finalOrderIndex, isLocked || false, maxPauses || 3, allowSeeking === 'true' || allowSeeking === true]
     );
 
     const l = result.rows[0];
@@ -281,6 +283,7 @@ const createLesson = async (req, res) => {
         durationMinutes: l.duration_minutes,
         orderIndex: l.order_index,
         maxPauses: l.max_pauses,
+        allowSeeking: l.allow_seeking,
         isLocked: l.is_locked,
         createdAt: l.created_at,
         audioUrl: l.audio_url
@@ -296,7 +299,7 @@ const createLesson = async (req, res) => {
 const updateLesson = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses, courseId } = req.body;
+    const { title, description, content, videoUrl, durationMinutes, orderIndex, isLocked, maxPauses, courseId, allowSeeking } = req.body;
 
     // Debug: Log the uploaded file info
     if (req.file) {
@@ -370,10 +373,11 @@ const updateLesson = async (req, res) => {
            is_locked = COALESCE($10, is_locked),
            max_pauses = COALESCE($11, max_pauses),
            course_id = COALESCE($12, course_id),
+           allow_seeking = COALESCE($13, allow_seeking),
            updated_at = NOW()
-       WHERE id = $13
+       WHERE id = $14
        RETURNING *`,
-      [title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMinsForUpdate, orderIndex, isLocked, maxPauses, courseId, id]
+      [title, description, content, audioUrl, videoUrl, durationStr, durationSecs, durationMinsForUpdate, orderIndex, isLocked, maxPauses, courseId, allowSeeking === 'true' || allowSeeking === true, id]
     );
 
     if (result.rows.length === 0) {
@@ -392,6 +396,7 @@ const updateLesson = async (req, res) => {
         durationMinutes: l.duration_minutes,
         orderIndex: l.order_index,
         maxPauses: l.max_pauses,
+        allowSeeking: l.allow_seeking,
         isLocked: l.is_locked,
         audioUrl: l.audio_url,
         updatedAt: l.updated_at

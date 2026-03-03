@@ -45,6 +45,7 @@ export default function AdminLessons() {
     title: "",
     durationMinutes: 15,
     maxPauses: 3,
+    allowSeeking: false,
   });
   const [editingLesson, setEditingLesson] = useState<any | null>(null);
   const [previewLesson, setPreviewLesson] = useState<any | null>(null);
@@ -125,7 +126,23 @@ export default function AdminLessons() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      
+      // Extract duration from audio file
+      const audio = document.createElement('audio');
+      const objectUrl = URL.createObjectURL(file);
+      
+      audio.addEventListener('loadedmetadata', () => {
+        const durationInMinutes = Math.round(audio.duration / 60);
+        setNewLesson((prev) => ({
+          ...prev,
+          durationMinutes: durationInMinutes,
+        }));
+        URL.revokeObjectURL(objectUrl);
+      });
+      
+      audio.src = objectUrl;
     }
   };
 
@@ -139,6 +156,7 @@ export default function AdminLessons() {
       formData.append("title", newLesson.title);
       formData.append("durationMinutes", String(newLesson.durationMinutes));
       formData.append("maxPauses", String(newLesson.maxPauses));
+      formData.append("allowSeeking", String(newLesson.allowSeeking));
 
       if (selectedFile) {
         formData.append("audio", selectedFile);
@@ -175,6 +193,7 @@ export default function AdminLessons() {
         title: "",
         durationMinutes: 15,
         maxPauses: 3,
+        allowSeeking: false,
       });
       setSelectedFile(null);
     } catch (error: any) {
@@ -197,6 +216,7 @@ export default function AdminLessons() {
       title: lesson.title,
       durationMinutes: lesson.durationMinutes || 15,
       maxPauses: lesson.maxPauses || 3,
+      allowSeeking: lesson.allowSeeking || false,
     });
     setIsCreateOpen(true);
   };
@@ -293,6 +313,7 @@ export default function AdminLessons() {
                     title: "",
                     durationMinutes: 15,
                     maxPauses: 3,
+                    allowSeeking: false,
                   });
                   setSelectedFile(null);
                 }
@@ -358,9 +379,12 @@ export default function AdminLessons() {
                             durationMinutes: Number(e.target.value),
                           }))
                         }
-                        placeholder="15"
+                        placeholder="Auto-detected from audio"
                         disabled={isUploading}
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Auto-filled when audio is selected
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <Label>Max Pauses</Label>
@@ -415,7 +439,16 @@ export default function AdminLessons() {
                         Let users skip forward/backward
                       </p>
                     </div>
-                    <Switch disabled={isUploading} />
+                    <Switch 
+                      checked={newLesson.allowSeeking}
+                      onCheckedChange={(checked) =>
+                        setNewLesson((prev) => ({
+                          ...prev,
+                          allowSeeking: checked,
+                        }))
+                      }
+                      disabled={isUploading} 
+                    />
                   </div>
 
                   {/* Upload Progress Bar */}
