@@ -128,7 +128,7 @@ export function AccessCodeInputDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[340px] sm:max-w-sm mx-4">
+            <DialogContent className="max-w-[340px] sm:max-w-sm">
                 <DialogHeader className="text-center">
                     <div className="mx-auto mb-4 h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-primary/10 flex items-center justify-center">
                         {isVerified ? (
