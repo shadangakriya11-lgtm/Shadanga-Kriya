@@ -303,8 +303,9 @@ export function DownloadsPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() =>
-                            navigate(`/learner/lesson/${lesson.lessonId}`)
+                            navigate(`/course/${courseId}`)
                           }
+                          title="Go to course to play this lesson"
                         >
                           <Play className="h-4 w-4" />
                         </Button>

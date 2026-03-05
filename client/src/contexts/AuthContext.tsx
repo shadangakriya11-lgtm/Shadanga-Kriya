@@ -167,6 +167,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string): Promise<User> => {
     console.log("[AuthContext] Logging in user:", email);
     const response = await authApi.login(email, password);
+    
+    console.log("[AuthContext] Login response received:", JSON.stringify(response));
+    
+    // Validate response structure
+    if (!response || !response.user || !response.token) {
+      console.error("[AuthContext] Invalid login response structure:", response);
+      throw new Error('Invalid response from server');
+    }
 
     // iOS: Block admin and facilitator logins (Apple compliance)
     const isIOS = Capacitor.getPlatform() === 'ios';
