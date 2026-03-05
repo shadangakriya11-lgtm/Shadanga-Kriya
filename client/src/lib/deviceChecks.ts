@@ -13,10 +13,6 @@ interface HeadphoneDetectionPlugin {
  * Note: This feature is platform-specific and may have limitations
  */
 export async function isAirplaneModeEnabled(): Promise<boolean> {
-  // TEMPORARY: Always return true for testing
-  return true;
-
-  /* COMMENTED OUT FOR TESTING
   // For web, we cannot directly detect airplane mode
   if (!Capacitor.isNativePlatform()) {
     console.warn(
@@ -26,8 +22,6 @@ export async function isAirplaneModeEnabled(): Promise<boolean> {
   }
 
   try {
-    // On Android, we can check network connectivity
-    // If all network types are unavailable, likely in airplane mode
     // On Android, use our native plugin if available
     if (Capacitor.getPlatform() === "android") {
       try {
@@ -36,6 +30,7 @@ export async function isAirplaneModeEnabled(): Promise<boolean> {
 
         if (HeadphoneDetection.isAirplaneModeEnabled) {
           const result = await HeadphoneDetection.isAirplaneModeEnabled();
+          console.log("[DeviceChecks] Android airplane mode result:", result);
           return result.isEnabled === true;
         }
       } catch (nativeError) {
@@ -45,6 +40,7 @@ export async function isAirplaneModeEnabled(): Promise<boolean> {
       // Fallback to network status
       const { Network } = await import("@capacitor/network");
       const status = await Network.getStatus();
+      console.log("[DeviceChecks] Android network status fallback:", status);
       return !status.connected;
     }
 
@@ -53,6 +49,7 @@ export async function isAirplaneModeEnabled(): Promise<boolean> {
     if (Capacitor.getPlatform() === "ios") {
       const { Network } = await import("@capacitor/network");
       const status = await Network.getStatus();
+      console.log("[DeviceChecks] iOS network status:", status);
 
       // If not connected to any network type, likely in airplane mode
       return !status.connected;
@@ -63,27 +60,22 @@ export async function isAirplaneModeEnabled(): Promise<boolean> {
     console.error("Error checking airplane mode:", error);
     return false;
   }
-  */
 }
 
 /**
  * Check if earphones/headphones are connected
  */
 export async function areEarphonesConnected(): Promise<boolean> {
-  // TEMPORARY: Always return true for testing
-  return true;
-
-  /* COMMENTED OUT FOR TESTING
   // For native platforms (Android & iOS), use the native HeadphoneDetection plugin
   if (Capacitor.isNativePlatform()) {
     try {
       const { registerPlugin } = await import("@capacitor/core");
       const HeadphoneDetection = registerPlugin<HeadphoneDetectionPlugin>("HeadphoneDetection");
       const result = await HeadphoneDetection.isConnected();
-      console.log("Native headphone detection result:", result);
+      console.log("[DeviceChecks] Native headphone detection result:", result);
       return result.isConnected === true;
     } catch (error) {
-      console.error("Native headphone detection failed, falling back to web API:", error);
+      console.error("[DeviceChecks] Native headphone detection failed, falling back to web API:", error);
       // Fall through to web detection
     }
   }
@@ -94,7 +86,7 @@ export async function areEarphonesConnected(): Promise<boolean> {
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (permError) {
-      console.warn("Could not get audio permission:", permError);
+      console.warn("[DeviceChecks] Could not get audio permission:", permError);
     }
 
     const devices = await navigator.mediaDevices.enumerateDevices();
@@ -102,7 +94,7 @@ export async function areEarphonesConnected(): Promise<boolean> {
       (device) => device.kind === "audiooutput"
     );
 
-    console.log("Audio output devices:", audioOutputs.map(d => d.label || d.deviceId));
+    console.log("[DeviceChecks] Audio output devices:", audioOutputs.map(d => d.label || d.deviceId));
 
     const hasExternalAudio = audioOutputs.some((device) => {
       const label = device.label.toLowerCase();
@@ -146,10 +138,9 @@ export async function areEarphonesConnected(): Promise<boolean> {
 
     return false;
   } catch (error) {
-    console.error("Error checking earphones:", error);
+    console.error("[DeviceChecks] Error checking earphones:", error);
     return false;
   }
-  */
 }
 
 
