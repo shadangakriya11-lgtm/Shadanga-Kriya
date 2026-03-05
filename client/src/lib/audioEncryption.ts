@@ -1,10 +1,13 @@
 /**
- * Audio Encryption Utilities — V2 Chunk-based
- * AES-256-CBC encryption with per-chunk IVs for memory-efficient processing.
+ * Audio Encryption Utilities — V3 Chunk-based with AES-CTR
+ * AES-256-CTR encryption with position-based counters for memory-efficient processing.
  *
- * Each 5 MB audio chunk is encrypted independently so that decryption can
- * happen one chunk at a time, keeping peak WebView memory usage around 10-15 MB
+ * Each 5 MB audio chunk is encrypted independently using CTR mode (stream cipher).
+ * CTR mode does NOT add padding, so audio file structure remains intact - no corruption!
+ * Decryption happens one chunk at a time, keeping peak WebView memory usage around 10-15 MB
  * regardless of total file size.
+ *
+ * Key advantage over CBC: No padding = no audio frame corruption at chunk boundaries.
  */
 
 /** Chunk size for encryption: 5 MB of raw audio per chunk */
@@ -76,7 +79,7 @@ export const base64ToArrayBuffer = (base64: string): ArrayBuffer => {
 
 const importKey = async (hexKey: string): Promise<CryptoKey> => {
   const keyBytes = hexToArrayBuffer(hexKey.substring(0, 64)); // 32 bytes = AES-256
-  return crypto.subtle.importKey("raw", keyBytes, { name: "AES-CBC" }, false, [
+  return crypto.subtle.importKey("raw", keyBytes, { name: "AES-CTR" }, false, [
     "encrypt",
     "decrypt",
   ]);
@@ -87,18 +90,17 @@ const importKey = async (hexKey: string): Promise<CryptoKey> => {
 // ---------------------------------------------------------------------------
 
 export interface ChunkInfo {
-  /** Hex-encoded IV for this chunk */
-  iv: string;
   /** Size of the encrypted base64 text stored on disk */
   encryptedSize: number;
 }
 
 export interface ChunkManifest {
-  version: 2;
-  algorithm: "AES-256-CBC";
+  version: 3;
+  algorithm: "AES-256-CTR";
   chunkSize: number;
   totalChunks: number;
   chunks: ChunkInfo[];
+  nonce: string; // Base nonce/IV for CTR mode
   metadata: {
     lessonId: string;
     originalSize: number;
@@ -111,46 +113,99 @@ export interface ChunkManifest {
 // ---------------------------------------------------------------------------
 
 /**
- * Encrypt a single chunk (up to ENCRYPTION_CHUNK_SIZE) with a fresh random IV.
- * Returns the hex IV and the encrypted data as a base64 string.
+ * Encrypt a single chunk using AES-CTR with position-based counter.
+ * CTR mode is a stream cipher - no padding added, so audio structure stays intact!
+ * 
+ * @param chunkData - Raw audio bytes for this chunk
+ * @param hexKey - AES-256 key (hex encoded)
+ * @param baseNonce - Base nonce/IV (16 bytes)
+ * @param chunkIndex - Position of this chunk (0, 1, 2, ...)
+ * @returns Encrypted data as base64 string
  */
 export const encryptChunk = async (
   chunkData: ArrayBuffer,
-  hexKey: string
-): Promise<{ iv: string; encryptedBase64: string }> => {
+  hexKey: string,
+  baseNonce: Uint8Array,
+  chunkIndex: number
+): Promise<{ encryptedBase64: string }> => {
   const key = await importKey(hexKey);
-  const iv = crypto.getRandomValues(new Uint8Array(16));
 
+  // Create counter for this chunk position
+  // We need to add (chunkIndex * ENCRYPTION_CHUNK_SIZE / 16) to the base nonce
+  // But we must avoid overflow, so we do the math in smaller steps
+  const counter = new Uint8Array(baseNonce);
+  
+  // Calculate how many AES blocks (16 bytes each) to skip
+  // Do division first to avoid overflow: (chunkIndex * (ENCRYPTION_CHUNK_SIZE / 16))
+  const blocksPerChunk = ENCRYPTION_CHUNK_SIZE / 16; // 327680 blocks per 5MB chunk
+  const blockOffset = chunkIndex * blocksPerChunk;
+  
+  console.log(`[CTR] Chunk ${chunkIndex}: blocksPerChunk=${blocksPerChunk}, blockOffset=${blockOffset}`);
+  console.log(`[CTR] Base nonce: ${Array.from(baseNonce).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+  
+  // Add block offset to counter (big-endian addition)
+  // We need to handle this as a 128-bit integer addition
+  let carry = Math.floor(blockOffset);
+  for (let i = 15; i >= 0 && carry > 0; i--) {
+    const sum = counter[i] + (carry & 0xFF);
+    counter[i] = sum & 0xFF;
+    carry = Math.floor(carry / 256) + Math.floor(sum / 256);
+  }
+  
+  console.log(`[CTR] Final counter: ${Array.from(counter).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+
+  // Encrypt with CTR mode (no padding!)
   const encryptedBuffer = await crypto.subtle.encrypt(
-    { name: "AES-CBC", iv },
+    { name: "AES-CTR", counter, length: 64 },
     key,
     chunkData
   );
 
   return {
-    iv: arrayBufferToHex(iv.buffer),
     encryptedBase64: arrayBufferToBase64(encryptedBuffer),
   };
 };
 
 /**
- * Decrypt a single encrypted chunk.
+ * Decrypt a single encrypted chunk using AES-CTR.
  * @param encryptedBase64 - base64-encoded ciphertext read from disk
- * @param iv              - hex-encoded IV used during encryption
  * @param hexKey          - hex-encoded AES-256 key
- * @returns the decrypted raw audio bytes
+ * @param baseNonce       - base nonce/IV (16 bytes)
+ * @param chunkIndex      - position of this chunk (0, 1, 2, ...)
+ * @returns the decrypted raw audio bytes (exact original, no padding!)
  */
 export const decryptChunk = async (
   encryptedBase64: string,
-  iv: string,
-  hexKey: string
+  hexKey: string,
+  baseNonce: Uint8Array,
+  chunkIndex: number
 ): Promise<ArrayBuffer> => {
   const key = await importKey(hexKey);
-  const ivBuffer = hexToArrayBuffer(iv);
   const dataBuffer = base64ToArrayBuffer(encryptedBase64);
 
+  // Recreate the same counter used during encryption
+  const counter = new Uint8Array(baseNonce);
+  
+  // Calculate block offset (same as encryption)
+  const blocksPerChunk = ENCRYPTION_CHUNK_SIZE / 16;
+  const blockOffset = chunkIndex * blocksPerChunk;
+  
+  console.log(`[CTR-DEC] Chunk ${chunkIndex}: blocksPerChunk=${blocksPerChunk}, blockOffset=${blockOffset}`);
+  console.log(`[CTR-DEC] Base nonce: ${Array.from(baseNonce).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+  
+  // Add block offset to counter (big-endian addition)
+  let carry = Math.floor(blockOffset);
+  for (let i = 15; i >= 0 && carry > 0; i--) {
+    const sum = counter[i] + (carry & 0xFF);
+    counter[i] = sum & 0xFF;
+    carry = Math.floor(carry / 256) + Math.floor(sum / 256);
+  }
+  
+  console.log(`[CTR-DEC] Final counter: ${Array.from(counter).map(b => b.toString(16).padStart(2, '0')).join('')}`);
+
+  // Decrypt with CTR mode
   return crypto.subtle.decrypt(
-    { name: "AES-CBC", iv: ivBuffer },
+    { name: "AES-CTR", counter, length: 64 },
     key,
     dataBuffer
   );

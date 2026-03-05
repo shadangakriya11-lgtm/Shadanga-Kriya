@@ -36,6 +36,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(HeadphonePlugin.class);
         registerPlugin(ScreenProtectionPlugin.class);
         registerPlugin(AudioProtectionPlugin.class);
+        registerPlugin(FileConcatenationPlugin.class);
         super.onCreate(savedInstanceState);
         
         // Additional security flags

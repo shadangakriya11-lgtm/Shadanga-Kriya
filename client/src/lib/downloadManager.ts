@@ -11,6 +11,7 @@ import { Preferences } from "@capacitor/preferences";
 import { Capacitor } from "@capacitor/core";
 import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
 import { SecureStoragePlugin } from "capacitor-secure-storage-plugin";
+import FileConcatenation from "../plugins/fileConcatenation";
 import {
   encryptChunk,
   decryptChunk,
@@ -18,6 +19,23 @@ import {
   ENCRYPTION_CHUNK_SIZE,
   ChunkManifest,
 } from "./audioEncryption";
+
+// Helper to convert hex to ArrayBuffer (if not already imported)
+const hexToArrayBuffer = (hex: string): ArrayBuffer => {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes.buffer;
+};
+
+// Helper to convert ArrayBuffer to hex
+const arrayBufferToHex = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+};
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -94,9 +112,10 @@ const ensureAudioFolder = async (): Promise<void> => {
 // ---------------------------------------------------------------------------
 
 /**
- * Split raw audio into 5 MB chunks, encrypt each one independently, and write
+ * Split raw audio into 5 MB chunks, encrypt each one with AES-CTR, and write
  * the encrypted base64 text + a manifest to the filesystem.
  *
+ * CTR mode is a stream cipher - no padding added, so audio structure stays intact!
  * Peak memory ≈ 2 × chunkSize (one raw + one encrypted) ≈ 10 MB.
  */
 const encryptAndSaveChunks = async (
@@ -111,8 +130,11 @@ const encryptAndSaveChunks = async (
   const numChunks = Math.ceil(totalSize / ENCRYPTION_CHUNK_SIZE);
   const chunks: ChunkManifest["chunks"] = [];
 
+  // Generate ONE base nonce for the entire file
+  const baseNonce = crypto.getRandomValues(new Uint8Array(16));
+
   console.log(
-    `[DL] Encrypting ${totalSize} bytes in ${numChunks} chunks of ${ENCRYPTION_CHUNK_SIZE} bytes`
+    `[DL] Encrypting ${totalSize} bytes in ${numChunks} chunks of ${ENCRYPTION_CHUNK_SIZE} bytes using AES-CTR`
   );
 
   try {
@@ -121,21 +143,32 @@ const encryptAndSaveChunks = async (
       const end = Math.min(start + ENCRYPTION_CHUNK_SIZE, totalSize);
       const chunkData = audioData.slice(start, end);
 
-      // Encrypt this chunk (fresh IV each time)
-      const { iv, encryptedBase64 } = await encryptChunk(chunkData, hexKey);
+      console.log(`[ENC] === Encrypting chunk ${i} ===`);
+      console.log(`[ENC] Chunk ${i} byte range: ${start} to ${end} (size: ${chunkData.byteLength})`);
+      
+      // DEBUG: Log first 32 bytes of original chunk
+      const firstBytes = new Uint8Array(chunkData.slice(0, 32));
+      const firstBytesHex = Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      console.log(`[ENC] Chunk ${i} first 32 bytes (ORIGINAL): ${firstBytesHex}`);
+
+      // Encrypt this chunk with position-based counter (no padding!)
+      const { encryptedBase64 } = await encryptChunk(chunkData, hexKey, baseNonce, i);
+      console.log(`[ENC] Chunk ${i} encrypted size: ${encryptedBase64.length} chars`);
 
       // Write encrypted text to its own file
+      const chunkPath = `${AUDIO_FOLDER}/${lessonId}_chunk_${i}.enc`;
+      console.log(`[ENC] Writing chunk ${i} to: ${chunkPath}`);
       await Filesystem.writeFile({
-        path: `${AUDIO_FOLDER}/${lessonId}_chunk_${i}.enc`,
+        path: chunkPath,
         data: encryptedBase64,
         directory: Directory.Data,
         encoding: Encoding.UTF8,
       });
 
-      chunks.push({ iv, encryptedSize: encryptedBase64.length });
+      chunks.push({ encryptedSize: encryptedBase64.length });
 
       console.log(
-        `[DL] Chunk ${i + 1}/${numChunks} encrypted & saved (${encryptedBase64.length} chars)`
+        `[ENC] ✓ Chunk ${i + 1}/${numChunks} encrypted & saved (${encryptedBase64.length} chars)`
       );
       onProgress?.(Math.round(((i + 1) / numChunks) * 100));
     }
@@ -155,11 +188,12 @@ const encryptAndSaveChunks = async (
   }
 
   const manifest: ChunkManifest = {
-    version: 2,
-    algorithm: "AES-256-CBC",
+    version: 3,
+    algorithm: "AES-256-CTR",
     chunkSize: ENCRYPTION_CHUNK_SIZE,
     totalChunks: numChunks,
     chunks,
+    nonce: arrayBufferToHex(baseNonce.buffer),
     metadata: {
       lessonId,
       originalSize: totalSize,
@@ -574,9 +608,10 @@ export const getDownloadedLessonsForCourse = async (
 
 /**
  * Decrypt a downloaded lesson chunk-by-chunk and write the result to a temp
- * file on disk.  Returns a web-accessible URL for the temp file that can
+ * file on disk. Returns a web-accessible URL for the temp file that can
  * be passed straight to `new Audio(url)`.
  *
+ * Uses AES-CTR mode - no padding, so audio structure stays perfect!
  * Peak memory ≈ 2 × chunkSize ≈ 10 MB (one encrypted + one decrypted buffer
  * exist at the same time; both are released before the next iteration).
  */
@@ -593,7 +628,33 @@ export const loadEncryptedAudio = async (
       encoding: Encoding.UTF8,
     });
     manifest = JSON.parse(manifestResult.data as string);
-  } catch {
+    
+    // Check version compatibility
+    if (manifest.version !== 3) {
+      throw new Error(
+        `This lesson was downloaded with an older version (v${manifest.version}). ` +
+        `Please delete and re-download the lesson to use the new encryption format.`
+      );
+    }
+    
+    // Verify it's CTR mode
+    if (manifest.algorithm !== "AES-256-CTR") {
+      throw new Error(
+        `Incompatible encryption algorithm: ${manifest.algorithm}. ` +
+        `Please re-download the lesson.`
+      );
+    }
+    
+    // Verify nonce exists
+    if (!manifest.nonce) {
+      throw new Error(
+        `Missing encryption nonce. Please re-download the lesson.`
+      );
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("version")) {
+      throw error; // Re-throw version errors
+    }
     throw new Error("Audio not found. Please download the lesson first.");
   }
 
@@ -615,7 +676,10 @@ export const loadEncryptedAudio = async (
     }
   }
 
-  // 3. Decrypt chunk-by-chunk → write to temp .mp3 on disk
+  // 3. Get base nonce from manifest
+  const baseNonce = new Uint8Array(hexToArrayBuffer(manifest.nonce));
+
+  // 4. Decrypt chunk-by-chunk → write to temp .mp3 on disk
   const tempPath = `${AUDIO_FOLDER}/${lessonId}_temp.mp3`;
 
   // Remove stale temp file
@@ -627,6 +691,9 @@ export const loadEncryptedAudio = async (
 
   try {
     for (let i = 0; i < manifest.totalChunks; i++) {
+      console.log(`[DL] === Processing chunk ${i} ===`);
+      console.log(`[DL] Reading: ${AUDIO_FOLDER}/${lessonId}_chunk_${i}.enc`);
+      
       // Read encrypted base64 text (~6.7 MB for a 5 MB chunk)
       const chunkResult = await Filesystem.readFile({
         path: `${AUDIO_FOLDER}/${lessonId}_chunk_${i}.enc`,
@@ -634,37 +701,70 @@ export const loadEncryptedAudio = async (
         encoding: Encoding.UTF8,
       });
       const encryptedBase64 = chunkResult.data as string;
+      console.log(`[DL] Encrypted chunk ${i} size: ${encryptedBase64.length} chars`);
 
-      // Decrypt → raw audio ArrayBuffer (~5 MB)
+      // Decrypt → raw audio ArrayBuffer (~5 MB) - EXACT original bytes!
+      console.log(`[DL] Decrypting chunk ${i} with chunkIndex=${i}`);
       const decryptedBuffer = await decryptChunk(
         encryptedBase64,
-        manifest.chunks[i].iv,
-        decryptionKey
+        decryptionKey,
+        baseNonce,
+        i
       );
+      console.log(`[DL] Decrypted chunk ${i} size: ${decryptedBuffer.byteLength} bytes`);
+      
+      // DEBUG: Log first 32 bytes of each chunk to verify order
+      const firstBytes = new Uint8Array(decryptedBuffer.slice(0, 32));
+      const firstBytesHex = Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      console.log(`[DL] Chunk ${i} first 32 bytes: ${firstBytesHex}`);
 
-      // Convert to base64 so Filesystem can write as binary
+      // Write each chunk to a separate temp file first
+      const chunkTempPath = `${AUDIO_FOLDER}/${lessonId}_temp_chunk_${i}.mp3`;
       const decryptedBase64 = arrayBufferToBase64(decryptedBuffer);
-
-      // Write / append raw binary audio to temp file
-      if (i === 0) {
-        await Filesystem.writeFile({
-          path: tempPath,
-          data: decryptedBase64,
-          directory: Directory.Data,
-          // no encoding → data is treated as base64, written as binary
-        });
-      } else {
-        await Filesystem.appendFile({
-          path: tempPath,
-          data: decryptedBase64,
-          directory: Directory.Data,
-        });
-      }
-
-      console.log(
-        `[DL] Decrypted chunk ${i + 1}/${manifest.totalChunks}`
-      );
+      
+      await Filesystem.writeFile({
+        path: chunkTempPath,
+        data: decryptedBase64,
+        directory: Directory.Data,
+      });
+      
+      console.log(`[DL] ✓ Chunk ${i + 1}/${manifest.totalChunks} written to temp file`);
     }
+    
+    // Concatenate all temp chunk files using native plugin
+    console.log(`[DL] Concatenating ${manifest.totalChunks} temp files using native plugin...`);
+    
+    // Build array of input paths
+    const inputPaths: string[] = [];
+    for (let i = 0; i < manifest.totalChunks; i++) {
+      inputPaths.push(`${AUDIO_FOLDER}/${lessonId}_temp_chunk_${i}.mp3`);
+    }
+    
+    // Use native plugin to concatenate
+    const result = await FileConcatenation.concatenateFiles({
+      outputPath: tempPath,
+      inputPaths,
+    });
+    
+    console.log(`[DL] ✓ Native concatenation complete: ${result.totalBytes} bytes`);
+    
+    // Clean up temp chunk files
+    for (let i = 0; i < manifest.totalChunks; i++) {
+      const chunkTempPath = `${AUDIO_FOLDER}/${lessonId}_temp_chunk_${i}.mp3`;
+      try {
+        await Filesystem.deleteFile({
+          path: chunkTempPath,
+          directory: Directory.Data,
+        });
+      } catch {
+        // Ignore deletion errors
+      }
+    }
+    console.log(`[DL] ✓ All temp chunks deleted`);
+    
+    
+    console.log(`[DL] ✓ All chunks concatenated successfully!`);
+    
   } catch (error) {
     // Clean up temp file on failure
     try {
@@ -681,11 +781,28 @@ export const loadEncryptedAudio = async (
     );
   }
 
-  // 4. Convert file path to a web-accessible URL
+  // 5. Convert file path to a web-accessible URL
   const fileInfo = await Filesystem.getUri({
     path: tempPath,
     directory: Directory.Data,
   });
+
+  // DEBUG: Log file size to verify it matches original
+  try {
+    const stat = await Filesystem.stat({
+      path: tempPath,
+      directory: Directory.Data,
+    });
+    console.log(`[DL] ✓ Decrypted file size: ${stat.size} bytes (original: ${manifest.metadata.originalSize} bytes)`);
+    
+    if (stat.size !== manifest.metadata.originalSize) {
+      console.error(`[DL] ❌ SIZE MISMATCH! Decrypted: ${stat.size}, Original: ${manifest.metadata.originalSize}`);
+    } else {
+      console.log(`[DL] ✓ File size matches perfectly!`);
+    }
+  } catch (e) {
+    console.warn('[DL] Could not verify file size:', e);
+  }
 
   return Capacitor.convertFileSrc(fileInfo.uri);
 };
