@@ -129,6 +129,21 @@ export default function AdminLessons() {
       const file = e.target.files[0];
       setSelectedFile(file);
       
+      // Auto-fill title from filename if title is empty and not editing
+      if (!editingLesson && !newLesson.title.trim()) {
+        // Remove file extension and clean up the filename
+        const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+        // Replace underscores and hyphens with spaces, and capitalize words
+        const cleanedName = fileNameWithoutExt
+          .replace(/[_-]/g, ' ')
+          .replace(/\b\w/g, (char) => char.toUpperCase());
+        
+        setNewLesson((prev) => ({
+          ...prev,
+          title: cleanedName,
+        }));
+      }
+      
       // Extract duration from audio file
       const audio = document.createElement('audio');
       const objectUrl = URL.createObjectURL(file);
