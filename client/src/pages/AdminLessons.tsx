@@ -405,11 +405,12 @@ export default function AdminLessons() {
                       <Label>Max Pauses</Label>
                       <Input
                         type="number"
+                        min="0"
                         value={newLesson.maxPauses}
                         onChange={(e) =>
                           setNewLesson((prev) => ({
                             ...prev,
-                            maxPauses: Number(e.target.value),
+                            maxPauses: Math.max(0, Number(e.target.value)),
                           }))
                         }
                         placeholder="3"
