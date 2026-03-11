@@ -108,7 +108,7 @@ const createPayment = async (req, res) => {
 // Create Razorpay Order
 const createRazorpayOrder = async (req, res) => {
   try {
-    const { courseId } = req.body;
+    const { courseId, finalAmount } = req.body;
 
     // 1. Get Razorpay keys from settings
     const keyId = await getSetting('razorpay_key_id');
@@ -140,7 +140,10 @@ const createRazorpayOrder = async (req, res) => {
     if (course.status === 'draft') {
       return res.status(400).json({ error: 'Cannot purchase a draft course' });
     }
-    const amountInPaise = Math.round(course.price * 100);
+    
+    // Use finalAmount if provided (with discount), otherwise use course price
+    const amount = finalAmount !== undefined ? finalAmount : course.price;
+    const amountInPaise = Math.round(amount * 100);
 
     // 3. Initialize Razorpay
     const razorpay = new Razorpay({
@@ -162,7 +165,7 @@ const createRazorpayOrder = async (req, res) => {
     await pool.query(
       `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [req.user.id, courseId, course.price, 'INR', 'pending', 'razorpay', transactionId]
+      [req.user.id, courseId, amount, 'INR', 'pending', 'razorpay', transactionId]
     );
 
     res.status(201).json({

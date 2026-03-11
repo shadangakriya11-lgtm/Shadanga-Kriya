@@ -25,6 +25,9 @@ const exportRoutes = require('./routes/export.routes.js');
 const downloadRoutes = require('./routes/download.routes.js');
 const referralRoutes = require('./routes/referral.routes.js');
 const demoRoutes = require('./routes/demo.routes.js');
+const supportRoutes = require('./routes/support.routes.js');
+const discountRoutes = require('./routes/discount.routes.js');
+const paymentLinkRoutes = require('./routes/paymentLink.routes.js');
 
 const app = express();
 
@@ -137,6 +140,9 @@ app.use('/api/exports', exportRoutes);
 app.use('/api/downloads', downloadRoutes);
 app.use('/api/referrals', referralRoutes);
 app.use('/api/demo', demoRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/discounts', discountRoutes);
+app.use('/api/payment-links', paymentLinkRoutes);
 
 // SECURITY: Error handling middleware - don't expose sensitive data
 app.use((err, req, res, next) => {
