@@ -232,12 +232,12 @@ export default function AdminDiscounts() {
       return;
     }
 
-    const discountPercent = parseInt(formData.discountPercent);
+    const discountPercent = parseFloat(formData.discountPercent);
     
-    if (isNaN(discountPercent) || discountPercent < 1 || discountPercent > 100) {
+    if (isNaN(discountPercent) || discountPercent <= 0 || discountPercent > 100) {
       toast({
         title: 'Validation Error',
-        description: 'Discount percentage must be between 1 and 100',
+        description: 'Discount percentage must be between 0.01 and 100',
         variant: 'destructive',
       });
       return;
@@ -418,14 +418,14 @@ export default function AdminDiscounts() {
                 <Input
                   id="discountPercent"
                   type="number"
-                  min="1"
+                  min="0.01"
                   max="100"
-                  step="1"
+                  step="0.01"
                   value={formData.discountPercent}
                   onChange={(e) => {
                     const value = e.target.value;
-                    // Only allow numbers between 1-100
-                    if (value === '' || (parseInt(value) >= 1 && parseInt(value) <= 100)) {
+                    // Allow decimals between 0.01-100
+                    if (value === '' || (parseFloat(value) > 0 && parseFloat(value) <= 100)) {
                       setFormData({ ...formData, discountPercent: value });
                     }
                   }}

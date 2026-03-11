@@ -1,7 +1,7 @@
 import { Course } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, BookOpen, Lock, CheckCircle2, ChevronRight } from 'lucide-react';
+import { BookOpen, Lock, CheckCircle2, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { shouldShowPricing } from '@/lib/platformDetection';
 
@@ -64,10 +64,6 @@ export function CourseCard({ course, onClick, className, style }: CourseCardProp
         <div className="flex items-center gap-1.5">
           <BookOpen className="h-4 w-4" />
           <span>{course.totalLessons} lessons</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Clock className="h-4 w-4" />
-          <span>{course.duration}</span>
         </div>
       </div>
 

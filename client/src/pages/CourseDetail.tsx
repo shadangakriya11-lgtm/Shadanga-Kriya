@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   ChevronLeft,
-  Clock,
   BookOpen,
-  DollarSign,
   AlertCircle,
   Users,
   Trash2,
@@ -369,16 +367,6 @@ export default function CourseDetail() {
               <BookOpen className="h-4 w-4" />
               <span>{totalLessons} lessons</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-4 w-4" />
-              <span>{course.duration || "N/A"}</span>
-            </div>
-            {shouldShowPricing() && course.price > 0 && (
-              <div className="flex items-center gap-1.5">
-                <DollarSign className="h-4 w-4" />
-                <span>₹{course.price}</span>
-              </div>
-            )}
           </div>
         </section>
 

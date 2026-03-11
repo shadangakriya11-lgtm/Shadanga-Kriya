@@ -50,6 +50,7 @@ export default function PaymentLinkPage() {
   const [paymentStep, setPaymentStep] = useState<'form' | 'processing' | 'success' | 'error'>('form');
   const [errorMessage, setErrorMessage] = useState('');
   const [paymentId, setPaymentId] = useState('');
+  const [paymentData, setPaymentData] = useState<any>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -233,6 +234,16 @@ export default function PaymentLinkPage() {
 
             const verifyData = await verifyResponse.json();
             setPaymentId(verifyData.payment.id);
+            setPaymentData({
+              transactionId: razorpayResponse.razorpay_payment_id,
+              amount: data.amount / 100,
+              createdAt: new Date().toISOString(),
+              status: 'completed',
+              paymentMethod: 'Razorpay',
+              userName: formData.name,
+              userEmail: formData.email,
+              courseTitle: course.title,
+            });
             setPaymentStep('success');
             setIsProcessing(false);
           } catch (error: any) {
@@ -268,7 +279,106 @@ export default function PaymentLinkPage() {
   };
 
   const handleDownloadReceipt = () => {
-    window.open(`${import.meta.env.VITE_API_URL}/api/exports/payment-receipt/${paymentId}`, '_blank');
+    if (!paymentData) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Please allow pop-ups to download receipt');
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Payment Receipt - ${paymentData.transactionId}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 40px; color: #333; max-width: 600px; margin: 0 auto; }
+          .header { text-align: center; border-bottom: 2px solid #4f46e5; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo { font-size: 24px; font-weight: bold; color: #4f46e5; }
+          .receipt-title { font-size: 18px; color: #666; margin-top: 10px; }
+          .section { margin-bottom: 25px; }
+          .section-title { font-size: 14px; color: #888; text-transform: uppercase; margin-bottom: 10px; }
+          .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+          .row:last-child { border-bottom: none; }
+          .label { color: #666; }
+          .value { font-weight: 500; text-align: right; }
+          .total-row { background: #f5f5f5; padding: 15px; border-radius: 8px; margin-top: 20px; }
+          .total-row .label { font-size: 16px; }
+          .total-row .value { font-size: 24px; color: #4f46e5; }
+          .status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; background: #d1fae5; color: #059669; }
+          .footer { text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #888; font-size: 12px; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">Shadanga Kriya</div>
+          <div class="receipt-title">Payment Receipt</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Transaction Details</div>
+          <div class="row">
+            <span class="label">Transaction ID</span>
+            <span class="value">${paymentData.transactionId}</span>
+          </div>
+          <div class="row">
+            <span class="label">Date</span>
+            <span class="value">${new Date(paymentData.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
+          </div>
+          <div class="row">
+            <span class="label">Status</span>
+            <span class="value"><span class="status">${paymentData.status.toUpperCase()}</span></span>
+          </div>
+          <div class="row">
+            <span class="label">Payment Method</span>
+            <span class="value">${paymentData.paymentMethod}</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Customer Information</div>
+          <div class="row">
+            <span class="label">Name</span>
+            <span class="value">${paymentData.userName}</span>
+          </div>
+          <div class="row">
+            <span class="label">Email</span>
+            <span class="value">${paymentData.userEmail}</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Purchase Details</div>
+          <div class="row">
+            <span class="label">Course</span>
+            <span class="value">${paymentData.courseTitle}</span>
+          </div>
+        </div>
+
+        <div class="total-row">
+          <div class="row" style="border: none;">
+            <span class="label">Total Amount</span>
+            <span class="value">₹${paymentData.amount.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>Thank you for your purchase!</p>
+          <p>Shadanga Kriya - Holistic Wellness Platform</p>
+          <p>This is a computer-generated receipt.</p>
+        </div>
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+
+    setTimeout(() => {
+      printWindow.print();
+    }, 500);
   };
 
   if (isLoading) {

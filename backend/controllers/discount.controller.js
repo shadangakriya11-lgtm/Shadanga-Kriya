@@ -18,9 +18,9 @@ exports.createDiscountCode = async (req, res) => {
       });
     }
 
-    if (discountPercent < 1 || discountPercent > 100) {
+    if (discountPercent <= 0 || discountPercent > 100) {
       return res.status(400).json({ 
-        error: 'Discount percent must be between 1 and 100' 
+        error: 'Discount percent must be between 0.01 and 100' 
       });
     }
 
@@ -200,9 +200,9 @@ exports.updateDiscountCode = async (req, res) => {
     }
 
     if (discountPercent !== undefined) {
-      if (discountPercent < 1 || discountPercent > 100) {
+      if (discountPercent <= 0 || discountPercent > 100) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Discount percent must be between 1 and 100' });
+        return res.status(400).json({ error: 'Discount percent must be between 0.01 and 100' });
       }
       updates.push(`discount_percent = $${paramCount}`);
       params.push(discountPercent);

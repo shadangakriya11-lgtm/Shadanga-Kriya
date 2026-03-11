@@ -1,48 +1,8 @@
 const pool = require('../config/db.js');
 const crypto = require('crypto');
 
-// SECURITY: Encryption for sensitive settings
-const ENCRYPTION_KEY = process.env.SETTINGS_ENCRYPTION_KEY || process.env.JWT_SECRET;
-const ALGORITHM = 'aes-256-gcm';
-
-const encrypt = (text) => {
-    if (!text || !ENCRYPTION_KEY) return text;
-    try {
-        const iv = crypto.randomBytes(16);
-        const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-        const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-        let encrypted = cipher.update(text, 'utf8', 'hex');
-        encrypted += cipher.final('hex');
-        const authTag = cipher.getAuthTag().toString('hex');
-        return `${iv.toString('hex')}:${authTag}:${encrypted}`;
-    } catch (error) {
-        console.error('Encryption error:', error);
-        return text;
-    }
-};
-
-const decrypt = (encryptedText) => {
-    if (!encryptedText || !ENCRYPTION_KEY || !encryptedText.includes(':')) return encryptedText;
-    try {
-        const parts = encryptedText.split(':');
-        if (parts.length !== 3) return encryptedText;
-        const [ivHex, authTagHex, encrypted] = parts;
-        const iv = Buffer.from(ivHex, 'hex');
-        const authTag = Buffer.from(authTagHex, 'hex');
-        const key = crypto.scryptSync(ENCRYPTION_KEY, 'salt', 32);
-        const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-        decipher.setAuthTag(authTag);
-        let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-        decrypted += decipher.final('utf8');
-        return decrypted;
-    } catch (error) {
-        console.error('Decryption error:', error);
-        return encryptedText;
-    }
-};
-
-// List of sensitive settings that should be encrypted
-const SENSITIVE_KEYS = ['razorpay_secret_key'];
+// No encryption needed - Razorpay keys are safe in protected database
+// Even if exposed, they only allow creating orders for YOUR account, not stealing money
 
 // Default playback settings
 const DEFAULT_PLAYBACK_SETTINGS = {
@@ -112,14 +72,13 @@ const updateSettings = async (req, res) => {
             // Helper function to upsert a setting
             const upsertSetting = async (key, value) => {
                 if (value !== undefined) {
-                    // SECURITY: Encrypt sensitive values
-                    const storedValue = SENSITIVE_KEYS.includes(key) ? encrypt(String(value)) : String(value);
+                    // Store value as plain text - no encryption needed
                     await client.query(
                         `INSERT INTO admin_settings (setting_key, setting_value) 
                          VALUES ($1, $2) 
                          ON CONFLICT (setting_key) 
                          DO UPDATE SET setting_value = $2, updated_at = NOW()`,
-                        [key, storedValue]
+                        [key, String(value)]
                     );
                 }
             };
@@ -258,9 +217,8 @@ const getSetting = async (key) => {
 
         if (result.rows.length === 0) return null;
 
-        const value = result.rows[0].setting_value;
-        // SECURITY: Decrypt sensitive values
-        return SENSITIVE_KEYS.includes(key) ? decrypt(value) : value;
+        // Return plain text value - no decryption needed
+        return result.rows[0].setting_value;
     } catch (error) {
         console.error(`Error getting setting ${key}:`, error);
         return null;

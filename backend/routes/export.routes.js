@@ -5,7 +5,10 @@ const validate = require('../middleware/validate.middleware.js');
 const { verifyToken, isAdmin } = require('../middleware/auth.middleware.js');
 const exportController = require('../controllers/export.controller.js');
 
-// All export routes require admin access
+// PUBLIC ROUTE - Payment receipt (no auth required)
+router.get('/payment-receipt/:paymentId', exportController.generatePaymentReceipt);
+
+// All other export routes require admin access
 router.use(verifyToken, isAdmin);
 
 // Export users

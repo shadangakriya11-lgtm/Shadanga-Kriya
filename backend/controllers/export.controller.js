@@ -383,11 +383,85 @@ const exportCertificates = async (req, res) => {
     }
 };
 
+// Generate payment receipt (PUBLIC - no auth required)
+const generatePaymentReceipt = async (req, res) => {
+    try {
+        const { paymentId } = req.params;
+
+        // Get payment details with user and course info
+        const result = await pool.query(
+            `SELECT 
+                p.id, p.payment_id, p.transaction_id, p.amount, p.currency, 
+                p.status, p.payment_method, p.created_at,
+                u.first_name, u.last_name, u.email, u.phone,
+                c.title as course_title
+             FROM payments p
+             JOIN users u ON p.user_id = u.id
+             JOIN courses c ON p.course_id = c.id
+             WHERE p.id = $1 AND p.status = 'completed'`,
+            [paymentId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Payment not found or not completed' });
+        }
+
+        const payment = result.rows[0];
+
+        // Generate simple text receipt
+        const receipt = `
+═══════════════════════════════════════════════════════
+                    PAYMENT RECEIPT
+═══════════════════════════════════════════════════════
+
+Receipt ID: ${payment.id}
+Transaction ID: ${payment.transaction_id || payment.payment_id}
+Date: ${new Date(payment.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+
+───────────────────────────────────────────────────────
+CUSTOMER DETAILS
+───────────────────────────────────────────────────────
+Name: ${payment.first_name} ${payment.last_name}
+Email: ${payment.email}
+Phone: ${payment.phone || 'N/A'}
+
+───────────────────────────────────────────────────────
+COURSE DETAILS
+───────────────────────────────────────────────────────
+Course: ${payment.course_title}
+
+───────────────────────────────────────────────────────
+PAYMENT DETAILS
+───────────────────────────────────────────────────────
+Amount Paid: ${payment.currency} ${payment.amount}
+Payment Method: ${payment.payment_method.toUpperCase()}
+Status: ${payment.status.toUpperCase()}
+
+═══════════════════════════════════════════════════════
+            Thank you for your payment!
+═══════════════════════════════════════════════════════
+
+This is a computer-generated receipt and does not require a signature.
+
+For any queries, please contact support.
+        `.trim();
+
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename=receipt-${payment.id}.txt`);
+        res.send(receipt);
+
+    } catch (error) {
+        console.error('Generate payment receipt error:', error);
+        res.status(500).json({ error: 'Failed to generate receipt' });
+    }
+};
+
 module.exports = {
     exportUsers,
     exportEnrollments,
     exportPayments,
     exportAttendance,
     exportCourses,
-    exportCertificates
+    exportCertificates,
+    generatePaymentReceipt
 };
