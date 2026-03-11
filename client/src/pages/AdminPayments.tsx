@@ -276,8 +276,12 @@ export default function AdminPayments() {
         <div class="section">
           <div class="section-title">Transaction Details</div>
           <div class="row">
-            <span class="label">Transaction ID</span>
+            <span class="label">Razorpay Order ID</span>
             <span class="value">${tx.transactionId || 'N/A'}</span>
+          </div>
+          <div class="row">
+            <span class="label">Razorpay Payment ID</span>
+            <span class="value">${tx.paymentId || 'N/A'}</span>
           </div>
           <div class="row">
             <span class="label">Date</span>
@@ -411,9 +415,16 @@ export default function AdminPayments() {
     },
     {
       key: 'transactionId',
-      header: 'Transaction ID',
+      header: 'Razorpay Order ID',
       render: (tx: any) => (
         <code className="text-xs bg-muted px-2 py-1 rounded">{tx.transactionId || 'N/A'}</code>
+      ),
+    },
+    {
+      key: 'paymentId',
+      header: 'Razorpay Payment ID',
+      render: (tx: any) => (
+        <code className="text-xs bg-muted px-2 py-1 rounded">{tx.paymentId || 'N/A'}</code>
       ),
     },
     {

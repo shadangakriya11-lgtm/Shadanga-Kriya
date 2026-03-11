@@ -346,6 +346,7 @@ const getAllPayments = async (req, res) => {
       status: p.status,
       paymentMethod: p.payment_method,
       transactionId: p.transaction_id,
+      paymentId: p.payment_id,
       createdAt: p.created_at
     }));
 

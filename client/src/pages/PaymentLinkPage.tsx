@@ -320,7 +320,7 @@ export default function PaymentLinkPage() {
         <div class="section">
           <div class="section-title">Transaction Details</div>
           <div class="row">
-            <span class="label">Transaction ID</span>
+            <span class="label">Razorpay Payment ID</span>
             <span class="value">${paymentData.transactionId}</span>
           </div>
           <div class="row">
