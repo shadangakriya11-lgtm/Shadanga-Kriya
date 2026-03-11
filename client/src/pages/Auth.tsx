@@ -231,14 +231,14 @@ export default function Auth() {
             {mode === "signup" && (
               <div className="space-y-1.5">
                 <Label htmlFor="fullName" className="text-sm text-muted-foreground">
-                  Full Name
+                  Name (First and Last Name)
                 </Label>
                 <div className="relative">
                   <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
                     id="fullName"
                     type="text"
-                    placeholder="Enter your full name"
+                    placeholder="Enter name (First and Last Name)"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
@@ -525,13 +525,13 @@ export default function Auth() {
             <form onSubmit={handleSubmit} className="space-y-5">
               {mode === "signup" && (
                 <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="fullName" className="text-foreground">Full Name</Label>
+                  <Label htmlFor="fullName" className="text-foreground">Name (First and Last Name)</Label>
                   <div className="relative group">
                     <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
                       id="fullName"
                       type="text"
-                      placeholder="Enter your full name"
+                      placeholder="Enter name (First and Last Name)"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"

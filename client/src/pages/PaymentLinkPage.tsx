@@ -477,12 +477,12 @@ export default function PaymentLinkPage() {
               
               <div className="space-y-4 mb-6">
                 <div>
-                  <Label htmlFor="name">Full Name *</Label>
+                  <Label htmlFor="name">Name (First and Last Name) *</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter your full name"
+                    placeholder="Enter name (First and Last Name)"
                     className="mt-1"
                   />
                 </div>
