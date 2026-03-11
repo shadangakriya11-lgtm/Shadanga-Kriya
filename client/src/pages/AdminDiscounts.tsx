@@ -57,7 +57,7 @@ export default function AdminDiscounts() {
     queryFn: async () => {
       const token = getCachedToken();
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/discounts`,
+        `${import.meta.env.VITE_API_URL}/api/discounts?includeExpired=true`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -183,9 +183,28 @@ export default function AdminDiscounts() {
 
   const discountCodes: DiscountCode[] = discountsData?.discountCodes || [];
 
-  const filteredDiscounts = discountCodes.filter((discount) =>
+  // Helper function to check if discount is expired
+  const isExpired = (expiresAt: string) => new Date(expiresAt) <= new Date();
+
+  // Filter by search query
+  const searchFiltered = discountCodes.filter((discount) =>
     discount.code.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Separate active and expired codes
+  const activeDiscounts = searchFiltered.filter((discount) => !isExpired(discount.expires_at));
+  const expiredDiscounts = searchFiltered.filter((discount) => isExpired(discount.expires_at));
+
+  // Debug log to see what's happening
+  console.log('Total discount codes:', discountCodes.length);
+  console.log('Active discounts:', activeDiscounts.length);
+  console.log('Expired discounts:', expiredDiscounts.length);
+  if (discountCodes.length > 0) {
+    console.log('Sample discount:', discountCodes[0]);
+  }
+
+  // Combine: active first, then expired
+  const filteredDiscounts = [...activeDiscounts, ...expiredDiscounts];
 
   const handleOpenDialog = (discount?: DiscountCode) => {
     if (discount) {
@@ -273,8 +292,6 @@ export default function AdminDiscounts() {
     }));
   };
 
-  const isExpired = (expiresAt: string) => new Date(expiresAt) < new Date();
-
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
@@ -314,78 +331,170 @@ export default function AdminDiscounts() {
               <p className="text-muted-foreground">No discount codes found</p>
             </div>
           ) : (
-            <div className="grid gap-4">
-              {filteredDiscounts.map((discount) => {
-                const expired = isExpired(discount.expires_at);
-                
-                return (
-                  <div
-                    key={discount.id}
-                    className="bg-card rounded-xl border border-border/50 p-5 shadow-soft"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-bold text-lg text-foreground">{discount.code}</h3>
-                          <Badge variant={expired ? 'locked' : discount.is_active ? 'active' : 'pending'}>
-                            {expired ? 'Expired' : discount.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Percent className="h-4 w-4" />
-                            <span>{discount.discount_percent}% off</span>
+            <div className="space-y-6">
+              {/* Active Discount Codes */}
+              {activeDiscounts.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                    Active Codes ({activeDiscounts.length})
+                  </h3>
+                  <div className="grid gap-4">
+                    {activeDiscounts.map((discount) => {
+                      const expired = isExpired(discount.expires_at);
+                      
+                      return (
+                        <div
+                          key={discount.id}
+                          className="bg-card rounded-xl border border-border/50 p-5 shadow-soft"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-bold text-lg text-foreground">{discount.code}</h3>
+                                <Badge variant={expired ? 'locked' : discount.is_active ? 'active' : 'pending'}>
+                                  {expired ? 'Expired' : discount.is_active ? 'Active' : 'Inactive'}
+                                </Badge>
+                              </div>
+                              
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Percent className="h-4 w-4" />
+                                  <span>{discount.discount_percent}% off</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>Expires: {new Date(discount.expires_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Tag className="h-4 w-4" />
+                                  <span>{discount.course_count} course{discount.course_count !== 1 ? 's' : ''}</span>
+                                </div>
+                                {discount.max_usage && (
+                                  <div>
+                                    <span>Used: {discount.usage_count}/{discount.max_usage}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenDialog(discount)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteDiscount(discount.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-4 w-4" />
-                            <span>Expires: {new Date(discount.expires_at).toLocaleDateString()}</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Tag className="h-4 w-4" />
-                            <span>{discount.course_count} course{discount.course_count !== 1 ? 's' : ''}</span>
-                          </div>
-                          {discount.max_usage && (
-                            <div>
-                              <span>Used: {discount.usage_count}/{discount.max_usage}</span>
+                          
+                          {discount.courses && discount.courses.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-border/50">
+                              <p className="text-xs text-muted-foreground mb-2">Applicable Courses:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {discount.courses.map((course) => (
+                                  <Badge key={course.id} variant="outline" className="text-xs">
+                                    {course.title}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenDialog(discount)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteDiscount(discount.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    {discount.courses && discount.courses.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-border/50">
-                        <p className="text-xs text-muted-foreground mb-2">Applicable Courses:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {discount.courses.map((course) => (
-                            <Badge key={course.id} variant="outline" className="text-xs">
-                              {course.title}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              )}
+
+              {/* Expired Discount Codes */}
+              {expiredDiscounts.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">
+                    Expired Codes ({expiredDiscounts.length})
+                  </h3>
+                  <div className="grid gap-4">
+                    {expiredDiscounts.map((discount) => {
+                      const expired = isExpired(discount.expires_at);
+                      
+                      return (
+                        <div
+                          key={discount.id}
+                          className="bg-card rounded-xl border border-border/50 p-5 shadow-soft opacity-60"
+                        >
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="font-bold text-lg text-foreground">{discount.code}</h3>
+                                <Badge variant={expired ? 'locked' : discount.is_active ? 'active' : 'pending'}>
+                                  {expired ? 'Expired' : discount.is_active ? 'Active' : 'Inactive'}
+                                </Badge>
+                              </div>
+                              
+                              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Percent className="h-4 w-4" />
+                                  <span>{discount.discount_percent}% off</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>Expires: {new Date(discount.expires_at).toLocaleDateString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Tag className="h-4 w-4" />
+                                  <span>{discount.course_count} course{discount.course_count !== 1 ? 's' : ''}</span>
+                                </div>
+                                {discount.max_usage && (
+                                  <div>
+                                    <span>Used: {discount.usage_count}/{discount.max_usage}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenDialog(discount)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteDiscount(discount.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                          
+                          {discount.courses && discount.courses.length > 0 && (
+                            <div className="mt-3 pt-3 border-t border-border/50">
+                              <p className="text-xs text-muted-foreground mb-2">Applicable Courses:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {discount.courses.map((course) => (
+                                  <Badge key={course.id} variant="outline" className="text-xs">
+                                    {course.title}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>

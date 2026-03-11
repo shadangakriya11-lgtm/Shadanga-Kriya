@@ -235,6 +235,7 @@ export default function PaymentLinkPage() {
             const verifyData = await verifyResponse.json();
             setPaymentId(verifyData.payment.id);
             setPaymentData({
+              orderId: razorpayResponse.razorpay_order_id,
               transactionId: razorpayResponse.razorpay_payment_id,
               amount: data.amount / 100,
               createdAt: new Date().toISOString(),
@@ -319,6 +320,10 @@ export default function PaymentLinkPage() {
 
         <div class="section">
           <div class="section-title">Transaction Details</div>
+          <div class="row">
+            <span class="label">Razorpay Order ID</span>
+            <span class="value">${paymentData.orderId || 'N/A'}</span>
+          </div>
           <div class="row">
             <span class="label">Razorpay Payment ID</span>
             <span class="value">${paymentData.transactionId}</span>
