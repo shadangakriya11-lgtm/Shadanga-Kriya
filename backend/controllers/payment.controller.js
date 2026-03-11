@@ -323,11 +323,19 @@ const getAllPayments = async (req, res) => {
     }
 
     // Get count
-    const countResult = await pool.query(
-      query.replace(/SELECT p\.\*.*FROM/, 'SELECT COUNT(*) FROM'),
-      params
-    );
-    const total = parseInt(countResult.rows[0].count);
+    const countQuery = `
+      SELECT COUNT(*) as count
+      FROM payments p
+      LEFT JOIN courses c ON p.course_id = c.id
+      JOIN users u ON p.user_id = u.id
+      WHERE 1=1
+      ${status ? ` AND p.status = $1` : ''}
+      ${userId ? ` AND p.user_id = $${status ? 2 : 1}` : ''}
+      ${courseId ? ` AND p.course_id = $${(status ? 1 : 0) + (userId ? 1 : 0) + 1}` : ''}
+    `;
+    
+    const countResult = await pool.query(countQuery, params);
+    const total = parseInt(countResult.rows[0]?.count || 0);
 
     query += ` ORDER BY p.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
