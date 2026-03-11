@@ -33,8 +33,8 @@ exports.generatePaymentLink = async (req, res) => {
 
     const course = courseResult.rows[0];
     
-    // Generate payment link
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    // Generate payment link using CLIENT_DOMAIN from .env
+    const baseUrl = process.env.CLIENT_DOMAIN || process.env.FRONTEND_URL || 'http://localhost:5173';
     const courseSlug = course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const paymentLink = `${baseUrl}/pay/${courseId}/${courseSlug}`;
 
