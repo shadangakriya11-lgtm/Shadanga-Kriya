@@ -18,6 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyEnrollments, useMyPayments, useMyProgress } from '@/hooks/useApi';
+import { shouldShowPaymentFeatures } from '@/lib/platformDetection';
 
 export default function Progress() {
   const navigate = useNavigate();
@@ -49,7 +50,7 @@ export default function Progress() {
             Your Progress
           </h1>
           <p className="text-muted-foreground">
-            Track your therapy journey and payment history
+            Track your therapy journey{shouldShowPaymentFeatures() ? ' and payment history' : ''}
           </p>
         </section>
 
@@ -79,10 +80,12 @@ export default function Progress() {
               <BookOpen className="h-4 w-4 mr-2" />
               Courses
             </TabsTrigger>
-            <TabsTrigger value="payments" className="flex-1">
-              <CreditCard className="h-4 w-4 mr-2" />
-              Payments
-            </TabsTrigger>
+            {shouldShowPaymentFeatures() && (
+              <TabsTrigger value="payments" className="flex-1">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Payments
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Progress Tab */}
@@ -148,8 +151,9 @@ export default function Progress() {
             )}
           </TabsContent>
 
-          {/* Payments Tab */}
-          <TabsContent value="payments" className="space-y-4">
+          {/* Payments Tab - Only show on web/Android */}
+          {shouldShowPaymentFeatures() && (
+            <TabsContent value="payments" className="space-y-4">
             {/* Payment Summary */}
             <div className="bg-card rounded-xl border border-border/50 p-5 shadow-soft animate-fade-in">
               <h3 className="font-medium text-foreground mb-3">Payment Summary</h3>
@@ -215,6 +219,7 @@ export default function Progress() {
               </div>
             )}
           </TabsContent>
+          )}
         </Tabs>
       </main>
 

@@ -15,6 +15,8 @@ import {
   BookOpen,
   Users,
   Shield,
+  Link as LinkIcon,
+  Copy,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -46,6 +48,7 @@ import {
   useUpdateCourse,
   useDeleteCourse,
 } from "@/hooks/useApi";
+import { getCachedToken } from "@/lib/api";
 import { CoursePermissionDialog } from "@/components/admin/CoursePermissionDialog";
 
 export default function AdminCourses() {
@@ -53,6 +56,9 @@ export default function AdminCourses() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<any | null>(null);
   const [permissionCourse, setPermissionCourse] = useState<any | null>(null);
+  const [paymentLinkDialogOpen, setPaymentLinkDialogOpen] = useState(false);
+  const [generatedPaymentLink, setGeneratedPaymentLink] = useState("");
+  const [selectedCourseForLink, setSelectedCourseForLink] = useState<any | null>(null);
   const [newCourse, setNewCourse] = useState({
     title: "",
     description: "",
@@ -125,6 +131,46 @@ export default function AdminCourses() {
       } catch (error) {
         console.error("Failed to delete course:", error);
       }
+    }
+  };
+
+  const handleGeneratePaymentLink = async (course: any) => {
+    try {
+      setSelectedCourseForLink(course);
+      const token = getCachedToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/payment-links/generate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: JSON.stringify({ courseId: course.id }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate payment link');
+      }
+
+      setGeneratedPaymentLink(data.paymentLink);
+      setPaymentLinkDialogOpen(true);
+    } catch (error) {
+      console.error('Error generating payment link:', error);
+      alert('Failed to generate payment link');
+    }
+  };
+
+  const handleCopyPaymentLink = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedPaymentLink);
+      alert('Payment link copied to clipboard!');
+    } catch (error) {
+      console.error('Failed to copy:', error);
     }
   };
 
@@ -209,6 +255,11 @@ export default function AdminCourses() {
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate(`/admin/lessons`)}>
               Manage Lessons
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleGeneratePaymentLink(course)}>
+              <LinkIcon className="h-4 w-4 mr-2" />
+              Generate Payment Link
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setPermissionCourse(course)}>
@@ -458,6 +509,90 @@ export default function AdminCourses() {
               onOpenChange={(open) => !open && setPermissionCourse(null)}
             />
           )}
+
+          {/* Payment Link Dialog */}
+          <Dialog open={paymentLinkDialogOpen} onOpenChange={setPaymentLinkDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="font-serif">Payment Link Generated</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                {selectedCourseForLink && (
+                  <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                      <span className="font-medium text-foreground">
+                        {selectedCourseForLink.title}
+                      </span>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Price: ₹{selectedCourseForLink.price?.toLocaleString() || 0}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <Label>Payment Link</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={generatedPaymentLink}
+                      readOnly
+                      className="font-mono text-sm"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleCopyPaymentLink}
+                      title="Copy to clipboard"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Share this link with students to allow them to pay and enroll in the course.
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
+                  <div className="flex items-start gap-2">
+                    <LinkIcon className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        How it works:
+                      </p>
+                      <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-1 list-disc list-inside">
+                        <li>Students can pay without logging in</li>
+                        <li>New users are automatically created with default password: Password@123</li>
+                        <li>Existing users can pay and get enrolled instantly</li>
+                        <li>Discount codes can be applied during payment</li>
+                        <li>All transactions are tracked in the Payments section</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setPaymentLinkDialogOpen(false);
+                      setGeneratedPaymentLink('');
+                      setSelectedCourseForLink(null);
+                    }}
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    variant="premium"
+                    onClick={handleCopyPaymentLink}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Link
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>

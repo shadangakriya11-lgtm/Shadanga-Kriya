@@ -549,7 +549,7 @@ export const paymentsApi = {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  createRazorpayOrder: (courseId: string) =>
+  createRazorpayOrder: (courseId: string, finalAmount?: number) =>
     apiRequest<{
       orderId: string;
       amount: number;
@@ -558,7 +558,7 @@ export const paymentsApi = {
       courseTitle: string;
     }>("/payments/create-razorpay-order", {
       method: "POST",
-      body: JSON.stringify({ courseId }),
+      body: JSON.stringify({ courseId, finalAmount }),
     }),
   verifyRazorpay: (data: Record<string, string>) =>
     apiRequest<Payment>("/payments/verify-razorpay", {

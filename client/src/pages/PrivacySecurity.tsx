@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ChevronLeft, Shield, Lock, Eye, FileText, Cookie, UserCheck } from 'lucide-react';
+import { shouldShowPaymentFeatures } from '@/lib/platformDetection';
 
 export default function PrivacySecurity() {
     const navigate = useNavigate();
@@ -79,7 +80,7 @@ export default function PrivacySecurity() {
                                 <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                                     <li>Name and email address</li>
                                     <li>Profile information and preferences</li>
-                                    <li>Payment and billing information</li>
+                                    {shouldShowPaymentFeatures() && <li>Payment and billing information</li>}
                                     <li>Communication history with support</li>
                                 </ul>
                             </div>
@@ -253,7 +254,7 @@ export default function PrivacySecurity() {
                                 <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
                                     <li>Your personal information (name, email, phone number)</li>
                                     <li>All course enrollments and progress records</li>
-                                    <li>Payment history and transaction records</li>
+                                    {shouldShowPaymentFeatures() && <li>Payment history and transaction records</li>}
                                     <li>Downloaded content and offline data</li>
                                     <li>Notifications and communication history</li>
                                     <li>All other associated data</li>

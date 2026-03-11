@@ -35,7 +35,9 @@ import AdminPayments from "./pages/AdminPayments";
 import AdminSubAdmins from "./pages/AdminSubAdmins";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminNotifications from "./pages/AdminNotifications";
+import AdminSupport from "./pages/AdminSupport";
 import AdminSettings from "./pages/AdminSettings";
+import AdminDiscounts from "./pages/AdminDiscounts";
 import AdminReferralAnalytics from "./pages/AdminReferralAnalytics";
 import AdminDemoAnalytics from "./pages/AdminDemoAnalytics";
 import FacilitatorDashboard from "./pages/FacilitatorDashboard";
@@ -48,6 +50,7 @@ import FacilitatorCourses from "./pages/FacilitatorCourses";
 import FacilitatorReferrals from "./pages/FacilitatorReferrals";
 import DownloadsPage from "./pages/learner/DownloadsPage";
 import Demo from "./pages/Demo";
+import PaymentLinkPage from "./pages/PaymentLinkPage";
 import NotFound from "./pages/NotFound";
 import About from "./pages/About";
 import VisionMission from "./pages/VisionMission";
@@ -243,6 +246,9 @@ const AppContent = () => {
               {/* Auth */}
               <Route path="/auth" element={<Auth />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
+              
+              {/* Payment Link - Public */}
+              <Route path="/pay/:courseId/:courseSlug" element={<PaymentLinkPage />} />
 
               {/* Learner Routes */}
               <Route path="/splash" element={<Splash />} />
@@ -398,6 +404,22 @@ const AppContent = () => {
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
                     <AdminNotifications />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/support"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminSupport />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/discounts"
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <AdminDiscounts />
                   </ProtectedRoute>
                 }
               />

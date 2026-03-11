@@ -18,6 +18,7 @@ import {
     ChevronDown,
     ChevronUp,
 } from 'lucide-react';
+import { shouldShowPaymentFeatures } from '@/lib/platformDetection';
 
 const faqs = [
     {
@@ -25,37 +26,16 @@ const faqs = [
         icon: <BookOpen className="h-5 w-5" />,
         questions: [
             {
-                q: 'How do I reset my password?',
-                a: 'Click the "Forgot Password" link on the login page. Enter your email address and we will send you a password reset link.',
-            },
-            {
-                q: 'Can I change my email address?',
-                a: 'Yes, go to your profile settings and update your email address. You will receive a confirmation email to verify the change.',
+                q: 'How do I update my profile information?',
+                a: 'Go to your Profile page from the bottom navigation. You can update your name, email address, phone number, and other personal details.',
             },
             {
                 q: 'How do I delete my account?',
-                a: 'Contact our support team to request account deletion. Please note this action is irreversible and all your data will be permanently removed.',
+                a: 'Go to your Profile page and scroll to the bottom. Click "Delete Account" and follow the confirmation steps. Please note this action is irreversible and all your data will be permanently removed.',
             },
         ],
     },
-    {
-        category: 'Course Access',
-        icon: <Headphones className="h-5 w-5" />,
-        questions: [
-            {
-                q: 'How do I enroll in a course?',
-                a: 'Browse the available courses, select one you are interested in, and click "Enroll Now". For paid courses, you will need to complete the payment process first.',
-            },
-            {
-                q: 'Can I access courses offline?',
-                a: 'Currently, courses require an internet connection. We recommend using a stable WiFi connection for the best experience.',
-            },
-            {
-                q: 'Why is a lesson locked?',
-                a: 'Lessons are unlocked sequentially. You must complete the previous lesson before accessing the next one. This ensures a proper learning progression.',
-            },
-        ],
-    },
+
     {
         category: 'Audio Playback',
         icon: <Headphones className="h-5 w-5" />,
@@ -74,39 +54,26 @@ const faqs = [
             },
         ],
     },
-    {
-        category: 'Payments',
-        icon: <CreditCard className="h-5 w-5" />,
-        questions: [
-            {
-                q: 'What payment methods do you accept?',
-                a: 'We accept major credit cards, debit cards, and digital payment methods. All transactions are secure and encrypted.',
-            },
-            {
-                q: 'Is my payment information secure?',
-                a: 'Yes, we use industry-standard encryption and do not store your complete payment details. All transactions are processed through secure payment gateways.',
-            },
-            {
-                q: 'Can I get a refund?',
-                a: 'Refund policies vary by course. Please check the specific course details or contact support for refund requests within the eligible period.',
-            },
-        ],
-    },
+
     {
         category: 'Technical Issues',
         icon: <Smartphone className="h-5 w-5" />,
         questions: [
             {
-                q: 'What browsers are supported?',
-                a: 'We support the latest versions of Chrome, Firefox, Safari, and Edge. For the best experience, keep your browser updated.',
+                q: 'The app is not working properly on my iPhone/iPad. What should I do?',
+                a: 'First, make sure you have the latest version of the app from the App Store. Try closing and reopening the app. If issues persist, restart your device. Check that you have a stable internet connection and sufficient storage space.',
+            },
+            {
+                q: 'Audio is not playing on my iOS device. How do I fix this?',
+                a: 'Check that your device is not in silent mode (check the side switch). Ensure the volume is turned up. Try using headphones to test if the issue is with the speaker. Close other apps that might be using audio. If the problem continues, restart your device.',
             },
             {
                 q: 'The page is loading slowly. What should I do?',
-                a: 'Check your internet connection speed. Clear your browser cache and cookies. Try using a different browser or device.',
+                a: 'Check your internet connection speed. We recommend a minimum of 5 Mbps for smooth streaming. Try switching between WiFi and mobile data. Close other apps running in the background. Clear the app cache by closing and reopening it.',
             },
             {
                 q: 'I am getting an error message. What should I do?',
-                a: 'Take a screenshot of the error message and contact our support team. Include details about what you were doing when the error occurred.',
+                a: 'Take a screenshot of the error message and contact our support team. Include details about what you were doing when the error occurred, your device model, and operating system version.',
             },
         ],
     },
@@ -126,11 +93,30 @@ export default function HelpSupport() {
         setExpandedFaq(expandedFaq === id ? null : id);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // TODO: Implement contact form submission
-        alert('Thank you for contacting us! We will get back to you soon.');
-        setContactForm({ name: '', email: '', subject: '', message: '' });
+        
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/support/message`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(contactForm),
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to send message');
+            }
+
+            alert('Thank you for contacting us! We will get back to you soon.');
+            setContactForm({ name: '', email: '', subject: '', message: '' });
+        } catch (error) {
+            console.error('Error submitting contact form:', error);
+            alert(error instanceof Error ? error.message : 'Failed to send message. Please try again.');
+        }
     };
 
     return (
@@ -175,7 +161,14 @@ export default function HelpSupport() {
                     </div>
 
                     <div className="space-y-4">
-                        {faqs.map((category, catIndex) => (
+                        {faqs.filter(category => {
+                            // Hide Payments and Course Access categories on iOS
+                            if (!shouldShowPaymentFeatures() && 
+                                (category.category === 'Payments' || category.category === 'Course Access')) {
+                                return false;
+                            }
+                            return true;
+                        }).map((category, catIndex) => (
                             <Card key={catIndex} className="overflow-hidden">
                                 <div className="p-4 bg-muted/50 border-b border-border">
                                     <div className="flex items-center gap-2">
@@ -212,64 +205,6 @@ export default function HelpSupport() {
                             </Card>
                         ))}
                     </div>
-                </section>
-
-                {/* System Requirements */}
-                <section className="mb-8">
-                    <div className="flex items-center gap-3 mb-4">
-                        <Smartphone className="h-6 w-6 text-primary" />
-                        <h2 className="font-serif text-xl font-semibold text-foreground">System Requirements</h2>
-                    </div>
-                    <Card className="p-6">
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                                    <Smartphone className="h-4 w-4 text-primary" />
-                                    Supported Devices
-                                </h3>
-                                <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
-                                    <li>Desktop computers (Windows, Mac, Linux)</li>
-                                    <li>Laptops</li>
-                                    <li>Tablets (iOS, Android)</li>
-                                    <li>Smartphones (iOS, Android)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                                    <Wifi className="h-4 w-4 text-primary" />
-                                    Internet Connection
-                                </h3>
-                                <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
-                                    <li>Minimum: 5 Mbps download speed</li>
-                                    <li>Recommended: 10+ Mbps for best quality</li>
-                                    <li>Stable connection required for audio streaming</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                                    <BookOpen className="h-4 w-4 text-primary" />
-                                    Supported Browsers
-                                </h3>
-                                <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
-                                    <li>Google Chrome (latest version)</li>
-                                    <li>Mozilla Firefox (latest version)</li>
-                                    <li>Safari (latest version)</li>
-                                    <li>Microsoft Edge (latest version)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                                    <Headphones className="h-4 w-4 text-primary" />
-                                    Audio Requirements
-                                </h3>
-                                <ul className="text-sm text-muted-foreground space-y-1 ml-6 list-disc">
-                                    <li>Working speakers or headphones</li>
-                                    <li>Updated audio drivers</li>
-                                    <li>Browser audio permissions enabled</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </Card>
                 </section>
 
                 {/* Contact Support */}

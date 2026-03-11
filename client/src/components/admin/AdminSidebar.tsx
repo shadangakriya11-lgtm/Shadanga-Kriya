@@ -16,6 +16,7 @@ import {
   Bell,
   Ticket,
   Headphones,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -31,10 +32,12 @@ const navItems = [
   { icon: ListMusic, label: 'Lessons', href: '/admin/lessons' },
   { icon: Activity, label: 'Monitoring', href: '/admin/monitoring' },
   { icon: CreditCard, label: 'Payments', href: '/admin/payments' },
+  { icon: Ticket, label: 'Discounts', href: '/admin/discounts' },
   { icon: UserCog, label: 'Sub-Admins', href: '/admin/subadmins' },
   { icon: BarChart3, label: 'Analytics', href: '/admin/analytics' },
   { icon: Ticket, label: 'Referrals', href: '/admin/referrals' },
   { icon: Headphones, label: 'Demo Analytics', href: '/admin/demo-analytics' },
+  { icon: MessageSquare, label: 'Support', href: '/admin/support' },
   { icon: Bell, label: 'Notifications', href: '/admin/notifications' },
 ];
 

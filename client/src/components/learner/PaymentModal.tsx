@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Course } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +21,11 @@ import {
   Check,
   AlertCircle,
   Loader2,
+  Tag,
+  X,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { paymentsApi } from "@/lib/api";
+import { paymentsApi, getCachedToken } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { shouldShowPaymentFeatures } from "@/lib/platformDetection";
@@ -65,6 +70,88 @@ export function PaymentModal({
     "details" | "processing" | "success" | "error"
   >("details");
   const [errorMessage, setErrorMessage] = useState("");
+  
+  // Discount code state
+  const [hasDiscountCode, setHasDiscountCode] = useState(false);
+  const [discountCode, setDiscountCode] = useState("");
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    discountPercent: number;
+    discountAmount: number;
+    finalPrice: number;
+  } | null>(null);
+
+  const handleValidateDiscount = async () => {
+    if (!discountCode.trim() || !course) return;
+
+    setIsValidatingCode(true);
+    try {
+      const token = getCachedToken();
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/discounts/validate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: JSON.stringify({
+            code: discountCode.toUpperCase(),
+            courseId: course.id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.valid) {
+        toast({
+          title: 'Invalid Code',
+          description: data.error || 'This discount code is not valid',
+          variant: 'destructive',
+        });
+        setAppliedDiscount(null);
+        return;
+      }
+
+      // Calculate discount
+      const originalPrice = course.price || 0;
+      const discountPercent = data.discountCode.discountPercent;
+      const discountAmount = Math.round((originalPrice * discountPercent) / 100);
+      const finalPrice = originalPrice - discountAmount;
+
+      setAppliedDiscount({
+        code: data.discountCode.code,
+        discountPercent,
+        discountAmount,
+        finalPrice,
+      });
+
+      toast({
+        title: 'Discount Applied!',
+        description: `${discountPercent}% off - You save ₹${discountAmount}`,
+      });
+    } catch (error) {
+      console.error('Error validating discount code:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to validate discount code',
+        variant: 'destructive',
+      });
+      setAppliedDiscount(null);
+    } finally {
+      setIsValidatingCode(false);
+    }
+  };
+
+  const handleRemoveDiscount = () => {
+    setAppliedDiscount(null);
+    setDiscountCode('');
+  };
+
+  const finalAmount = appliedDiscount ? appliedDiscount.finalPrice : (course?.price || 0);
 
   const handlePayment = async () => {
     if (!course || !user) return;
@@ -82,7 +169,7 @@ export function PaymentModal({
       }
 
       // 2. Create order on backend
-      const orderData = await paymentsApi.createRazorpayOrder(course.id);
+      const orderData = await paymentsApi.createRazorpayOrder(course.id, finalAmount);
 
       // 3. Open Razorpay Checkout
       // Note: Logo only works with publicly accessible HTTPS URLs
@@ -262,11 +349,106 @@ export function PaymentModal({
             </div>
 
             {/* Price */}
-            <div className="flex items-center justify-between py-3 border-t border-b border-border">
-              <span className="text-muted-foreground">Course Fee</span>
-              <span className="font-serif text-2xl font-bold text-foreground">
-                ₹{course.price?.toLocaleString()}
-              </span>
+            <div className="space-y-2">
+              {appliedDiscount ? (
+                <>
+                  <div className="flex items-center justify-between py-2 text-sm">
+                    <span className="text-muted-foreground">Original Price</span>
+                    <span className="line-through text-muted-foreground">
+                      ₹{course.price?.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 text-sm">
+                    <span className="text-success flex items-center gap-1">
+                      <Tag className="h-4 w-4" />
+                      Discount ({appliedDiscount.discountPercent}%)
+                    </span>
+                    <span className="text-success font-medium">
+                      -₹{appliedDiscount.discountAmount.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-3 border-t border-b border-border">
+                    <span className="font-medium text-foreground">Final Amount</span>
+                    <span className="font-serif text-2xl font-bold text-success">
+                      ₹{appliedDiscount.finalPrice.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <Badge variant="active" className="flex items-center gap-1">
+                      <Tag className="h-3 w-3" />
+                      {appliedDiscount.code}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveDiscount}
+                      className="h-auto p-1 text-xs"
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-between py-3 border-t border-b border-border">
+                  <span className="text-muted-foreground">Course Fee</span>
+                  <span className="font-serif text-2xl font-bold text-foreground">
+                    ₹{course.price?.toLocaleString()}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Discount Code Section */}
+            <div className="space-y-3 mt-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="hasDiscount"
+                  checked={hasDiscountCode}
+                  onCheckedChange={(checked) => {
+                    setHasDiscountCode(checked as boolean);
+                    if (!checked) {
+                      setDiscountCode('');
+                      setAppliedDiscount(null);
+                    }
+                  }}
+                  disabled={!!appliedDiscount}
+                />
+                <Label
+                  htmlFor="hasDiscount"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  I have a discount code
+                </Label>
+              </div>
+
+              {hasDiscountCode && !appliedDiscount && (
+                <div className="flex gap-2 animate-in slide-in-from-top-2">
+                  <Input
+                    placeholder="Enter discount code"
+                    value={discountCode}
+                    onChange={(e) => setDiscountCode(e.target.value.toUpperCase())}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleValidateDiscount();
+                      }
+                    }}
+                    disabled={isValidatingCode}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={handleValidateDiscount}
+                    disabled={!discountCode.trim() || isValidatingCode}
+                  >
+                    {isValidatingCode ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Apply'
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
 
             {/* Security Notice */}
@@ -297,7 +479,7 @@ export function PaymentModal({
                 ) : (
                   <>
                     <CreditCard className="h-4 w-4 mr-2" />
-                    Pay ₹{course.price?.toLocaleString()}
+                    Pay ₹{finalAmount.toLocaleString()}
                   </>
                 )}
               </Button>
