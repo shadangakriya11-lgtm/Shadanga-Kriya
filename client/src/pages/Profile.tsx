@@ -19,7 +19,6 @@ import {
   Phone,
   Calendar,
   Shield,
-  Bell,
   LogOut,
   ChevronRight,
   HelpCircle,
@@ -27,7 +26,6 @@ import {
   Trash2,
   AlertTriangle
 } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/contexts/AuthContext';
 import { authApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +34,6 @@ export default function Profile() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
   const { toast } = useToast();
-  const [notifications, setNotifications] = useState(true);
 
   // Edit Profile State
   const [isEditing, setIsEditing] = useState(false);
@@ -200,14 +197,6 @@ export default function Profile() {
           <h2 className="font-medium text-foreground px-5 pt-5 pb-3">Settings</h2>
 
           <div className="divide-y divide-border/50">
-            <div className="flex items-center justify-between px-5 py-4">
-              <div className="flex items-center gap-3">
-                <Bell className="h-5 w-5 text-muted-foreground" />
-                <span className="text-foreground">Notifications</span>
-              </div>
-              <Switch checked={notifications} onCheckedChange={setNotifications} />
-            </div>
-
             <button className="flex items-center justify-between w-full px-5 py-4 hover:bg-muted/50 transition-colors" onClick={() => navigate('/privacy')}>
               <div className="flex items-center gap-3">
                 <Shield className="h-5 w-5 text-muted-foreground" />

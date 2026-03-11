@@ -227,11 +227,7 @@ export function DownloadsPage() {
           <Card className="text-center py-12">
             <CardContent>
               <Download className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No Downloads Yet</h3>
-              <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-                Download lessons from your enrolled courses to listen offline
-                during your practice sessions.
-              </p>
+              <h3 className="text-lg font-medium mb-4">No Downloads Yet</h3>
               <Button onClick={() => navigate("/home")}>
                 Browse My Courses
               </Button>

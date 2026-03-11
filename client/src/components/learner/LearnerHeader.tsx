@@ -1,5 +1,3 @@
-import { NotificationBell } from "./NotificationBell";
-
 interface LearnerHeaderProps {
   userName?: string;
 }
@@ -12,7 +10,6 @@ export function LearnerHeader({ userName = "User" }: LearnerHeaderProps) {
           <p className="text-xs text-muted-foreground">Welcome back</p>
           <p className="font-medium text-foreground">{userName}</p>
         </div>
-        <NotificationBell />
       </div>
     </header>
   );
