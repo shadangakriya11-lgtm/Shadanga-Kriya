@@ -59,17 +59,12 @@ export function ThemeProvider({
 
     // Update status bar for native platforms
     if (Capacitor.isNativePlatform()) {
-      try {
-        if (effectiveTheme === 'dark') {
-          StatusBar.setStyle({ style: Style.Dark });
-          StatusBar.setBackgroundColor({ color: '#0a0a0a' }); // Dark background
-        } else {
-          StatusBar.setStyle({ style: Style.Light });
-          StatusBar.setBackgroundColor({ color: '#0d4744' }); // Teal background for light mode
-        }
-      } catch (error) {
-        console.error('Failed to update status bar:', error);
-      }
+      StatusBar.setStyle({ style: effectiveTheme === 'dark' ? Style.Dark : Style.Light })
+        .catch((error) => console.error('Failed to set status bar style:', error));
+      
+      StatusBar.setBackgroundColor({ 
+        color: effectiveTheme === 'dark' ? '#1a1a1a' : '#007AFF' // Blue background for light mode
+      }).catch((error) => console.error('Failed to set status bar background:', error));
     }
   }, [theme]);
 

@@ -31,24 +31,24 @@ const roleConfig = {
     icon: User,
     title: "Practitioner",
     description: "Access guided meditation and track your spiritual journey",
-    color: "bg-gradient-to-br from-teal-500 to-cyan-500",
-    textColor: "text-teal-600 dark:text-teal-400",
+    color: "bg-gradient-to-br from-primary to-primary",
+    textColor: "text-primary",
     redirectTo: "/home",
   },
   admin: {
     icon: BarChart3,
     title: "Administrator",
     description: "Manage users, courses, and platform settings",
-    color: "bg-gradient-to-br from-amber-500 to-orange-500",
-    textColor: "text-amber-600 dark:text-amber-400",
+    color: "bg-gradient-to-br from-primary to-primary",
+    textColor: "text-primary",
     redirectTo: "/admin",
   },
   facilitator: {
     icon: Users,
     title: "Facilitator",
     description: "Supervise sessions and guide practitioners",
-    color: "bg-gradient-to-br from-teal-600 to-teal-400",
-    textColor: "text-teal-700 dark:text-teal-300",
+    color: "bg-gradient-to-br from-primary to-primary",
+    textColor: "text-primary",
     redirectTo: "/facilitator",
   },
 };
@@ -167,124 +167,84 @@ export default function Auth() {
   // Native App - Custom Design
   if (isNativePlatform) {
     return (
-      <div className="min-h-screen bg-background flex flex-col overflow-hidden">
-        {/* Fixed Header Buttons - Outside curved area for proper touch */}
-        <div className="absolute top-4 left-4 z-50">
+      <div className="min-h-screen bg-background flex flex-col">
+        {/* Simple Header with Back Button */}
+        <div className="pt-safe px-4 py-4 flex items-center justify-between">
           <button
             onClick={() => navigate("/")}
-            className="p-2.5 rounded-full bg-white/30 backdrop-blur-sm text-white shadow-lg active:scale-95 transition-transform"
+            className="p-2 rounded-full hover:bg-muted/50 active:scale-95 transition-transform"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-6 w-6 text-primary" />
           </button>
-        </div>
-        <div className="absolute top-4 right-4 z-50">
           <ThemeToggle />
         </div>
 
-        {/* Curved Header with Gradient */}
-        <div className="relative">
-          <div
-            className="h-44 bg-gradient-to-br from-teal-600 via-teal-500 to-cyan-500"
-            style={{
-              borderBottomLeftRadius: '50% 30%',
-              borderBottomRightRadius: '50% 30%',
-            }}
-          >
-            <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{
-              borderBottomLeftRadius: '50% 30%',
-              borderBottomRightRadius: '50% 30%',
-            }}>
-              <div className="absolute top-10 left-10 w-20 h-20 rounded-full bg-white/10 blur-xl" />
-              <div className="absolute top-20 right-16 w-16 h-16 rounded-full bg-white/10 blur-xl" />
-              <div className="absolute bottom-8 left-1/4 w-24 h-24 rounded-full bg-teal-400/20 blur-2xl" />
-            </div>
-
-            {/* Logo - Inside gradient */}
-            <div className="absolute inset-x-0 top-10 flex items-center justify-center pointer-events-none">
-              <div className="bg-card/90 dark:bg-card/80 backdrop-blur-sm rounded-full p-2 shadow-xl border border-border/20">
-                <img
-                  src="/shadanga-kriya-logo.png"
-                  alt="Shadanga Kriya"
-                  className="h-20 w-20 object-contain"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 px-6 pt-4 relative z-10">
-          {/* Welcome Text - Below header */}
-          <div className="text-center mb-5">
-            <h1 className="text-2xl font-bold text-foreground mb-1">
-              {mode === "login" ? "Welcome Back" : "Get Started Free"}
+        {/* Main Content - Scrollable */}
+        <div className="flex-1 px-6 pt-8 pb-8 overflow-y-auto">
+          {/* Title */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              {mode === "login" ? "Welcome Back" : "Create an account."}
             </h1>
-            <p className="text-sm text-muted-foreground">
-              {mode === "login"
-                ? "Enter your details below"
-                : "Create your account to begin"}
-            </p>
+            {mode === "login" && (
+              <p className="text-base text-muted-foreground">
+                Enter your details below
+              </p>
+            )}
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             {mode === "signup" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="fullName" className="text-sm text-muted-foreground">
-                  Name (First and Last Name)
+              <div className="space-y-2">
+                <Label htmlFor="fullName" className="text-sm font-medium text-muted-foreground">
+                  Your Name
                 </Label>
-                <div className="relative">
-                  <UserCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="Enter name (First and Last Name)"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
-                    required
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-sm text-muted-foreground">
-                Email Address
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="email@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  id="fullName"
+                  type="text"
+                  placeholder="First and Last Name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className="h-14 px-4 rounded-xl border border-border bg-background text-base focus:border-primary focus:ring-2 focus:ring-primary/10"
                   required
                 />
               </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-muted-foreground">
+                {mode === "signup" ? "Your Email" : "Email Address"}
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="h-14 px-4 rounded-xl border border-border bg-background text-base focus:border-primary focus:ring-2 focus:ring-primary/10"
+                required
+              />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-sm text-muted-foreground">
-                Password
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium text-muted-foreground">
+                {mode === "signup" ? "Create a strong password" : "Password"}
               </Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
+                  placeholder={mode === "signup" ? "Create a strong password" : "Enter your password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 pl-10 pr-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
+                  className="h-14 px-4 pr-12 rounded-xl border border-border bg-background text-base focus:border-primary focus:ring-2 focus:ring-primary/10"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
@@ -292,48 +252,51 @@ export default function Auth() {
             </div>
 
             {mode === "signup" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="confirmPassword" className="text-sm text-muted-foreground">
-                  Confirm Password
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-sm font-medium text-muted-foreground">
+                  Repeat password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                   <Input
                     id="confirmPassword"
                     type={showPassword ? "text" : "password"}
-                    placeholder="Confirm your password"
+                    placeholder="Repeat password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
+                    className="h-14 px-4 pr-12 rounded-xl border border-border bg-background text-base focus:border-primary focus:ring-2 focus:ring-primary/10"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
                 </div>
               </div>
             )}
 
             {mode === "signup" && (
-              <div className="space-y-1.5">
-                <Label htmlFor="referralCode" className="text-sm text-muted-foreground">
+              <div className="space-y-2">
+                <Label htmlFor="referralCode" className="text-sm font-medium text-muted-foreground">
                   Referral Code (Optional)
                 </Label>
-                <div className="relative">
-                  <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                  <Input
-                    id="referralCode"
-                    type="text"
-                    placeholder="Enter referral code"
-                    value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value)}
-                    className="h-12 pl-10 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary/20"
-                  />
-                </div>
+                <Input
+                  id="referralCode"
+                  type="text"
+                  placeholder="Enter referral code"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value)}
+                  className="h-14 px-4 rounded-xl border border-border bg-background text-base focus:border-primary focus:ring-2 focus:ring-primary/10"
+                />
               </div>
             )}
 
             <Button
               type="submit"
               size="lg"
-              className="w-full h-12 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white rounded-xl font-semibold text-base shadow-lg shadow-teal-500/25 mt-2"
+              className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-semibold text-base shadow-sm mt-6"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -342,22 +305,38 @@ export default function Auth() {
                   {mode === "login" ? "Signing in..." : "Creating account..."}
                 </span>
               ) : (
-                mode === "login" ? "Sign In" : "Sign Up"
+                mode === "login" ? "Sign In" : "Create an account"
               )}
             </Button>
+
+            {mode === "signup" && (
+              <p className="text-xs text-center text-muted-foreground px-4 mt-4">
+                By signing up you agree to our{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/privacy-security")}
+                  className="text-primary underline"
+                >
+                  Privacy Policy and Terms
+                </button>
+                .
+              </p>
+            )}
           </form>
 
           {/* Switch Mode */}
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            {mode === "login" ? "Don't have an account? " : "Already have an account? "}
-            <button
-              type="button"
-              onClick={() => setMode(mode === "login" ? "signup" : "login")}
-              className="text-primary font-semibold"
-            >
-              {mode === "login" ? "Sign Up" : "Sign In"}
-            </button>
-          </p>
+          <div className="mt-8 text-center">
+            <p className="text-base text-foreground">
+              {mode === "login" ? "Don't have an account? " : "Already have an account? "}
+              <button
+                type="button"
+                onClick={() => setMode(mode === "login" ? "signup" : "login")}
+                className="text-primary font-semibold"
+              >
+                {mode === "login" ? "Sign Up" : "Sign In"}
+              </button>
+            </p>
+          </div>
         </div>
 
         <ConsentFormDialog
@@ -374,26 +353,26 @@ export default function Auth() {
     <div className="min-h-screen bg-background flex">
       {/* Left Panel - Branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-teal-800 via-teal-700 to-cyan-800" />
+        <div className="absolute inset-0 bg-primary" />
 
         <div className="absolute inset-0 overflow-hidden">
           <div
             className="absolute top-20 left-10 w-72 h-72 rounded-full blur-3xl opacity-30 animate-float-slow"
             style={{
-              background: "radial-gradient(circle, hsl(174 65% 50% / 0.5) 0%, transparent 70%)",
+              background: "radial-gradient(circle, hsl(211 100% 50% / 0.5) 0%, transparent 70%)",
             }}
           />
           <div
             className="absolute bottom-20 right-10 w-96 h-96 rounded-full blur-3xl opacity-20 animate-float"
             style={{
-              background: "radial-gradient(circle, hsl(38 85% 55% / 0.5) 0%, transparent 70%)",
+              background: "radial-gradient(circle, hsl(211 100% 60% / 0.5) 0%, transparent 70%)",
               animationDelay: "2s",
             }}
           />
           <div
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-3xl opacity-25 animate-pulse-gentle"
             style={{
-              background: "radial-gradient(circle, hsl(180 50% 45% / 0.4) 0%, transparent 70%)",
+              background: "radial-gradient(circle, hsl(211 100% 55% / 0.4) 0%, transparent 70%)",
             }}
           />
         </div>
@@ -413,7 +392,7 @@ export default function Auth() {
 
             <div className="max-w-md animate-fade-in">
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-6">
-                <Sparkles className="h-4 w-4 text-amber-300" />
+                <Sparkles className="h-4 w-4 text-white" />
                 <span className="text-sm font-medium text-white/90">
                   {mode === "login" ? "Continue Your Journey" : "Begin Your Transformation"}
                 </span>
@@ -423,14 +402,14 @@ export default function Auth() {
                 {mode === "login" ? (
                   <>
                     Welcome Back,
-                    <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-100">
+                    <span className="block text-white/90">
                       Seeker
                     </span>
                   </>
                 ) : (
                   <>
                     Discover Your
-                    <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-amber-100">
+                    <span className="block text-white/90">
                       Inner Light
                     </span>
                   </>
@@ -446,7 +425,7 @@ export default function Auth() {
 
           <div className="space-y-4 animate-fade-in-up animation-fill-both animate-delay-300">
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-400 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center">
                 <Sunrise className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -455,7 +434,7 @@ export default function Auth() {
               </div>
             </div>
             <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-400 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-xl bg-white/20 flex items-center justify-center">
                 <Lock className="h-6 w-6 text-white" />
               </div>
               <div>
@@ -473,7 +452,7 @@ export default function Auth() {
         <div
           className="absolute top-20 right-10 w-64 h-64 rounded-full blur-3xl opacity-10"
           style={{
-            background: "radial-gradient(circle, hsl(174 65% 40%) 0%, transparent 70%)",
+            background: "radial-gradient(circle, hsl(211 100% 50%) 0%, transparent 70%)",
           }}
         />
 
@@ -505,7 +484,7 @@ export default function Auth() {
               <button
                 onClick={() => setMode("login")}
                 className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === "login"
-                  ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
+                  ? "bg-primary text-primary-foreground shadow-lg"
                   : "text-muted-foreground hover:text-foreground"
                   }`}
               >
@@ -514,7 +493,7 @@ export default function Auth() {
               <button
                 onClick={() => setMode("signup")}
                 className={`flex-1 py-3.5 px-4 rounded-xl text-sm font-medium transition-all duration-300 ${mode === "signup"
-                  ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg"
+                  ? "bg-primary text-primary-foreground shadow-lg"
                   : "text-muted-foreground hover:text-foreground"
                   }`}
               >
