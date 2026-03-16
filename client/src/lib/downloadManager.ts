@@ -48,6 +48,10 @@ const DEVICE_ID_KEY = "sk_device_id";
 const DOWNLOADS_INDEX_KEY = "sk_downloads_index";
 const AUDIO_FOLDER = "sk_audio_files";
 
+// Download/decryption locks to prevent race conditions
+const downloadLocks = new Map<string, Promise<void>>();
+const decryptionLocks = new Map<string, Promise<string>>();
+
 // ---------------------------------------------------------------------------
 // Secure key storage helpers
 // ---------------------------------------------------------------------------
@@ -444,6 +448,13 @@ export const downloadLesson = async (
   token: string,
   onProgress?: (progress: DownloadProgress) => void
 ): Promise<void> => {
+  // Check if download is already in progress
+  const existingDownload = downloadLocks.get(lessonId);
+  if (existingDownload) {
+    console.log(`[DL] Download already in progress for lesson ${lessonId}, waiting...`);
+    return existingDownload;
+  }
+
   const updateProgress = (
     status: DownloadProgress["status"],
     progress: number,
@@ -452,8 +463,10 @@ export const downloadLesson = async (
     onProgress?.({ lessonId, status, progress, error });
   };
 
-  try {
-    updateProgress("pending", 0);
+  // Create download promise and store it
+  const downloadPromise = (async () => {
+    try {
+      updateProgress("pending", 0);
 
     // 1. Authorize
     const { audioUrl, encryptionKey, lesson } = await authorizeDownload(
@@ -576,7 +589,16 @@ export const downloadLesson = async (
       error instanceof Error ? error.message : "Download failed";
     updateProgress("error", 0, errorMessage);
     throw error;
+  } finally {
+    // Remove lock when done (success or failure)
+    downloadLocks.delete(lessonId);
   }
+  })();
+
+  // Store the promise
+  downloadLocks.set(lessonId, downloadPromise);
+  
+  return downloadPromise;
 };
 
 // ---------------------------------------------------------------------------
@@ -619,8 +641,18 @@ export const loadEncryptedAudio = async (
   lessonId: string,
   token: string
 ): Promise<string> => {
-  // 1. Load manifest
-  let manifest: ChunkManifest;
+  // Check if decryption is already in progress
+  const existingDecryption = decryptionLocks.get(lessonId);
+  if (existingDecryption) {
+    console.log(`[DL] Decryption already in progress for lesson ${lessonId}, waiting...`);
+    return existingDecryption;
+  }
+
+  // Create decryption promise and store it
+  const decryptionPromise = (async () => {
+    try {
+      // 1. Load manifest
+      let manifest: ChunkManifest;
   try {
     const manifestResult = await Filesystem.readFile({
       path: `${AUDIO_FOLDER}/${lessonId}_manifest.json`,
@@ -805,6 +837,27 @@ export const loadEncryptedAudio = async (
   }
 
   return Capacitor.convertFileSrc(fileInfo.uri);
+    } catch (error) {
+      // Clean up on error
+      try {
+        await Filesystem.deleteFile({
+          path: tempPath,
+          directory: Directory.Data,
+        });
+      } catch {
+        // Ignore
+      }
+      throw error;
+    } finally {
+      // Remove lock when done (success or failure)
+      decryptionLocks.delete(lessonId);
+    }
+  })();
+
+  // Store the promise
+  decryptionLocks.set(lessonId, decryptionPromise);
+  
+  return decryptionPromise;
 };
 
 // ---------------------------------------------------------------------------
