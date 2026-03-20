@@ -469,21 +469,13 @@ export const downloadLesson = async (
   // Create download promise and store it
   const downloadPromise = (async () => {
     try {
-      console.log(`[DL] ========== DOWNLOAD START ==========`);
-      console.log(`[DL] Lesson ID: ${lessonId}`);
-      console.log(`[DL] Platform: ${Capacitor.getPlatform()}`);
-      console.log(`[DL] Attempt: ${retryCount + 1}/${MAX_RETRIES + 1}`);
-      
       updateProgress("pending", 0);
 
     // 1. Authorize
-    console.log(`[DL] Step 1: Authorizing download...`);
     const { audioUrl, encryptionKey, lesson } = await authorizeDownload(
       lessonId,
       token
     );
-    console.log(`[DL] Authorization successful`);
-    console.log(`[DL] Audio URL: ${audioUrl.substring(0, 100)}...`);
     updateProgress("downloading", 10);
 
     // 2. Determine download URL - use proxy for iOS to avoid CORS issues
@@ -495,14 +487,9 @@ export const downloadLesson = async (
     if (isIOS) {
       // Use backend proxy for iOS to avoid CORS and signed URL issues
       downloadUrl = `${API_BASE}/downloads/proxy/${lessonId}?deviceId=${encodeURIComponent(deviceId)}`;
-      console.log(`[DL] Using proxy URL for iOS`);
-    } else {
-      console.log(`[DL] Using direct URL for ${platform}`);
     }
 
     // 3. Stream-download the audio
-    console.log(`[DL] Step 2: Starting download...`);
-    console.log(`[DL] Download URL length: ${downloadUrl.length} chars`);
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 600_000); // 10 min timeout for large files
@@ -529,21 +516,14 @@ export const downloadLesson = async (
       const audioResponse = await fetch(downloadUrl, fetchOptions);
       clearTimeout(timeoutId);
       
-      console.log(`[DL] Response status: ${audioResponse.status}`);
-      console.log(`[DL] Response ok: ${audioResponse.ok}`);
-
       if (!audioResponse.ok) {
-        throw new Error(
-          `Failed to download audio file: ${audioResponse.status} ${audioResponse.statusText}`
-        );
+        throw new Error(`HTTP ${audioResponse.status}: ${audioResponse.statusText}`);
       }
 
       const contentLength = audioResponse.headers.get("content-length");
       const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
       const reader = audioResponse.body?.getReader();
       if (!reader) throw new Error("Failed to read audio stream");
-
-      console.log(`[DL] Downloading audio, total size: ${totalBytes} bytes`);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -557,53 +537,38 @@ export const downloadLesson = async (
           updateProgress("downloading", Math.min(dlProgress, 60));
         }
       }
-      console.log(`[DL] Download completed: ${receivedBytes} bytes`);
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
       
-      console.error(`[DL] ========== FETCH ERROR ==========`);
-      console.error(`[DL] Error type: ${typeof fetchError}`);
-      console.error(`[DL] Error name: ${fetchError?.name}`);
-      console.error(`[DL] Error message: ${fetchError?.message}`);
-      console.error(`[DL] Error toString: ${fetchError?.toString()}`);
-      console.error(`[DL] Error stack:`, fetchError?.stack);
-      console.error(`[DL] Full error object:`, JSON.stringify(fetchError, Object.getOwnPropertyNames(fetchError)));
-      
-      // Create detailed error message for user
-      const errorInfo = {
+      // Create detailed error message for debugging
+      const errorDetails = {
+        type: typeof fetchError,
         name: fetchError?.name || 'Unknown',
         message: fetchError?.message || 'Unknown error',
+        toString: fetchError?.toString() || '',
         platform: Capacitor.getPlatform(),
-        isIOS: isIOS,
-        url: isIOS ? 'proxy' : 'direct',
+        urlType: isIOS ? 'proxy' : 'direct',
         attempt: retryCount + 1,
       };
       
-      const detailedError = `Download failed on ${errorInfo.platform}\n` +
-        `Error: ${errorInfo.name}\n` +
-        `Message: ${errorInfo.message}\n` +
-        `URL type: ${errorInfo.url}\n` +
-        `Attempt: ${errorInfo.attempt}/${MAX_RETRIES + 1}`;
+      const debugMessage = `Platform: ${errorDetails.platform}\n` +
+        `URL: ${errorDetails.urlType}\n` +
+        `Error: ${errorDetails.name}\n` +
+        `Message: ${errorDetails.message}\n` +
+        `Attempt: ${errorDetails.attempt}/${MAX_RETRIES + 1}`;
+      
+      console.error(`[DL] Fetch failed:`, debugMessage);
       
       // Retry logic for network errors
-      if (retryCount < MAX_RETRIES && 
-          (fetchError.name === "AbortError" || 
-           fetchError.message.includes("Failed to fetch") || 
-           fetchError.message.includes("Network") ||
-           fetchError.message.includes("Load failed") ||
-           fetchError.message.includes("network"))) {
-        console.log(`[DL] Retrying download... (${retryCount + 1}/${MAX_RETRIES})`);
-        downloadLocks.delete(lessonId); // Clear lock before retry
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+      if (retryCount < MAX_RETRIES) {
+        console.log(`[DL] Retrying...`);
+        downloadLocks.delete(lessonId);
+        await new Promise(resolve => setTimeout(resolve, 2000));
         return downloadLesson(lessonId, courseId, token, onProgress, retryCount + 1);
       }
       
-      if (fetchError.name === "AbortError") {
-        throw new Error(detailedError + "\n\nTimeout after 10 minutes");
-      }
-      
-      // Throw detailed error
-      throw new Error(detailedError);
+      // Final error after all retries
+      throw new Error(debugMessage);
     }
 
     // Combine fetch chunks into one ArrayBuffer
@@ -620,9 +585,6 @@ export const downloadLesson = async (
     updateProgress("encrypting", 65);
 
     // 3. Encrypt in 5 MB chunks & save each to disk
-    console.log(
-      `[DL] Starting chunk encryption for lesson ${lessonId}, size: ${audioData.byteLength} bytes`
-    );
     const manifest = await encryptAndSaveChunks(
       lessonId,
       audioData.buffer,
@@ -636,7 +598,6 @@ export const downloadLesson = async (
         );
       }
     );
-    console.log(`[DL] Encryption completed: ${manifest.totalChunks} chunks`);
 
     updateProgress("saving", 88);
 
@@ -664,10 +625,7 @@ export const downloadLesson = async (
     await confirmDownload(lessonId, totalEncryptedSize, token);
 
     updateProgress("completed", 100);
-    console.log(`[DL] ========== DOWNLOAD COMPLETE ==========`);
   } catch (error) {
-    console.error(`[DL] ========== DOWNLOAD FAILED ==========`);
-    console.error(`[DL] Final error for lesson ${lessonId}:`, error);
     const errorMessage =
       error instanceof Error ? error.message : "Download failed: " + String(error);
     updateProgress("error", 0, errorMessage);

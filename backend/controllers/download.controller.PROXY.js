@@ -60,8 +60,24 @@ const proxyAudioDownload = async (req, res) => {
 
         // Extract R2 key from URL
         const audioUrl = lesson.audio_url;
-        const urlParts = audioUrl.split('/');
-        const key = urlParts.slice(3).join('/'); // Everything after domain
+        
+        // R2 URL format: https://pub-xxx.r2.dev/path/to/file.mp3
+        // We need to extract just the path part
+        let key;
+        try {
+            const url = new URL(audioUrl);
+            key = url.pathname.substring(1); // Remove leading slash
+        } catch (e) {
+            // If URL parsing fails, try simple split
+            const urlParts = audioUrl.split('.r2.dev/');
+            if (urlParts.length > 1) {
+                key = urlParts[1];
+            } else {
+                // Last resort: everything after domain
+                const parts = audioUrl.split('/');
+                key = parts.slice(3).join('/');
+            }
+        }
 
         console.log(`[PROXY] Streaming audio for lesson ${lessonId}, key: ${key}`);
 
