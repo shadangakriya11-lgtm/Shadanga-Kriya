@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Clock, Lock, CheckCircle2, Play, Pause, KeyRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadButton } from "./DownloadButton";
+import { useState } from "react";
 
 interface LessonCardProps {
   lesson: Lesson;
@@ -34,6 +35,7 @@ export function LessonCard({
   courseId,
 }: LessonCardProps) {
   const status = statusConfig[lesson.status];
+  const [isDownloaded, setIsDownloaded] = useState<boolean | undefined>(undefined);
 
   return (
     <div
@@ -68,11 +70,11 @@ export function LessonCard({
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <h4 className="font-medium text-foreground truncate">
+        <div className="flex items-start gap-2 mb-1">
+          <h4 className="font-medium text-foreground line-clamp-2 flex-1">
             {lesson.title}
           </h4>
-          <Badge variant={status.variant} className="shrink-0 text-xs">
+          <Badge variant={status.variant} className="shrink-0 text-xs mt-0.5">
             {status.label}
           </Badge>
         </div>
@@ -104,12 +106,13 @@ export function LessonCard({
               courseId={courseId}
               lessonTitle={lesson.title}
               variant="icon"
+              onDownloadStatusChange={setIsDownloaded}
             />
           </div>
         )}
 
-      {/* Play/Access Code Action */}
-      {status.canPlay && (
+      {/* Play/Access Code Action - Only show if downloaded or download status unknown */}
+      {status.canPlay && (isDownloaded !== false) && (
         <>
           {/* Case 1: Access code disabled - show Play icon */}
           {!lesson.accessCodeEnabled && (

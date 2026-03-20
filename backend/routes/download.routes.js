@@ -36,6 +36,12 @@ router.post('/decrypt/:lessonId', [
     body('deviceId').notEmpty().withMessage('Device ID required')
 ], validate, downloadController.getDecryptionKey);
 
+// Proxy audio download for iOS (avoids CORS issues)
+router.get('/proxy/:lessonId', [
+    param('lessonId').isUUID().withMessage('Valid lesson ID required'),
+    query('deviceId').notEmpty().withMessage('Device ID required')
+], validate, require('../controllers/download.controller.PROXY.js').proxyAudioDownload);
+
 // Get my downloads
 router.get('/my', [
     query('deviceId').optional()

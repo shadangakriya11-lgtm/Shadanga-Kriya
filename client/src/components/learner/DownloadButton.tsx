@@ -36,6 +36,7 @@ interface DownloadButtonProps {
   variant?: "default" | "icon" | "compact";
   className?: string;
   onDownloadComplete?: () => void;
+  onDownloadStatusChange?: (isDownloaded: boolean) => void;
 }
 
 export function DownloadButton({
@@ -45,6 +46,7 @@ export function DownloadButton({
   variant = "default",
   className,
   onDownloadComplete,
+  onDownloadStatusChange,
 }: DownloadButtonProps) {
   const { toast } = useToast();
   const { isDownloaded, isChecking, refresh } =
@@ -71,6 +73,11 @@ export function DownloadButton({
       onDownloadComplete?.();
     }
   }, [progress?.status, onDownloadComplete, refresh]);
+
+  // Notify parent of download status changes
+  useEffect(() => {
+    onDownloadStatusChange?.(isDownloaded);
+  }, [isDownloaded, onDownloadStatusChange]);
 
   // SECURITY: Block downloads on web browsers - only allow on native apps
   if (!isNativePlatform) {
@@ -130,12 +137,29 @@ export function DownloadButton({
           : "Lesson downloaded for offline use",
       });
     } catch (error) {
+      console.error("Download error:", error);
+      
+      // Show detailed error for debugging on iPhone
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : '';
+      
+      // Create a detailed error message
+      const detailedError = `${errorMessage}\n\n${errorStack ? 'Stack:\n' + errorStack.substring(0, 300) : ''}`;
+      
+      // Show in toast with long duration
       toast({
-        title: "Download Failed",
-        description:
-          error instanceof Error ? error.message : "Failed to download lesson",
+        title: "Download Failed - Debug Info",
+        description: detailedError,
         variant: "destructive",
+        duration: 15000, // Show for 15 seconds
       });
+      
+      // Also try to show an alert for iOS
+      if (typeof window !== 'undefined' && window.alert) {
+        setTimeout(() => {
+          window.alert(`Download Failed\n\n${detailedError}`);
+        }, 100);
+      }
     }
   };
 

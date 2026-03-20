@@ -52,6 +52,8 @@ export interface Lesson {
   hasAccessCode?: boolean;
   accessCodeType?: "permanent" | "temporary";
   accessCodeExpired?: boolean;
+  // Download status
+  isDownloaded?: boolean;
 }
 
 export interface PlaybackState {

@@ -446,8 +446,11 @@ export const downloadLesson = async (
   lessonId: string,
   courseId: string,
   token: string,
-  onProgress?: (progress: DownloadProgress) => void
+  onProgress?: (progress: DownloadProgress) => void,
+  retryCount: number = 0
 ): Promise<void> => {
+  const MAX_RETRIES = 2;
+  
   // Check if download is already in progress
   const existingDownload = downloadLocks.get(lessonId);
   if (existingDownload) {
@@ -466,28 +469,68 @@ export const downloadLesson = async (
   // Create download promise and store it
   const downloadPromise = (async () => {
     try {
+      console.log(`[DL] ========== DOWNLOAD START ==========`);
+      console.log(`[DL] Lesson ID: ${lessonId}`);
+      console.log(`[DL] Platform: ${Capacitor.getPlatform()}`);
+      console.log(`[DL] Attempt: ${retryCount + 1}/${MAX_RETRIES + 1}`);
+      
       updateProgress("pending", 0);
 
     // 1. Authorize
+    console.log(`[DL] Step 1: Authorizing download...`);
     const { audioUrl, encryptionKey, lesson } = await authorizeDownload(
       lessonId,
       token
     );
+    console.log(`[DL] Authorization successful`);
+    console.log(`[DL] Audio URL: ${audioUrl.substring(0, 100)}...`);
     updateProgress("downloading", 10);
 
-    // 2. Stream-download the audio
-    console.log(`[DL] Starting download from: ${audioUrl}`);
+    // 2. Determine download URL - use proxy for iOS to avoid CORS issues
+    const platform = Capacitor.getPlatform();
+    const isIOS = platform === 'ios';
+    const deviceId = await getDeviceId();
+    
+    let downloadUrl = audioUrl;
+    if (isIOS) {
+      // Use backend proxy for iOS to avoid CORS and signed URL issues
+      downloadUrl = `${API_BASE}/downloads/proxy/${lessonId}?deviceId=${encodeURIComponent(deviceId)}`;
+      console.log(`[DL] Using proxy URL for iOS`);
+    } else {
+      console.log(`[DL] Using direct URL for ${platform}`);
+    }
+
+    // 3. Stream-download the audio
+    console.log(`[DL] Step 2: Starting download...`);
+    console.log(`[DL] Download URL length: ${downloadUrl.length} chars`);
+    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300_000); // 5 min
+    const timeoutId = setTimeout(() => controller.abort(), 600_000); // 10 min timeout for large files
 
     let chunks: Uint8Array[] = [];
     let receivedBytes = 0;
 
     try {
-      const audioResponse = await fetch(audioUrl, {
+      // For iOS, we need to be more careful with fetch options
+      const fetchOptions: RequestInit = {
         signal: controller.signal,
-      });
+        method: 'GET',
+        headers: {
+          'Accept': 'audio/mpeg,audio/*;q=0.9,*/*;q=0.8',
+          // Add auth header for proxy endpoint
+          ...(isIOS ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        credentials: isIOS ? 'include' : 'omit',
+        mode: 'cors',
+        cache: 'no-store',
+      };
+      
+      console.log(`[DL] Starting fetch...`);
+      const audioResponse = await fetch(downloadUrl, fetchOptions);
       clearTimeout(timeoutId);
+      
+      console.log(`[DL] Response status: ${audioResponse.status}`);
+      console.log(`[DL] Response ok: ${audioResponse.ok}`);
 
       if (!audioResponse.ok) {
         throw new Error(
@@ -517,12 +560,50 @@ export const downloadLesson = async (
       console.log(`[DL] Download completed: ${receivedBytes} bytes`);
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
-      if (fetchError.name === "AbortError") {
-        throw new Error(
-          "Download timeout. Please check your internet connection and try again."
-        );
+      
+      console.error(`[DL] ========== FETCH ERROR ==========`);
+      console.error(`[DL] Error type: ${typeof fetchError}`);
+      console.error(`[DL] Error name: ${fetchError?.name}`);
+      console.error(`[DL] Error message: ${fetchError?.message}`);
+      console.error(`[DL] Error toString: ${fetchError?.toString()}`);
+      console.error(`[DL] Error stack:`, fetchError?.stack);
+      console.error(`[DL] Full error object:`, JSON.stringify(fetchError, Object.getOwnPropertyNames(fetchError)));
+      
+      // Create detailed error message for user
+      const errorInfo = {
+        name: fetchError?.name || 'Unknown',
+        message: fetchError?.message || 'Unknown error',
+        platform: Capacitor.getPlatform(),
+        isIOS: isIOS,
+        url: isIOS ? 'proxy' : 'direct',
+        attempt: retryCount + 1,
+      };
+      
+      const detailedError = `Download failed on ${errorInfo.platform}\n` +
+        `Error: ${errorInfo.name}\n` +
+        `Message: ${errorInfo.message}\n` +
+        `URL type: ${errorInfo.url}\n` +
+        `Attempt: ${errorInfo.attempt}/${MAX_RETRIES + 1}`;
+      
+      // Retry logic for network errors
+      if (retryCount < MAX_RETRIES && 
+          (fetchError.name === "AbortError" || 
+           fetchError.message.includes("Failed to fetch") || 
+           fetchError.message.includes("Network") ||
+           fetchError.message.includes("Load failed") ||
+           fetchError.message.includes("network"))) {
+        console.log(`[DL] Retrying download... (${retryCount + 1}/${MAX_RETRIES})`);
+        downloadLocks.delete(lessonId); // Clear lock before retry
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+        return downloadLesson(lessonId, courseId, token, onProgress, retryCount + 1);
       }
-      throw fetchError;
+      
+      if (fetchError.name === "AbortError") {
+        throw new Error(detailedError + "\n\nTimeout after 10 minutes");
+      }
+      
+      // Throw detailed error
+      throw new Error(detailedError);
     }
 
     // Combine fetch chunks into one ArrayBuffer
@@ -583,10 +664,12 @@ export const downloadLesson = async (
     await confirmDownload(lessonId, totalEncryptedSize, token);
 
     updateProgress("completed", 100);
+    console.log(`[DL] ========== DOWNLOAD COMPLETE ==========`);
   } catch (error) {
-    console.error(`[DL] Download failed for lesson ${lessonId}:`, error);
+    console.error(`[DL] ========== DOWNLOAD FAILED ==========`);
+    console.error(`[DL] Final error for lesson ${lessonId}:`, error);
     const errorMessage =
-      error instanceof Error ? error.message : "Download failed";
+      error instanceof Error ? error.message : "Download failed: " + String(error);
     updateProgress("error", 0, errorMessage);
     throw error;
   } finally {
