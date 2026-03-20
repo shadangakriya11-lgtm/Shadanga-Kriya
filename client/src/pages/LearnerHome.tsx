@@ -21,7 +21,7 @@ export default function LearnerHome() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: coursesData, isLoading: coursesLoading } = useCourses();
@@ -65,16 +65,8 @@ export default function LearnerHome() {
     };
   });
 
-  // iOS App Store compliance: Show enrolled courses + free courses (price = 0) on iOS
-  // Hide only paid locked courses (price > 0 and not enrolled)
-  const displayCourses = shouldShowPaymentFeatures() 
-    ? mappedCourses 
-    : mappedCourses.filter((c) => 
-        c.status === "active" || 
-        c.status === "completed" || 
-        (c.status === "pending" && c.price === 0) || // Free courses
-        (c.status === "locked" && c.price === 0)     // Free but locked by prerequisites
-      );
+  // Show all courses on all platforms
+  const displayCourses = mappedCourses;
 
   const activeCourses = displayCourses.filter(
     (c) => c.status === "active" || c.status === "pending"
@@ -107,23 +99,12 @@ export default function LearnerHome() {
   }, [activeTab, searchFilteredCourses, mappedCourses, searchQuery]);
 
   const handleCourseClick = (course: Course) => {
-    // On iOS, locked courses are not displayed, so this should only handle enrolled courses
     if (course.status === "locked" && course.price) {
-      // iOS App Store compliance: Don't show payment on iOS
-      if (!shouldShowPaymentFeatures()) {
-        // This shouldn't happen on iOS since locked courses are filtered out
-        toast({
-          title: "Course Not Available",
-          description: "This course is not available in your account.",
-          variant: "default",
-        });
-        return;
-      }
       setSelectedCourse(course);
-      setIsPaymentOpen(true);
-    } else {
-      navigate(`/course/${course.id}`);
+      setIsPaymentModalOpen(true);
+      return;
     }
+    navigate(`/course/${course.id}`);
   };
 
   const handlePaymentSuccess = (courseId: string) => {
@@ -311,15 +292,13 @@ export default function LearnerHome() {
 
       <BottomNav />
 
-      {/* Payment Modal - Only show on web/Android */}
-      {shouldShowPaymentFeatures() && (
-        <PaymentModal
-          course={selectedCourse}
-          isOpen={isPaymentOpen}
-          onClose={() => setIsPaymentOpen(false)}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
+      {/* Payment Modal */}
+      <PaymentModal
+        course={selectedCourse}
+        isOpen={isPaymentModalOpen}
+        onClose={() => setIsPaymentModalOpen(false)}
+        onSuccess={handlePaymentSuccess}
+      />
     </div>
   );
 }

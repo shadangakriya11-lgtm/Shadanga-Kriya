@@ -23,12 +23,14 @@ import {
   Loader2,
   Tag,
   X,
+  Apple,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { paymentsApi, getCachedToken } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
-import { shouldShowPaymentFeatures } from "@/lib/platformDetection";
+import { isIOSApp } from "@/lib/platformDetection";
+import { Capacitor } from "@capacitor/core";
 
 declare global {
   interface Window {
@@ -271,10 +273,7 @@ export function PaymentModal({
 
   if (!course) return null;
 
-  // iOS App Store compliance: Don't show payment modal on iOS
-  if (!shouldShowPaymentFeatures()) {
-    return null;
-  }
+  const isIOS = isIOSApp();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -350,7 +349,7 @@ export function PaymentModal({
 
             {/* Price */}
             <div className="space-y-2">
-              {appliedDiscount ? (
+              {appliedDiscount && !isIOS ? (
                 <>
                   <div className="flex items-center justify-between py-2 text-sm">
                     <span className="text-muted-foreground">Original Price</span>
@@ -390,16 +389,24 @@ export function PaymentModal({
                   </div>
                 </>
               ) : (
-                <div className="flex items-center justify-between py-3 border-t border-b border-border">
-                  <span className="text-muted-foreground">Course Fee</span>
-                  <span className="font-serif text-2xl font-bold text-foreground">
-                    ₹{course.price?.toLocaleString()}
-                  </span>
-                </div>
+                <>
+                  <div className="flex items-center justify-between py-3 border-t border-b border-border">
+                    <span className="text-muted-foreground">Course Fee</span>
+                    <span className="font-serif text-2xl font-bold text-foreground">
+                      ₹{course.price?.toLocaleString()}
+                    </span>
+                  </div>
+                  {isIOS && (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      One-time purchase • Lifetime access
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Discount Code Section */}
+            {/* Discount Code Section - Only for non-iOS */}
+            {!isIOS && (
             <div className="space-y-3 mt-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
@@ -450,11 +457,12 @@ export function PaymentModal({
                 </div>
               )}
             </div>
+            )}
 
             {/* Security Notice */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
               <Shield className="h-4 w-4" />
-              <span>Secure payment powered by Razorpay</span>
+              <span>{isIOS ? 'Managed by Apple • Secure payment' : 'Secure payment processing'}</span>
             </div>
 
             <DialogFooter className="mt-4">
@@ -476,6 +484,11 @@ export function PaymentModal({
                     <span className="h-4 w-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                     Processing...
                   </span>
+                ) : isIOS ? (
+                  <>
+                    <Apple className="h-5 w-5 mr-2" />
+                    Buy with App Store
+                  </>
                 ) : (
                   <>
                     <CreditCard className="h-4 w-4 mr-2" />
