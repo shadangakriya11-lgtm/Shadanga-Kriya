@@ -61,6 +61,7 @@ import { StatusBar } from "@capacitor/status-bar";
 import { Capacitor } from "@capacitor/core";
 import { App as CapApp, BackButtonListenerEvent } from "@capacitor/app";
 import { useScreenProtection } from "@/hooks/useScreenProtection";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
 
 // Configure status bar for native platforms - don't overlay webview
 if (Capacitor.isNativePlatform()) {
@@ -223,6 +224,10 @@ const BackButtonHandler = () => {
 const AppContent = () => {
   // Enable screen recording protection for the entire app
   useScreenProtection();
+
+  // Initialise RevenueCat SDK (iOS only — no-op on Android/web)
+  useRevenueCat();
+
 
   return (
     <ThemeProvider defaultTheme="light" storageKey="therapy-ui-theme">

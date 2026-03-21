@@ -31,6 +31,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { isIOSApp } from "@/lib/platformDetection";
 import { Capacitor } from "@capacitor/core";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
 
 declare global {
   interface Window {
@@ -67,6 +68,7 @@ export function PaymentModal({
 }: PaymentModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { purchaseCourse } = useRevenueCat();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentStep, setPaymentStep] = useState<
     "details" | "processing" | "success" | "error"
@@ -155,6 +157,60 @@ export function PaymentModal({
 
   const finalAmount = appliedDiscount ? appliedDiscount.finalPrice : (course?.price || 0);
 
+  // ─── iOS: Purchase via RevenueCat / App Store ───────────────
+  const handleIOSPurchase = async () => {
+    if (!course || !user) return;
+
+    setIsProcessing(true);
+    setPaymentStep("processing");
+
+    try {
+      const purchased = await purchaseCourse();
+
+      if (purchased) {
+        // Tell the backend to create payment + enrollment records
+        const token = getCachedToken();
+        await fetch(`${import.meta.env.VITE_API_URL}/api/payments/ios-purchase`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            'ngrok-skip-browser-warning': 'true',
+          },
+          body: JSON.stringify({ courseId: course.id }),
+        });
+
+        // Invalidate queries to refresh enrollment status
+        await queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
+        await queryClient.invalidateQueries({ queryKey: ["courses"] });
+        await queryClient.invalidateQueries({ queryKey: ["myPayments"] });
+
+        setPaymentStep("success");
+
+        setTimeout(() => {
+          onSuccess(course.id);
+          toast({
+            title: "Purchase Successful!",
+            description: `You now have access to "${course.title}"`,
+          });
+          setPaymentStep("details");
+          setIsProcessing(false);
+          onClose();
+        }, 2000);
+      } else {
+        // User cancelled or purchase failed
+        setPaymentStep("details");
+        setIsProcessing(false);
+      }
+    } catch (error: any) {
+      console.error("iOS purchase error:", error);
+      setPaymentStep("error");
+      setErrorMessage(error.message || "App Store purchase failed");
+      setIsProcessing(false);
+    }
+  };
+
+  // ─── Android / Web: Purchase via Razorpay ──────────────────
   const handlePayment = async () => {
     if (!course || !user) return;
 
@@ -311,7 +367,7 @@ export function PaymentModal({
             <Loader2 className="h-12 w-12 text-primary animate-spin mx-auto mb-4" />
             <h3 className="font-medium text-lg">Initializing Secure Payment</h3>
             <p className="text-muted-foreground">
-              Please wait while we connect to Razorpay...
+              {isIOS ? 'Connecting to App Store...' : 'Please wait while we connect to Razorpay...'}
             </p>
           </div>
         ) : (
@@ -475,7 +531,7 @@ export function PaymentModal({
               </Button>
               <Button
                 variant="premium"
-                onClick={handlePayment}
+                onClick={isIOS ? handleIOSPurchase : handlePayment}
                 disabled={isProcessing}
                 className="min-w-[140px]"
               >

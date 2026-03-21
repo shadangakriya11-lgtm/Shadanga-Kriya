@@ -488,6 +488,80 @@ const activateCourse = async (req, res) => {
   }
 };
 
+// Record iOS In-App Purchase (RevenueCat / Apple IAP)
+const recordIOSPurchase = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { courseId } = req.body;
+    const userId = req.user.id;
+
+    // 1. Get course details
+    const courseResult = await client.query(
+      'SELECT id, title, price, status FROM courses WHERE id = $1',
+      [courseId]
+    );
+
+    if (courseResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const course = courseResult.rows[0];
+
+    if (course.status === 'draft') {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Cannot purchase a draft course' });
+    }
+
+    // 2. Check if already enrolled
+    const enrollCheck = await client.query(
+      'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
+      [userId, courseId]
+    );
+
+    if (enrollCheck.rows.length > 0) {
+      await client.query('ROLLBACK');
+      // Already enrolled — not an error, just return success
+      return res.json({ message: 'Already enrolled', status: 'success' });
+    }
+
+    // 3. Create payment record
+    const transactionId = `IOS-${uuidv4().slice(0, 8).toUpperCase()}`;
+    await client.query(
+      `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [userId, courseId, course.price, 'INR', 'completed', 'apple_iap', transactionId]
+    );
+
+    // 4. Create enrollment
+    await client.query(
+      `INSERT INTO enrollments (user_id, course_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, course_id) DO NOTHING`,
+      [userId, courseId]
+    );
+
+    await client.query('COMMIT');
+
+    // 5. Notify admins
+    notifyAdmins(
+      'iOS Purchase',
+      `Apple IAP payment received for course "${course.title}" (${transactionId})`,
+      'success',
+      `/admin/payments`
+    ).catch(err => console.error('Notification error:', err));
+
+    res.json({ message: 'iOS purchase recorded and course unlocked', status: 'success' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Record iOS purchase error:', error);
+    res.status(500).json({ error: 'Failed to record iOS purchase' });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   getMyPayments,
   createPayment,
@@ -497,5 +571,6 @@ module.exports = {
   refundPayment,
   activateCourse,
   createRazorpayOrder,
-  verifyRazorpayPayment
+  verifyRazorpayPayment,
+  recordIOSPurchase
 };
