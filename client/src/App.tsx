@@ -62,6 +62,7 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapApp, BackButtonListenerEvent } from "@capacitor/app";
 import { useScreenProtection } from "@/hooks/useScreenProtection";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
+import DebugConsole from "@/components/DebugConsole";
 
 // Configure status bar for native platforms - don't overlay webview
 if (Capacitor.isNativePlatform()) {
@@ -524,6 +525,11 @@ const AppContent = () => {
   );
 };
 
-const App = () => <AppContent />;
+const App = () => (
+  <>
+    <AppContent />
+    <DebugConsole />
+  </>
+);
 
 export default App;
