@@ -98,14 +98,11 @@ const proxyAudioDownload = async (req, res) => {
         // Set appropriate headers for audio streaming
         res.setHeader('Content-Type', response.ContentType || 'audio/mpeg');
         res.setHeader('Content-Length', response.ContentLength);
-        res.setHeader('Accept-Ranges', 'bytes');
         res.setHeader('Cache-Control', 'no-cache');
         
-        // CORS headers for iOS
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', '*');
-
+        // Expose Content-Length for iOS frontend fetch progress indicator
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Type');
+        
         // Stream the audio data
         response.Body.pipe(res);
 
