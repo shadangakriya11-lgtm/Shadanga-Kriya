@@ -27,7 +27,7 @@ public class HeadphoneDetectionPlugin: CAPPlugin {
                 isConnected = true
                 deviceType = "usb_audio"
             case .airPlay:
-                isConnected = true
+                isConnected = false  // AirPlay is generally a speaker, not headphones
                 deviceType = "airplay"
             default:
                 break

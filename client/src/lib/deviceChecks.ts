@@ -114,7 +114,7 @@ export async function areEarphonesConnected(): Promise<boolean> {
       return true;
     }
 
-    if (audioOutputs.length > 2) {
+    if (Capacitor.getPlatform() !== "ios" && audioOutputs.length > 2) {
       return true;
     }
 
