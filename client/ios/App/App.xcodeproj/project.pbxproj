@@ -17,6 +17,8 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
+		9C1366C42262401A81ED43F8 /* AudioFocusPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A949E59A806C4EFD8387312C /* AudioFocusPlugin.swift */; };
+		9072CF44C63247E8B1528593 /* AudioFocusPlugin.m in Sources */ = {isa = PBXBuildFile; fileRef = 510DD9974D8E4231B2413AA4 /* AudioFocusPlugin.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +36,8 @@
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
+		A949E59A806C4EFD8387312C /* AudioFocusPlugin.swift */ = {isa = PBXFileReference; name = "AudioFocusPlugin.swift"; path = "AudioFocusPlugin.swift"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = undefined; };
+		510DD9974D8E4231B2413AA4 /* AudioFocusPlugin.m */ = {isa = PBXFileReference; name = "AudioFocusPlugin.m"; path = "AudioFocusPlugin.m"; sourceTree = "<group>"; fileEncoding = undefined; lastKnownFileType = sourcecode.c.objc; explicitFileType = undefined; includeInIndex = undefined; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,6 +91,8 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				A949E59A806C4EFD8387312C /* AudioFocusPlugin.swift */,
+				510DD9974D8E4231B2413AA4 /* AudioFocusPlugin.m */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -128,8 +134,8 @@
 		504EC2FC1FED79650016851F /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 0920;
-				LastUpgradeCheck = 0920;
+				LastSwiftUpdateCheck = 920;
+				LastUpgradeCheck = 920;
 				TargetAttributes = {
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
@@ -216,6 +222,8 @@
 				CAB000000000000000000003 /* FileConcatenationPlugin.swift in Sources */,
 				CAB000000000000000000004 /* FileConcatenationPlugin.m in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
+				9C1366C42262401A81ED43F8 /* AudioFocusPlugin.swift in Sources */,
+				9072CF44C63247E8B1528593 /* AudioFocusPlugin.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -354,7 +362,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 21;
+				CURRENT_PROJECT_VERSION = 21;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -374,7 +382,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 21;
+				CURRENT_PROJECT_VERSION = 21;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
