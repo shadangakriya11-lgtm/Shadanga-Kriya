@@ -31,6 +31,7 @@ export interface Course {
   duration: string;
   thumbnail?: string;
   price?: number;
+  appleProductId?: string;
 }
 
 
@@ -261,6 +262,7 @@ export interface CreateCourseData {
   price?: number;
   duration?: string;
   thumbnail?: string;
+  appleProductId?: string;
 }
 
 export interface UpdateCourseData {
@@ -271,6 +273,7 @@ export interface UpdateCourseData {
   duration?: string;
   thumbnail?: string;
   status?: CourseStatus;
+  appleProductId?: string;
 }
 
 export interface CreateLessonData {

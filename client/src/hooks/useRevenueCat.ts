@@ -185,13 +185,14 @@ export function useRevenueCat() {
   }, []);
 
   // ─── Purchase a specific package directly ────────────────────
-  const purchaseCourse = useCallback(async (): Promise<boolean> => {
+  const purchaseCourse = useCallback(async (productId?: string): Promise<boolean> => {
     if (Capacitor.getPlatform() !== "ios") return false;
 
     try {
       const offerings = await Purchases.getOfferings();
+      const pkgToFind = productId || "com.shadangakriya.course_full"; // fallback
       const pkg = offerings.current?.availablePackages.find(
-        (p) => p.product.identifier === "com.shadangakriya.course_full"
+        (p) => p.product.identifier === pkgToFind
       );
 
       if (!pkg) {

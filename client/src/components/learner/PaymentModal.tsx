@@ -165,7 +165,7 @@ export function PaymentModal({
     setPaymentStep("processing");
 
     try {
-      const purchased = await purchaseCourse();
+      const purchased = await purchaseCourse(course.appleProductId);
 
       if (purchased) {
         // Tell the backend to create payment + enrollment records

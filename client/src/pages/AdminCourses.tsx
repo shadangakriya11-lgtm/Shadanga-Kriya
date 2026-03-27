@@ -66,6 +66,7 @@ export default function AdminCourses() {
     price: 0,
     status: "active",
     duration: "",
+    appleProductId: "",
   });
 
   const navigate = useNavigate();
@@ -105,6 +106,7 @@ export default function AdminCourses() {
         price: 0,
         status: "active",
         duration: "",
+        appleProductId: "",
       });
     } catch (error) {
       console.error("Failed to save course:", error);
@@ -120,6 +122,7 @@ export default function AdminCourses() {
       price: Number(course.price) || 0,
       status: course.status || "active",
       duration: course.duration || "",
+      appleProductId: course.appleProductId || "",
     });
     setIsCreateOpen(true);
   };
@@ -343,6 +346,7 @@ export default function AdminCourses() {
                     price: 0,
                     status: "active",
                     duration: "",
+                    appleProductId: "",
                   });
                 }
               }}
@@ -431,6 +435,19 @@ export default function AdminCourses() {
                         }))
                       }
                       placeholder="e.g., 6 hours"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Apple Product ID (Optional for iOS IAP)</Label>
+                    <Input
+                      value={newCourse.appleProductId || ""}
+                      onChange={(e) =>
+                        setNewCourse((prev) => ({
+                          ...prev,
+                          appleProductId: e.target.value,
+                        }))
+                      }
+                      placeholder="e.g., com.shadangakriya.course1"
                     />
                   </div>
                   <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">

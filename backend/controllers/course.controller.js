@@ -184,6 +184,7 @@ const getCourseById = async (req, res) => {
       category: course.category,
       prerequisites: course.prerequisites,
       prerequisiteCourseId: course.prerequisite_course_id,
+      appleProductId: course.apple_product_id,
       createdBy: course.created_by,
       creatorName: course.creator_first_name ? `${course.creator_first_name} ${course.creator_last_name}` : null,
       createdAt: course.created_at,
@@ -206,13 +207,13 @@ const getCourseById = async (req, res) => {
 // Create course
 const createCourse = async (req, res) => {
   try {
-    const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId } = req.body;
+    const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId, appleProductId } = req.body;
 
     const result = await pool.query(
-      `INSERT INTO courses (title, description, thumbnail_url, price, duration_hours, duration, status, category, type, prerequisites, prerequisite_course_id, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      `INSERT INTO courses (title, description, thumbnail_url, price, duration_hours, duration, status, category, type, prerequisites, prerequisite_course_id, created_by, apple_product_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
-      [title, description, thumbnailUrl, price || 0, durationHours || 0, duration, status || 'active', category, type || 'self', prerequisites, prerequisiteCourseId, req.user.id]
+      [title, description, thumbnailUrl, price || 0, durationHours || 0, duration, status || 'active', category, type || 'self', prerequisites, prerequisiteCourseId, req.user.id, appleProductId]
     );
 
     const course = result.rows[0];
@@ -232,6 +233,7 @@ const createCourse = async (req, res) => {
         category: course.category,
         prerequisites: course.prerequisites,
         prerequisiteCourseId: course.prerequisite_course_id,
+        appleProductId: course.apple_product_id,
         createdAt: course.created_at
       }
     });
@@ -254,7 +256,7 @@ const createCourse = async (req, res) => {
 const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId } = req.body;
+    const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId, appleProductId } = req.body;
 
     // Check permission for facilitator
     if (req.user.role === 'facilitator') {
@@ -282,10 +284,11 @@ const updateCourse = async (req, res) => {
            type = COALESCE($9, type),
            prerequisites = COALESCE($10, prerequisites),
            prerequisite_course_id = $11,
+           apple_product_id = COALESCE($13, apple_product_id),
            updated_at = NOW()
        WHERE id = $12
        RETURNING *`,
-      [title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId, id]
+      [title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId, id, appleProductId]
     );
 
     if (result.rows.length === 0) {
@@ -309,6 +312,7 @@ const updateCourse = async (req, res) => {
         category: course.category,
         prerequisites: course.prerequisites,
         prerequisiteCourseId: course.prerequisite_course_id,
+        appleProductId: course.apple_product_id,
         updatedAt: course.updated_at
       }
     });
