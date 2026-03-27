@@ -114,6 +114,7 @@ const getAllCourses = async (req, res) => {
       category: course.category,
       prerequisites: course.prerequisites,
       prerequisiteCourseId: course.prerequisite_course_id,
+      appleProductId: course.apple_product_id,
       createdBy: course.created_by,
       creatorName: course.creator_first_name ? `${course.creator_first_name} ${course.creator_last_name}` : null,
       lessonCount: parseInt(course.lesson_count),
