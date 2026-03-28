@@ -493,7 +493,7 @@ const recordIOSPurchase = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { courseId } = req.body;
+    const { courseId, transactionId: reqTransactionId, appUserId } = req.body;
     const userId = req.user.id;
 
     // 1. Get course details
@@ -514,7 +514,40 @@ const recordIOSPurchase = async (req, res) => {
       return res.status(400).json({ error: 'Cannot purchase a draft course' });
     }
 
-    // 2. Check if already enrolled
+    // 2. Server-side RevenueCat Verification
+    if (process.env.REVENUECAT_SECRET_KEY && appUserId) {
+      try {
+        const rcResponse = await fetch(`https://api.revenuecat.com/v1/subscribers/${appUserId}`, {
+          headers: {
+            Authorization: `Bearer ${process.env.REVENUECAT_SECRET_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!rcResponse.ok) {
+          throw new Error(`RevenueCat API responded with status: ${rcResponse.status}`);
+        }
+
+        const data = await rcResponse.json();
+        const entitlements = data.subscriber?.entitlements || {};
+        
+        // Check for generic course_access entitlement
+        const hasEntitlement = entitlements['course_access'] !== undefined;
+
+        if (!hasEntitlement) {
+          await client.query('ROLLBACK');
+          return res.status(403).json({ error: 'Server Verification Failed: You do not have the required entitlement.' });
+        }
+      } catch (err) {
+        console.error('RevenueCat server verification error:', err);
+        await client.query('ROLLBACK');
+        return res.status(500).json({ error: 'Failed to verify purchase with RevenueCat servers.' });
+      }
+    } else {
+      console.warn('Skipping RevenueCat server verification due to missing REVENUECAT_SECRET_KEY or appUserId.');
+    }
+
+    // 3. Check if already enrolled
     const enrollCheck = await client.query(
       'SELECT id FROM enrollments WHERE user_id = $1 AND course_id = $2',
       [userId, courseId]
@@ -526,15 +559,15 @@ const recordIOSPurchase = async (req, res) => {
       return res.json({ message: 'Already enrolled', status: 'success' });
     }
 
-    // 3. Create payment record
-    const transactionId = `IOS-${uuidv4().slice(0, 8).toUpperCase()}`;
+    // 4. Create payment record using the real App Store transaction ID
+    const transactionId = reqTransactionId || `IOS-${uuidv4().slice(0, 8).toUpperCase()}`;
     await client.query(
       `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [userId, courseId, course.price, 'INR', 'completed', 'apple_iap', transactionId]
     );
 
-    // 4. Create enrollment
+    // 5. Create enrollment
     await client.query(
       `INSERT INTO enrollments (user_id, course_id)
        VALUES ($1, $2)
@@ -544,7 +577,7 @@ const recordIOSPurchase = async (req, res) => {
 
     await client.query('COMMIT');
 
-    // 5. Notify admins
+    // 6. Notify admins
     notifyAdmins(
       'iOS Purchase',
       `Apple IAP payment received for course "${course.title}" (${transactionId})`,

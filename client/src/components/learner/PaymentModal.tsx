@@ -161,24 +161,41 @@ export function PaymentModal({
   const handleIOSPurchase = async () => {
     if (!course || !user) return;
 
+    if (!course.appleProductId) {
+      toast({
+        title: "Error",
+        description: "This course is not available for iOS purchase (Missing Product ID).",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsProcessing(true);
     setPaymentStep("processing");
 
     try {
-      const purchased = await purchaseCourse(course.appleProductId);
+      const result = await purchaseCourse(course.appleProductId);
 
-      if (purchased) {
+      if (result.success) {
         // Tell the backend to create payment + enrollment records
         const token = getCachedToken();
-        await fetch(`${import.meta.env.VITE_API_URL}/api/payments/ios-purchase`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/payments/ios-purchase`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
             'ngrok-skip-browser-warning': 'true',
           },
-          body: JSON.stringify({ courseId: course.id }),
+          body: JSON.stringify({ 
+            courseId: course.id,
+            transactionId: result.transactionId,
+            appUserId: result.appUserId
+          }),
         });
+
+        if (!response.ok) {
+          throw new Error("Failed to record purchase on the server. Please check your network or contact support.");
+        }
 
         // Invalidate queries to refresh enrollment status
         await queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
@@ -199,7 +216,8 @@ export function PaymentModal({
         }, 2000);
       } else {
         // User cancelled or purchase failed
-        setPaymentStep("details");
+        if (result.error) setErrorMessage(result.error);
+        setPaymentStep(result.error ? "error" : "details");
         setIsProcessing(false);
       }
     } catch (error: any) {

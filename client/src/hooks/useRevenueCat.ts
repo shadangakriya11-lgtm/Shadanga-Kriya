@@ -14,6 +14,16 @@ import {
 const REVENUECAT_IOS_API_KEY = import.meta.env.VITE_REVENUECAT_IOS_API_KEY as string;
 
 /**
+ * Interface for the result of a course purchase.
+ */
+export interface PurchaseResult {
+  success: boolean;
+  transactionId?: string;
+  appUserId?: string;
+  error?: string;
+}
+
+/**
  * Hook to manage RevenueCat purchases — iOS only.
  *
  * Provides:
@@ -185,8 +195,8 @@ export function useRevenueCat() {
   }, []);
 
   // ─── Purchase a specific package directly ────────────────────
-  const purchaseCourse = useCallback(async (productId?: string): Promise<boolean> => {
-    if (Capacitor.getPlatform() !== "ios") return false;
+  const purchaseCourse = useCallback(async (productId?: string): Promise<PurchaseResult> => {
+    if (Capacitor.getPlatform() !== "ios") return { success: false, error: "Not iOS platform" };
 
     try {
       const offerings = await Purchases.getOfferings();
@@ -197,20 +207,29 @@ export function useRevenueCat() {
 
       if (!pkg) {
         console.error("[RevenueCat] Package not found");
-        return false;
+        return { success: false, error: "Package not found" };
       }
 
-      const { customerInfo } = await Purchases.purchasePackage({
+      const { customerInfo, transaction } = await Purchases.purchasePackage({
         aPackage: pkg,
       });
 
       setCustomerInfo(customerInfo);
-      return "course_access" in customerInfo.entitlements.active;
+      const { appUserID } = await Purchases.getAppUserID();
+
+      if ("course_access" in customerInfo.entitlements.active || customerInfo.entitlements.active[productId || ""]) {
+        return {
+          success: true,
+          transactionId: transaction.transactionIdentifier,
+          appUserId: appUserID,
+        };
+      }
+      return { success: false, error: "Entitlement not granted after purchase" };
     } catch (err: any) {
       if (!err?.userCancelled) {
         console.error("[RevenueCat] Purchase error:", err);
       }
-      return false;
+      return { success: false, error: err?.message || "Purchase failed or cancelled" };
     }
   }, []);
 
