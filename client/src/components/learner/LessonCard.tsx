@@ -93,12 +93,6 @@ export function LessonCard({
             <Clock className="h-3.5 w-3.5" />
             <span>{lesson.duration}</span>
           </div>
-          {lesson.status !== "locked" && (
-            <div className="flex items-center gap-1">
-              <Pause className="h-3.5 w-3.5" />
-              <span>{lesson.maxPauses - lesson.pausesUsed} pauses left</span>
-            </div>
-          )}
         </div>
       </div>
 
