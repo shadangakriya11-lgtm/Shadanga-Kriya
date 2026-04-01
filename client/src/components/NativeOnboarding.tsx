@@ -69,8 +69,6 @@ export function NativeOnboarding() {
     const [touchStart, setTouchStart] = useState<number | null>(null);
     const [touchEnd, setTouchEnd] = useState<number | null>(null);
     const [progress, setProgress] = useState(0);
-    const [isFirstLoad, setIsFirstLoad] = useState(true);
-    const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
     const autoPlayTimerRef = useRef<NodeJS.Timeout | null>(null);
     const progressTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -79,19 +77,16 @@ export function NativeOnboarding() {
     const minSwipeDistance = 50;
 
     const nextSlide = useCallback(() => {
-        setSlideDirection('left');
         setCurrentSlide((prev) => (prev + 1) % slides.length);
         setProgress(0);
     }, []);
 
     const prevSlide = useCallback(() => {
-        setSlideDirection('right');
         setCurrentSlide((prev) => (prev - 1 + slides.length) % slides.length);
         setProgress(0);
     }, []);
 
     const goToSlide = (index: number) => {
-        setSlideDirection(index > currentSlide ? 'left' : 'right');
         setCurrentSlide(index);
         setProgress(0);
     };
@@ -120,8 +115,6 @@ export function NativeOnboarding() {
 
     useEffect(() => {
         resetAutoPlayTimer();
-        // Mark first load complete after initial render
-        const timer = setTimeout(() => setIsFirstLoad(false), 800);
         return () => {
             if (autoPlayTimerRef.current) {
                 clearInterval(autoPlayTimerRef.current);
@@ -129,7 +122,6 @@ export function NativeOnboarding() {
             if (progressTimerRef.current) {
                 clearInterval(progressTimerRef.current);
             }
-            clearTimeout(timer);
         };
     }, [resetAutoPlayTimer]);
 
@@ -166,54 +158,10 @@ export function NativeOnboarding() {
     const slide = slides[currentSlide];
     const IconComponent = slide.icon;
 
-    // Animation class based on direction
-    const getSlideAnimationClass = () => {
-        if (isFirstLoad && currentSlide === 0) {
-            return 'animate-fade-in';
-        }
-        if (slideDirection === 'left') {
-            return 'animate-slide-in-right';
-        }
-        if (slideDirection === 'right') {
-            return 'animate-slide-in-left';
-        }
-        return '';
-    };
-
     return (
         <div className="min-h-screen bg-background flex flex-col overflow-hidden">
-            {/* Inline styles for slide animations */}
+            {/* Inline styles for a simple fade transition */}
             <style>{`
-                @keyframes slideInRight {
-                    from {
-                        opacity: 0;
-                        transform: translateX(30px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(0);
-                    }
-                }
-                @keyframes slideInLeft {
-                    from {
-                        opacity: 0;
-                        transform: translateX(-30px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateX(0);
-                    }
-                }
-                @keyframes fadeInUp {
-                    from {
-                        opacity: 0;
-                        transform: translateY(20px);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0);
-                    }
-                }
                 @keyframes fadeIn {
                     from {
                         opacity: 0;
@@ -222,17 +170,8 @@ export function NativeOnboarding() {
                         opacity: 1;
                     }
                 }
-                .animate-slide-in-right {
-                    animation: slideInRight 0.4s ease-out forwards;
-                }
-                .animate-slide-in-left {
-                    animation: slideInLeft 0.4s ease-out forwards;
-                }
-                .animate-fade-in-initial {
-                    animation: fadeInUp 0.6s ease-out forwards;
-                }
                 .animate-fade-in {
-                    animation: fadeIn 0.5s ease-out forwards;
+                    animation: fadeIn 0.25s ease-out forwards;
                 }
             `}</style>
 
@@ -283,7 +222,7 @@ export function NativeOnboarding() {
 
                 {/* Slide Content with smooth transitions */}
                 <div
-                    className={`relative z-10 text-center max-w-sm mx-auto ${getSlideAnimationClass()}`}
+                    className="relative z-10 text-center max-w-sm mx-auto animate-fade-in"
                     key={currentSlide}
                 >
                     {/* Visual Element - Logo, Image, or Icon with breathing animation */}

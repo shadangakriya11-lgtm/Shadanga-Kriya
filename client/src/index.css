@@ -51,6 +51,36 @@ body {
   background-color: hsl(240, 10%, 10%);
 }
 
+/* Native/touch motion profile: keep interactions quick and app-like */
+.native-shell,
+.touch-shell {
+  scroll-behavior: auto;
+}
+
+.native-shell :where([class*="animate-"]:not([class*="animate-spin"])),
+.touch-shell :where([class*="animate-"]:not([class*="animate-spin"])) {
+  animation: none !important;
+}
+
+.native-shell .stagger-children > *,
+.touch-shell .stagger-children > * {
+  opacity: 1 !important;
+  animation: none !important;
+}
+
+.native-shell :where([class*="transition-all"], [class*="transition-transform"], [class*="transition-["]),
+.touch-shell :where([class*="transition-all"], [class*="transition-transform"], [class*="transition-["]) {
+  transition-property: color, background-color, border-color, opacity, box-shadow !important;
+  transition-duration: 120ms !important;
+  transition-timing-function: ease-out !important;
+}
+
+.native-shell :where([class*="animate-spin"]),
+.touch-shell :where([class*="animate-spin"]) {
+  animation-duration: 0.9s !important;
+  animation-timing-function: linear !important;
+}
+
 @layer base {
   :root {
     color-scheme: light;
