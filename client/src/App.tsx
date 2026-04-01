@@ -528,7 +528,7 @@ const AppContent = () => {
 const App = () => (
   <>
     <AppContent />
-    {/* <DebugConsole /> */}
+    {Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios" && <DebugConsole />}
   </>
 );
 
