@@ -336,25 +336,6 @@ export default function CourseDetail() {
 
         {/* Course Info */}
         <section className="mb-8 animate-fade-in">
-          <div className="flex gap-2 mb-4">
-            <Badge variant={course.type === "self" ? "self" : "onsite"}>
-              {course.type === "self" ? "Self-Paced" : "On-Site"}
-            </Badge>
-            <Badge
-              variant={
-                isEnrolled
-                  ? "active"
-                  : course.status === "active"
-                    ? "active"
-                    : "locked"
-              }
-            >
-              {isEnrolled
-                ? "Enrolled"
-                : course.status?.charAt(0).toUpperCase() +
-                course.status?.slice(1)}
-            </Badge>
-          </div>
 
           <h2 className="font-serif text-2xl font-bold text-foreground mb-3">
             {course.title}
