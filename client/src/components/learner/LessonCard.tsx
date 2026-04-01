@@ -1,10 +1,11 @@
 import { Lesson } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, Lock, CheckCircle2, Play, Pause, KeyRound } from "lucide-react";
+import { Clock, Lock, CheckCircle2, Play, Pause, KeyRound, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DownloadButton } from "./DownloadButton";
 import { useState } from "react";
+import { Capacitor } from "@capacitor/core";
 
 interface LessonCardProps {
   lesson: Lesson;
@@ -36,6 +37,10 @@ export function LessonCard({
 }: LessonCardProps) {
   const status = statusConfig[lesson.status];
   const [isDownloaded, setIsDownloaded] = useState<boolean | undefined>(undefined);
+  const isNativePlatform = Capacitor.isNativePlatform();
+
+  // On native: show play/key only when downloaded. On browser: always show (no download concept).
+  const shouldShowAction = status.canPlay && (isNativePlatform ? isDownloaded === true : true);
 
   return (
     <div
@@ -111,8 +116,14 @@ export function LessonCard({
           </div>
         )}
 
-      {/* Play/Access Code Action - Only show if downloaded or download status unknown */}
-      {status.canPlay && (isDownloaded !== false) && (
+      {/* Action Icon Logic:
+          - Browser: always show play/key (no download concept)
+          - Native (iOS/Android): show only after lesson is downloaded
+            - Downloaded + no access code lock => Play icon
+            - Downloaded + access code locked  => Key icon
+            - Not downloaded                   => nothing (DownloadButton handles it)
+      */}
+      {shouldShowAction && (
         <>
           {/* Case 1: Access code disabled - show Play icon */}
           {!lesson.accessCodeEnabled && (
