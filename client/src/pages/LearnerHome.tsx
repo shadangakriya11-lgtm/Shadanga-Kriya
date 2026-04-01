@@ -48,6 +48,7 @@ export default function LearnerHome() {
       title: course.title,
       description: course.description,
       type: course.type || "self",
+      appleProductId: course.appleProductId,
       status: enrollment
         ? enrollment.status === "completed"
           ? "completed"
