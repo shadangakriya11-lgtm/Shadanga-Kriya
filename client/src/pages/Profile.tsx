@@ -29,11 +29,13 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { authApi } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { Capacitor } from '@capacitor/core';
 
 export default function Profile() {
   const navigate = useNavigate();
   const { user, logout, refreshUser } = useAuth();
   const { toast } = useToast();
+  const isNativePlatform = Capacitor.isNativePlatform();
 
   // Edit Profile State
   const [isEditing, setIsEditing] = useState(false);
@@ -180,15 +182,17 @@ export default function Profile() {
                 <p className="font-medium text-foreground">{userInfo.phone}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                <Calendar className="h-5 w-5 text-muted-foreground" />
+            {!isNativePlatform && (
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                  <Calendar className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <p className="font-medium text-foreground">{userInfo.joinedDate}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Status</p>
-                <p className="font-medium text-foreground">{userInfo.joinedDate}</p>
-              </div>
-            </div>
+            )}
           </div>
         </section>
 
