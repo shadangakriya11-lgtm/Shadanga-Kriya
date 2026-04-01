@@ -79,9 +79,11 @@ export function LessonCard({
           <h4 className="font-medium text-foreground line-clamp-2 flex-1">
             {lesson.title}
           </h4>
-          <Badge variant={status.variant} className="shrink-0 text-xs mt-0.5">
-            {status.label}
-          </Badge>
+          {lesson.status !== "active" && (
+            <Badge variant={status.variant} className="shrink-0 text-xs mt-0.5">
+              {status.label}
+            </Badge>
+          )}
         </div>
         <p className="text-sm text-muted-foreground truncate">
           {lesson.description}
@@ -130,7 +132,7 @@ export function LessonCard({
             <Button
               variant="therapy"
               size="icon"
-              className="shrink-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              className="shrink-0 rounded-full transition-colors"
             >
               <Play className="h-5 w-5" />
             </Button>

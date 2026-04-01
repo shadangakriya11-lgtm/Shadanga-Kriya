@@ -258,11 +258,11 @@ export function DownloadButton({
                     variant="ghost"
                     size="icon"
                     className={cn(
-                      "text-green-600 hover:text-red-600",
+                      "text-red-500 hover:text-red-600",
                       className
                     )}
                   >
-                    <Check className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </AlertDialogTrigger>
               </TooltipTrigger>
