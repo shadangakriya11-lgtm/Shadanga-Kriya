@@ -39,23 +39,14 @@ export function CourseCard({ course, onClick, className, style }: CourseCardProp
       style={style}
       onClick={onClick}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex gap-2">
-          <Badge variant={type.variant}>{type.label}</Badge>
-          <Badge variant={status.variant} className="flex items-center gap-1">
-            {StatusIcon && <StatusIcon className="h-3 w-3" />}
-            {status.label}
-          </Badge>
-        </div>
-        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+      {/* Title & Arrow */}
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-serif text-xl font-semibold text-foreground leading-tight">
+          {course.title}
+        </h3>
+        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
       </div>
-
-      {/* Title & Description */}
-      <h3 className="font-serif text-xl font-semibold text-foreground mb-2 leading-tight">
-        {course.title}
-      </h3>
-      <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
+      <p className="text-muted-foreground text-sm line-clamp-1 mb-4">
         {course.description}
       </p>
 

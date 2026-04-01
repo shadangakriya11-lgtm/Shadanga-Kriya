@@ -144,7 +144,6 @@ export default function Profile() {
           <h1 className="font-serif text-2xl font-bold text-foreground mb-1">
             {userInfo.name}
           </h1>
-          <p className="text-muted-foreground text-sm">{userInfo.userId}</p>
           <Badge variant="active" className="mt-2">
             {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Member'}
           </Badge>
