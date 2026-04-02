@@ -370,9 +370,23 @@ export function AudioPlayer({ lesson, onBack, onComplete }: AudioPlayerProps) {
       }
     };
 
-    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+    const mediaDevices = navigator?.mediaDevices;
+    const supportsDeviceChangeEvents =
+      !!mediaDevices &&
+      typeof mediaDevices.addEventListener === "function" &&
+      typeof mediaDevices.removeEventListener === "function";
+
+    // Fallback for iOS/WKWebView builds where MediaDevices events are unavailable.
+    if (!supportsDeviceChangeEvents) {
+      const intervalId = window.setInterval(handleDeviceChange, 2000);
+      return () => {
+        window.clearInterval(intervalId);
+      };
+    }
+
+    mediaDevices.addEventListener("devicechange", handleDeviceChange);
     return () => {
-      navigator.mediaDevices.removeEventListener("devicechange", handleDeviceChange);
+      mediaDevices.removeEventListener("devicechange", handleDeviceChange);
     };
   }, [playback.isPlaying, playback.pausesRemaining, earphoneCheckEnabled, releaseWakeLock, toast]);
 

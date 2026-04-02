@@ -278,7 +278,7 @@ export default function LearnerHome() {
                   key={course.id}
                   course={course}
                   onClick={() => handleCourseClick(course)}
-                  className="opacity-0 animate-fade-in"
+                  className="animate-fade-in"
                   style={{ animationDelay: `${index * 100}ms` }}
                 />
               ))

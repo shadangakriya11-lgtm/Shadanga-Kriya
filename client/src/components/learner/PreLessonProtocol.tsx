@@ -205,14 +205,30 @@ export function PreLessonProtocol({
       }
     };
 
+    const mediaDevices = navigator?.mediaDevices;
+    const supportsDeviceChangeEvents =
+      !!mediaDevices &&
+      typeof mediaDevices.addEventListener === "function" &&
+      typeof mediaDevices.removeEventListener === "function";
+
+    // Fallback for iOS/WKWebView builds where MediaDevices events are unavailable.
+    if (!supportsDeviceChangeEvents) {
+      const intervalId = window.setInterval(handleDeviceChange, 3000);
+      handleDeviceChange();
+
+      return () => {
+        window.clearInterval(intervalId);
+      };
+    }
+
     // Listen for hardware changes (plug/unplug)
-    navigator.mediaDevices.addEventListener("devicechange", handleDeviceChange);
+    mediaDevices.addEventListener("devicechange", handleDeviceChange);
 
     // Initial check
     handleDeviceChange();
 
     return () => {
-      navigator.mediaDevices.removeEventListener(
+      mediaDevices.removeEventListener(
         "devicechange",
         handleDeviceChange
       );

@@ -404,7 +404,7 @@ export default function CourseDetail() {
                   lesson={lesson}
                   courseId={id}
                   onClick={() => handleLessonClick(lesson)}
-                  className="opacity-0 animate-fade-in"
+                  className="animate-fade-in"
                   style={
                     {
                       animationDelay: `${(index + 3) * 100}ms`,
