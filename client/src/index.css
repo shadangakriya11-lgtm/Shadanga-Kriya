@@ -62,6 +62,12 @@ body {
   animation: none !important;
 }
 
+/* Safety: when animations are disabled, do not keep animate-driven elements hidden */
+.native-shell :where([class*="animate-"].opacity-0:not([class*="animate-spin"])),
+.touch-shell :where([class*="animate-"].opacity-0:not([class*="animate-spin"])) {
+  opacity: 1 !important;
+}
+
 .native-shell .stagger-children > *,
 .touch-shell .stagger-children > * {
   opacity: 1 !important;

@@ -82,14 +82,22 @@ export async function areEarphonesConnected(): Promise<boolean> {
 
   // Web/fallback detection
   try {
+    const mediaDevices = navigator?.mediaDevices;
+    if (!mediaDevices || typeof mediaDevices.enumerateDevices !== "function") {
+      console.warn("[DeviceChecks] MediaDevices API not available for fallback earphone detection");
+      return false;
+    }
+
     // Request permission to enumerate devices (required on most browsers)
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (typeof mediaDevices.getUserMedia === "function") {
+        await mediaDevices.getUserMedia({ audio: true });
+      }
     } catch (permError) {
       console.warn("[DeviceChecks] Could not get audio permission:", permError);
     }
 
-    const devices = await navigator.mediaDevices.enumerateDevices();
+    const devices = await mediaDevices.enumerateDevices();
     const audioOutputs = devices.filter(
       (device) => device.kind === "audiooutput"
     );
