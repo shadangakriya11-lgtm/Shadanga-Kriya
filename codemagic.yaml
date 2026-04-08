@@ -17,6 +17,19 @@ workflows:
       app_store_connect: CodemagicKey
 
     scripts:
+      - name: Validate iOS build environment
+        script: |
+          set -e
+          echo "Checking required environment variables..."
+          if [[ -z "$VITE_API_URL" ]]; then
+            echo "ERROR: VITE_API_URL is not set"
+            exit 1
+          fi
+          if [[ -z "$VITE_REVENUECAT_IOS_API_KEY" ]]; then
+            echo "ERROR: VITE_REVENUECAT_IOS_API_KEY is not set"
+            exit 1
+          fi
+
       - name: Install dependencies
         script: |
           cd client
@@ -31,6 +44,23 @@ workflows:
         script: |
           cd client
           npx cap sync ios
+
+      - name: Verify latest web bundle was copied to iOS
+        script: |
+          set -e
+          cd client
+
+          # Ensure Capacitor public bundle exists
+          test -f ios/App/App/public/index.html
+          ls -la ios/App/App/public
+          ls -la ios/App/App/public/assets | head
+
+          # Ensure iOS IAP discoverability strings are present in shipped JS
+          grep -Fq "Buy with App Store" ios/App/App/public/assets/index-*.js
+          grep -Fq "Tap a locked course card to open course options" ios/App/App/public/assets/index-*.js
+
+          # Ensure iOS animation safety fix is present in shipped CSS
+          grep -Fq "native-shell :where([class*=animate-].opacity-0" ios/App/App/public/assets/index-*.css
 
       - name: Set up code signing
         script: |
