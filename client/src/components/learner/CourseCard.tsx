@@ -84,7 +84,7 @@ export function CourseCard({ course, onClick, className, style }: CourseCardProp
       {course.status === 'locked' && (
         <div className="flex items-center gap-2 text-locked-foreground bg-locked/10 rounded-lg px-3 py-2">
           <Lock className="h-4 w-4" />
-          <span className="text-sm">Complete prerequisites to unlock</span>
+          <span className="text-sm">Tap to open course options</span>
         </div>
       )}
     </div>

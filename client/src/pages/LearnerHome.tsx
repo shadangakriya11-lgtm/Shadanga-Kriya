@@ -251,6 +251,12 @@ export default function LearnerHome() {
           )}
         </section>
 
+        {lockedCourses.length > 0 && (
+          <p className="text-xs text-muted-foreground mb-4">
+            Tap a locked course card to open course options.
+          </p>
+        )}
+
         {/* Courses Tabs */}
         <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full mb-6">
