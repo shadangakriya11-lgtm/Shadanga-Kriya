@@ -99,7 +99,9 @@ export function PaymentModal({
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
-            'x-client-platform': Capacitor.getPlatform(),
+            ...(Capacitor.isNativePlatform() && {
+              'x-client-platform': Capacitor.getPlatform(),
+            }),
             'ngrok-skip-browser-warning': 'true',
           },
           body: JSON.stringify({
@@ -185,7 +187,9 @@ export function PaymentModal({
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
-            'x-client-platform': Capacitor.getPlatform(),
+            ...(Capacitor.isNativePlatform() && {
+              'x-client-platform': Capacitor.getPlatform(),
+            }),
             'ngrok-skip-browser-warning': 'true',
           },
           body: JSON.stringify({ 

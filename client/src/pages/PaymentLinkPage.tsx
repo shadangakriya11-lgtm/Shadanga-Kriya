@@ -78,7 +78,9 @@ export default function PaymentLinkPage() {
         `${import.meta.env.VITE_API_URL}/api/payment-links/course/${courseId}`,
         {
           headers: {
-            'x-client-platform': Capacitor.getPlatform(),
+            ...(Capacitor.isNativePlatform() && {
+              'x-client-platform': Capacitor.getPlatform(),
+            }),
           },
         }
       );
@@ -110,7 +112,9 @@ export default function PaymentLinkPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-client-platform': Capacitor.getPlatform(),
+            ...(Capacitor.isNativePlatform() && {
+              'x-client-platform': Capacitor.getPlatform(),
+            }),
           },
           body: JSON.stringify({
             code: discountCode.toUpperCase(),
@@ -192,7 +196,9 @@ export default function PaymentLinkPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-client-platform': Capacitor.getPlatform(),
+            ...(Capacitor.isNativePlatform() && {
+              'x-client-platform': Capacitor.getPlatform(),
+            }),
           },
           body: JSON.stringify({
             name: formData.name,
@@ -224,7 +230,9 @@ export default function PaymentLinkPage() {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'x-client-platform': Capacitor.getPlatform(),
+                  ...(Capacitor.isNativePlatform() && {
+                    'x-client-platform': Capacitor.getPlatform(),
+                  }),
                 },
                 body: JSON.stringify({
                   razorpay_order_id: razorpayResponse.razorpay_order_id,

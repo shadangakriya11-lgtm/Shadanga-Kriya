@@ -49,7 +49,7 @@ app.use(cors({
   origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost', 'capacitor://localhost', 'https://shadanga-kriya.vercel.app', 'https://www.shadangakriya.com', 'https://shadangakriya.com'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning']
+  allowedHeaders: ['Content-Type', 'Authorization', 'ngrok-skip-browser-warning', 'x-client-platform']
 }));
 app.use(express.json({ limit: '500mb' })); // SECURITY: Limit payload size
 

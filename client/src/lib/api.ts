@@ -193,7 +193,9 @@ async function apiRequest<T>(
   const headers: HeadersInit = {
     ...(!isFormData && { "Content-Type": "application/json" }),
     ...(token && { Authorization: `Bearer ${token}` }),
-    "x-client-platform": Capacitor.getPlatform(),
+    ...(Capacitor.isNativePlatform() && {
+      "x-client-platform": Capacitor.getPlatform(),
+    }),
     // Skip ngrok browser warning for free tier tunnels
     "ngrok-skip-browser-warning": "true",
     ...options.headers,
