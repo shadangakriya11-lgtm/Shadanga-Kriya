@@ -17,6 +17,7 @@ import android.media.projection.MediaProjection;
 import android.media.projection.MediaProjectionManager;
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewFeature;
+import com.ionicframework.capacitor.Checkout;
 import com.getcapacitor.BridgeActivity;
 import java.lang.reflect.Method;
 
@@ -37,6 +38,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ScreenProtectionPlugin.class);
         registerPlugin(AudioProtectionPlugin.class);
         registerPlugin(FileConcatenationPlugin.class);
+        registerPlugin(Checkout.class);
         super.onCreate(savedInstanceState);
         
         // Additional security flags

@@ -29,9 +29,16 @@ import { toast } from "@/hooks/use-toast";
 import { paymentsApi, getCachedToken } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
-import { isIOSApp } from "@/lib/platformDetection";
+import { isAndroidApp, isIOSApp } from "@/lib/platformDetection";
 import { Capacitor } from "@capacitor/core";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
+import {
+  extractRazorpayCheckoutResponse,
+  getNativeCheckoutErrorMessage,
+  isNativeCheckoutCancelled,
+  openNativeRazorpayCheckout,
+  RazorpayVerificationPayload,
+} from "@/lib/razorpayNative";
 
 declare global {
   interface Window {
@@ -160,6 +167,40 @@ export function PaymentModal({
 
   const finalAmount = appliedDiscount ? appliedDiscount.finalPrice : (course?.price || 0);
 
+  const handleVerifiedPayment = async (
+    razorpayResponse: RazorpayVerificationPayload,
+  ) => {
+    if (!course) {
+      throw new Error("Course details are unavailable");
+    }
+
+    await paymentsApi.verifyRazorpay({
+      razorpay_order_id: razorpayResponse.razorpay_order_id,
+      razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+      razorpay_signature: razorpayResponse.razorpay_signature,
+    });
+
+    // Invalidate queries to refresh enrollment status
+    await queryClient.invalidateQueries({
+      queryKey: ["myEnrollments"],
+    });
+    await queryClient.invalidateQueries({ queryKey: ["courses"] });
+    await queryClient.invalidateQueries({ queryKey: ["myPayments"] });
+
+    setPaymentStep("success");
+
+    setTimeout(() => {
+      onSuccess(course.id);
+      toast({
+        title: "Payment Successful!",
+        description: `You now have access to "${course.title}"`,
+      });
+      setPaymentStep("details");
+      setIsProcessing(false);
+      onClose();
+    }, 2000);
+  };
+
   // ─── iOS: Purchase via RevenueCat / App Store ───────────────
   const handleIOSPurchase = async () => {
     if (!course || !user) return;
@@ -242,7 +283,44 @@ export function PaymentModal({
     setPaymentStep("processing");
 
     try {
-      // 1. Load Razorpay script
+      // 1. Create order on backend
+      const orderData = await paymentsApi.createRazorpayOrder(course.id, finalAmount);
+
+      // 2. Use native Razorpay checkout on Android app to enable UPI app handoff.
+      if (isAndroidApp()) {
+        try {
+          const nativeResult = await openNativeRazorpayCheckout({
+            key: orderData.keyId,
+            amount: String(orderData.amount),
+            currency: orderData.currency,
+            name: "Shadanga Kriya",
+            description: `Enrollment for ${course.title}`,
+            order_id: orderData.orderId,
+            prefill: {
+              name: `${user.firstName} ${user.lastName}`,
+              email: user.email,
+              contact: user.phone || undefined,
+            },
+            theme: {
+              color: "#2d9d92",
+            },
+          });
+
+          const nativeResponse = extractRazorpayCheckoutResponse(nativeResult);
+          await handleVerifiedPayment(nativeResponse);
+          return;
+        } catch (nativeError) {
+          const nativeMessage = getNativeCheckoutErrorMessage(nativeError);
+          if (isNativeCheckoutCancelled(nativeMessage)) {
+            setPaymentStep("details");
+            setIsProcessing(false);
+            return;
+          }
+          throw new Error(nativeMessage || "Native Razorpay checkout failed");
+        }
+      }
+
+      // 3. Fallback to Razorpay web checkout for browser.
       const isLoaded = await loadRazorpayScript();
       if (!isLoaded) {
         throw new Error(
@@ -250,10 +328,6 @@ export function PaymentModal({
         );
       }
 
-      // 2. Create order on backend
-      const orderData = await paymentsApi.createRazorpayOrder(course.id, finalAmount);
-
-      // 3. Open Razorpay Checkout
       // Note: Logo only works with publicly accessible HTTPS URLs
       // For localhost, the logo won't display due to CORS restrictions
       const isLocalhost = window.location.hostname === 'localhost' || 
@@ -270,32 +344,7 @@ export function PaymentModal({
         order_id: orderData.orderId,
         handler: async function (response: any) {
           try {
-            // 4. Verify payment on backend
-            await paymentsApi.verifyRazorpay({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            });
-
-            // Invalidate queries to refresh enrollment status
-            await queryClient.invalidateQueries({
-              queryKey: ["myEnrollments"],
-            });
-            await queryClient.invalidateQueries({ queryKey: ["courses"] });
-            await queryClient.invalidateQueries({ queryKey: ["myPayments"] });
-
-            setPaymentStep("success");
-
-            setTimeout(() => {
-              onSuccess(course.id);
-              toast({
-                title: "Payment Successful!",
-                description: `You now have access to "${course.title}"`,
-              });
-              setPaymentStep("details");
-              setIsProcessing(false);
-              onClose();
-            }, 2000);
+            await handleVerifiedPayment(response);
           } catch (error: any) {
             console.error("Verification error:", error);
             setPaymentStep("error");

@@ -20,6 +20,14 @@ import {
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Capacitor } from '@capacitor/core';
+import { isAndroidApp } from '@/lib/platformDetection';
+import {
+  extractRazorpayCheckoutResponse,
+  getNativeCheckoutErrorMessage,
+  isNativeCheckoutCancelled,
+  openNativeRazorpayCheckout,
+  RazorpayVerificationPayload,
+} from '@/lib/razorpayNative';
 
 declare global {
   interface Window {
@@ -171,6 +179,56 @@ export default function PaymentLinkPage() {
 
   const finalAmount = appliedDiscount ? appliedDiscount.finalPrice : (course?.price || 0);
 
+  const verifyPaymentAndComplete = async (
+    orderData: any,
+    razorpayResponse: RazorpayVerificationPayload,
+  ) => {
+    if (!course) {
+      throw new Error('Course details are unavailable');
+    }
+
+    const verifyResponse = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/payment-links/verify`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(Capacitor.isNativePlatform() && {
+            'x-client-platform': Capacitor.getPlatform(),
+          }),
+        },
+        body: JSON.stringify({
+          razorpay_order_id: razorpayResponse.razorpay_order_id,
+          razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+          razorpay_signature: razorpayResponse.razorpay_signature,
+          userId: orderData.userId,
+          courseId: course.id,
+          discountInfo: orderData.discountInfo,
+        }),
+      }
+    );
+
+    if (!verifyResponse.ok) {
+      throw new Error('Payment verification failed');
+    }
+
+    const verifyData = await verifyResponse.json();
+    setPaymentId(verifyData.payment.id);
+    setPaymentData({
+      orderId: razorpayResponse.razorpay_order_id,
+      transactionId: razorpayResponse.razorpay_payment_id,
+      amount: orderData.amount / 100,
+      createdAt: new Date().toISOString(),
+      status: 'completed',
+      paymentMethod: 'Razorpay',
+      userName: formData.name,
+      userEmail: formData.email,
+      courseTitle: course.title,
+    });
+    setPaymentStep('success');
+    setIsProcessing(false);
+  };
+
   const handlePayment = async () => {
     if (!formData.name || !formData.email) {
       toast({
@@ -185,11 +243,6 @@ export default function PaymentLinkPage() {
     setPaymentStep('processing');
 
     try {
-      const isLoaded = await loadRazorpayScript();
-      if (!isLoaded) {
-        throw new Error('Razorpay SDK failed to load');
-      }
-
       const response = await fetch(
         `${import.meta.env.VITE_API_URL}/api/payment-links/process`,
         {
@@ -215,6 +268,43 @@ export default function PaymentLinkPage() {
         throw new Error(data.error || 'Failed to process payment');
       }
 
+      if (isAndroidApp()) {
+        try {
+          const nativeResult = await openNativeRazorpayCheckout({
+            key: data.keyId,
+            amount: String(data.amount),
+            currency: data.currency,
+            name: 'Shadanga Kriya',
+            description: `Enrollment for ${data.courseTitle}`,
+            order_id: data.orderId,
+            prefill: {
+              name: formData.name,
+              email: formData.email,
+            },
+            theme: {
+              color: '#2d9d92',
+            },
+          });
+
+          const nativeResponse = extractRazorpayCheckoutResponse(nativeResult);
+          await verifyPaymentAndComplete(data, nativeResponse);
+          return;
+        } catch (nativeError) {
+          const nativeMessage = getNativeCheckoutErrorMessage(nativeError);
+          if (isNativeCheckoutCancelled(nativeMessage)) {
+            setPaymentStep('form');
+            setIsProcessing(false);
+            return;
+          }
+          throw new Error(nativeMessage || 'Native Razorpay checkout failed');
+        }
+      }
+
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        throw new Error('Razorpay SDK failed to load');
+      }
+
       const options = {
         key: data.keyId,
         amount: data.amount,
@@ -222,48 +312,9 @@ export default function PaymentLinkPage() {
         name: 'Shadanga Kriya',
         description: `Enrollment for ${data.courseTitle}`,
         order_id: data.orderId,
-        handler: async function (razorpayResponse: any) {
+        handler: async function (razorpayResponse: RazorpayVerificationPayload) {
           try {
-            const verifyResponse = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/payment-links/verify`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(Capacitor.isNativePlatform() && {
-                    'x-client-platform': Capacitor.getPlatform(),
-                  }),
-                },
-                body: JSON.stringify({
-                  razorpay_order_id: razorpayResponse.razorpay_order_id,
-                  razorpay_payment_id: razorpayResponse.razorpay_payment_id,
-                  razorpay_signature: razorpayResponse.razorpay_signature,
-                  userId: data.userId,
-                  courseId: course.id,
-                  discountInfo: data.discountInfo,
-                }),
-              }
-            );
-
-            if (!verifyResponse.ok) {
-              throw new Error('Payment verification failed');
-            }
-
-            const verifyData = await verifyResponse.json();
-            setPaymentId(verifyData.payment.id);
-            setPaymentData({
-              orderId: razorpayResponse.razorpay_order_id,
-              transactionId: razorpayResponse.razorpay_payment_id,
-              amount: data.amount / 100,
-              createdAt: new Date().toISOString(),
-              status: 'completed',
-              paymentMethod: 'Razorpay',
-              userName: formData.name,
-              userEmail: formData.email,
-              courseTitle: course.title,
-            });
-            setPaymentStep('success');
-            setIsProcessing(false);
+            await verifyPaymentAndComplete(data, razorpayResponse);
           } catch (error: any) {
             console.error('Verification error:', error);
             setPaymentStep('error');
@@ -563,7 +614,7 @@ export default function PaymentLinkPage() {
                   </>
                 ) : (
                   <div className="flex items-center justify-between py-3 border-t border-b border-border">
-                    <span className="text-muted-foreground">Course Fee</span>
+                    <span className="text-muted-foreground">Price</span>
                     <span className="font-serif text-2xl font-bold text-foreground">
                       ₹{course.price?.toLocaleString()}
                     </span>

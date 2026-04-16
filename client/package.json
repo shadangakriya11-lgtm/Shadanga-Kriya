@@ -73,6 +73,7 @@
     "@revenuecat/purchases-capacitor-ui": "^12.3.0",
     "@supabase/supabase-js": "^2.89.0",
     "@tanstack/react-query": "^5.83.0",
+    "capacitor-razorpay": "https://codeload.github.com/razorpay/razorpay-capacitor/tar.gz/76fd7d6b59f631eb44e6ecebc9188b2425168beb",
     "capacitor-secure-storage-plugin": "^0.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

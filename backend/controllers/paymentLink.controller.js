@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const { v4: uuidv4 } = require('uuid');
-const { resolveRequestedPlatform, resolveCoursePrice, toApiCoursePrices } = require('../lib/platformPricing.js');
+const { resolveCoursePrice, toApiCoursePrices } = require('../lib/platformPricing.js');
 
 // Helper to get setting
 const getSetting = async (key) => {
@@ -13,6 +13,9 @@ const getSetting = async (key) => {
   );
   return result.rows[0]?.setting_value || null;
 };
+
+// Public payment links should always expose Android pricing as the default "Price".
+const resolvePaymentLinkPlatform = () => 'android';
 
 /**
  * Generate payment link for a course
@@ -33,7 +36,7 @@ exports.generatePaymentLink = async (req, res) => {
     }
 
     const course = courseResult.rows[0];
-    const pricing = toApiCoursePrices(course, resolveRequestedPlatform(req));
+    const pricing = toApiCoursePrices(course, resolvePaymentLinkPlatform());
     
     // Generate payment link using CLIENT_DOMAIN from .env
     const baseUrl = process.env.CLIENT_DOMAIN || process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -81,7 +84,7 @@ exports.getCourseForPayment = async (req, res) => {
     }
 
     const course = result.rows[0];
-    const pricing = toApiCoursePrices(course, resolveRequestedPlatform(req));
+    const pricing = toApiCoursePrices(course, resolvePaymentLinkPlatform());
 
     res.json({
       course: {
@@ -175,8 +178,7 @@ exports.processPaymentLinkPayment = async (req, res) => {
     }
 
     const course = courseResult.rows[0];
-    const requestedPlatform = resolveRequestedPlatform(req);
-    const baseAmount = resolveCoursePrice(course, requestedPlatform);
+    const baseAmount = resolveCoursePrice(course, resolvePaymentLinkPlatform());
     let finalAmount = baseAmount;
     let discountInfo = null;
 
