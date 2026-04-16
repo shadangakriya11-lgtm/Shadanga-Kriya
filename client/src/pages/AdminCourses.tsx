@@ -63,7 +63,8 @@ export default function AdminCourses() {
     title: "",
     description: "",
     type: "self",
-    price: 0,
+    androidPrice: 0,
+    iosPrice: 0,
     status: "active",
     duration: "",
     appleProductId: "",
@@ -89,13 +90,19 @@ export default function AdminCourses() {
 
   const handleCreateOrUpdateCourse = async () => {
     try {
+      const payload = {
+        ...newCourse,
+        // Keep legacy price in sync for older app builds.
+        price: newCourse.androidPrice,
+      };
+
       if (editingCourse) {
         await updateCourse.mutateAsync({
           id: editingCourse.id,
-          data: newCourse,
+          data: payload,
         });
       } else {
-        await createCourse.mutateAsync(newCourse as any);
+        await createCourse.mutateAsync(payload as any);
       }
       setIsCreateOpen(false);
       setEditingCourse(null);
@@ -103,7 +110,8 @@ export default function AdminCourses() {
         title: "",
         description: "",
         type: "self",
-        price: 0,
+        androidPrice: 0,
+        iosPrice: 0,
         status: "active",
         duration: "",
         appleProductId: "",
@@ -119,7 +127,8 @@ export default function AdminCourses() {
       title: course.title,
       description: course.description || "",
       type: course.type || "self",
-      price: Number(course.price) || 0,
+      androidPrice: Number(course.androidPrice ?? course.price) || 0,
+      iosPrice: Number(course.iosPrice ?? course.price) || 0,
       status: course.status || "active",
       duration: course.duration || "",
       appleProductId: course.appleProductId || "",
@@ -223,12 +232,22 @@ export default function AdminCourses() {
     },
     {
       key: "price",
-      header: "Price",
-      render: (course: any) => (
-        <span className="font-semibold text-foreground">
-          {course.price ? `₹${course.price}` : "Free"}
-        </span>
-      ),
+      header: "Platform Price",
+      render: (course: any) => {
+        const androidPrice = Number(course.androidPrice ?? course.price ?? 0);
+        const iosPrice = Number(course.iosPrice ?? course.price ?? 0);
+
+        return (
+          <div className="text-sm">
+            <div className="font-semibold text-foreground">
+              Android: {androidPrice > 0 ? `₹${androidPrice}` : "Free"}
+            </div>
+            <div className="text-muted-foreground">
+              iPhone: {iosPrice > 0 ? `₹${iosPrice}` : "Free"}
+            </div>
+          </div>
+        );
+      },
     },
     {
       key: "enrollments",
@@ -343,7 +362,8 @@ export default function AdminCourses() {
                     title: "",
                     description: "",
                     type: "self",
-                    price: 0,
+                    androidPrice: 0,
+                    iosPrice: 0,
                     status: "active",
                     duration: "",
                     appleProductId: "",
@@ -391,7 +411,7 @@ export default function AdminCourses() {
                       rows={4}
                     />
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label>Type</Label>
                       <Select
@@ -410,14 +430,28 @@ export default function AdminCourses() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Price (₹)</Label>
+                      <Label>Android Price (₹)</Label>
                       <Input
                         type="number"
-                        value={newCourse.price}
+                        value={newCourse.androidPrice}
                         onChange={(e) =>
                           setNewCourse((prev) => ({
                             ...prev,
-                            price: Number(e.target.value),
+                            androidPrice: Number(e.target.value),
+                          }))
+                        }
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>iPhone Price (₹)</Label>
+                      <Input
+                        type="number"
+                        value={newCourse.iosPrice}
+                        onChange={(e) =>
+                          setNewCourse((prev) => ({
+                            ...prev,
+                            iosPrice: Number(e.target.value),
                           }))
                         }
                         placeholder="0"
@@ -543,7 +577,10 @@ export default function AdminCourses() {
                       </span>
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Price: ₹{selectedCourseForLink.price?.toLocaleString() || 0}
+                      Android Price: ₹{Number(selectedCourseForLink.androidPrice ?? selectedCourseForLink.price ?? 0).toLocaleString()}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      iPhone Price: ₹{Number(selectedCourseForLink.iosPrice ?? selectedCourseForLink.price ?? 0).toLocaleString()}
                     </div>
                   </div>
                 )}

@@ -15,11 +15,16 @@ router.get('/:id', [
 // Admin/Facilitator routes
 router.post('/', verifyToken, isFacilitatorOrAdmin, [
   body('title').trim().notEmpty().withMessage('Title required'),
-  body('price').optional().isFloat({ min: 0 }).withMessage('Price must be positive')
+  body('price').optional().isFloat({ min: 0 }).withMessage('Price must be positive'),
+  body('androidPrice').optional().isFloat({ min: 0 }).withMessage('Android price must be positive'),
+  body('iosPrice').optional().isFloat({ min: 0 }).withMessage('iPhone price must be positive')
 ], validate, courseController.createCourse);
 
 router.put('/:id', verifyToken, isFacilitatorOrAdmin, [
-  param('id').isUUID().withMessage('Valid course ID required')
+  param('id').isUUID().withMessage('Valid course ID required'),
+  body('price').optional().isFloat({ min: 0 }).withMessage('Price must be positive'),
+  body('androidPrice').optional().isFloat({ min: 0 }).withMessage('Android price must be positive'),
+  body('iosPrice').optional().isFloat({ min: 0 }).withMessage('iPhone price must be positive')
 ], validate, courseController.updateCourse);
 
 router.delete('/:id', verifyToken, isAdmin, [

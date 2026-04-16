@@ -115,12 +115,12 @@ async function seedSampleCourse() {
             return true;
         }
 
-        const courseResult = await pool.query(`
-      INSERT INTO courses (title, description, price, duration_hours, type, status, category)
+                const courseResult = await pool.query(`
+            INSERT INTO courses (title, description, price, android_price, ios_price, duration_hours, type, status, category)
       VALUES (
         'Introduction to Shadanga Kriya',
         'Begin your journey with the ancient practice of Shadanga Kriya.',
-        49.99, 10, 'self', 'published', 'Meditation'
+                49.99, 49.99, 49.99, 10, 'self', 'published', 'Meditation'
       )
       RETURNING id
     `);

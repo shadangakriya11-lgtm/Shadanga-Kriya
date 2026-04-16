@@ -31,6 +31,20 @@ const migrations = [
     `
   },
   {
+    name: 'add_platform_course_prices',
+    description: 'Add android and iOS specific prices to courses',
+    sql: `
+      ALTER TABLE courses ADD COLUMN IF NOT EXISTS android_price DECIMAL(10, 2);
+      ALTER TABLE courses ADD COLUMN IF NOT EXISTS ios_price DECIMAL(10, 2);
+
+      UPDATE courses
+      SET
+        android_price = COALESCE(android_price, price),
+        ios_price = COALESCE(ios_price, price)
+      WHERE android_price IS NULL OR ios_price IS NULL;
+    `
+  },
+  {
     name: 'create_notifications_table',
     description: 'Create notifications table',
     sql: `

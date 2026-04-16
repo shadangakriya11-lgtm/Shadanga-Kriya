@@ -3,6 +3,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const { v4: uuidv4 } = require('uuid');
+const { resolveRequestedPlatform, resolveCoursePrice, toApiCoursePrices } = require('../lib/platformPricing.js');
 
 // Helper to get setting
 const getSetting = async (key) => {
@@ -23,7 +24,7 @@ exports.generatePaymentLink = async (req, res) => {
 
     // Get course details
     const courseResult = await pool.query(
-      'SELECT id, title, price FROM courses WHERE id = $1',
+      'SELECT id, title, price, android_price, ios_price FROM courses WHERE id = $1',
       [courseId]
     );
 
@@ -32,6 +33,7 @@ exports.generatePaymentLink = async (req, res) => {
     }
 
     const course = courseResult.rows[0];
+    const pricing = toApiCoursePrices(course, resolveRequestedPlatform(req));
     
     // Generate payment link using CLIENT_DOMAIN from .env
     const baseUrl = process.env.CLIENT_DOMAIN || process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -44,7 +46,9 @@ exports.generatePaymentLink = async (req, res) => {
       course: {
         id: course.id,
         title: course.title,
-        price: course.price
+        price: pricing.price,
+        androidPrice: pricing.androidPrice,
+        iosPrice: pricing.iosPrice,
       }
     });
   } catch (error) {
@@ -63,7 +67,7 @@ exports.getCourseForPayment = async (req, res) => {
 
     const result = await pool.query(
       `SELECT 
-        c.id, c.title, c.description, c.price, c.duration, c.thumbnail_url,
+        c.id, c.title, c.description, c.price, c.android_price, c.ios_price, c.duration, c.thumbnail_url,
         COUNT(l.id) as lesson_count
       FROM courses c
       LEFT JOIN lessons l ON c.id = l.course_id
@@ -76,8 +80,16 @@ exports.getCourseForPayment = async (req, res) => {
       return res.status(404).json({ error: 'Course not found or not available' });
     }
 
+    const course = result.rows[0];
+    const pricing = toApiCoursePrices(course, resolveRequestedPlatform(req));
+
     res.json({
-      course: result.rows[0]
+      course: {
+        ...course,
+        price: pricing.price,
+        android_price: pricing.androidPrice,
+        ios_price: pricing.iosPrice,
+      }
     });
   } catch (error) {
     console.error('Error fetching course for payment:', error);
@@ -153,7 +165,7 @@ exports.processPaymentLinkPayment = async (req, res) => {
 
     // 2. Get course details
     const courseResult = await client.query(
-      'SELECT id, title, price FROM courses WHERE id = $1 AND status = $2',
+      'SELECT id, title, price, android_price, ios_price FROM courses WHERE id = $1 AND status = $2',
       [courseId, 'active']
     );
 
@@ -163,7 +175,9 @@ exports.processPaymentLinkPayment = async (req, res) => {
     }
 
     const course = courseResult.rows[0];
-    let finalAmount = course.price;
+    const requestedPlatform = resolveRequestedPlatform(req);
+    const baseAmount = resolveCoursePrice(course, requestedPlatform);
+    let finalAmount = baseAmount;
     let discountInfo = null;
 
     // 3. Validate discount code if provided
@@ -195,15 +209,15 @@ exports.processPaymentLinkPayment = async (req, res) => {
           );
 
           if (usageCheck.rows.length === 0) {
-            const discountAmount = Math.round((course.price * discount.discount_percent) / 100);
-            finalAmount = course.price - discountAmount;
+            const discountAmount = Math.round((baseAmount * discount.discount_percent) / 100);
+            finalAmount = baseAmount - discountAmount;
             
             discountInfo = {
               id: discount.id,
               code: discount.code,
               discountPercent: discount.discount_percent,
               discountAmount,
-              originalPrice: course.price
+              originalPrice: baseAmount
             };
           }
         }

@@ -1,6 +1,12 @@
 const pool = require('../config/db.js');
 const { notifyAdmins } = require('./notification.controller.js');
 const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const {
+  resolveRequestedPlatform,
+  toApiCoursePrices,
+  buildCoursePricesForCreate,
+  buildCoursePricesForUpdate,
+} = require('../lib/platformPricing.js');
 
 // Configure Cloudflare R2 (S3 Client) for deleting audio files
 const r2 = new S3Client({
@@ -37,6 +43,7 @@ const getR2KeyFromUrl = (url) => {
 const getAllCourses = async (req, res) => {
   try {
     const { status, category, search, page = 1, limit = 20, noPagination } = req.query;
+    const requestedPlatform = resolveRequestedPlatform(req);
     
     // If noPagination is true, fetch all courses without limit
     const shouldPaginate = noPagination !== 'true';
@@ -101,27 +108,33 @@ const getAllCourses = async (req, res) => {
 
     const result = await pool.query(query, params);
 
-    const courses = result.rows.map(course => ({
-      id: course.id,
-      title: course.title,
-      description: course.description,
-      thumbnailUrl: course.thumbnail_url,
-      price: parseFloat(course.price),
-      durationHours: course.duration_hours,
-      duration: course.duration,
-      type: course.type,
-      status: course.status,
-      category: course.category,
-      prerequisites: course.prerequisites,
-      prerequisiteCourseId: course.prerequisite_course_id,
-      appleProductId: course.apple_product_id,
-      createdBy: course.created_by,
-      creatorName: course.creator_first_name ? `${course.creator_first_name} ${course.creator_last_name}` : null,
-      lessonCount: parseInt(course.lesson_count),
-      enrollmentCount: parseInt(course.enrollment_count),
-      createdAt: course.created_at,
-      updatedAt: course.updated_at
-    }));
+    const courses = result.rows.map(course => {
+      const pricing = toApiCoursePrices(course, requestedPlatform);
+
+      return {
+        id: course.id,
+        title: course.title,
+        description: course.description,
+        thumbnailUrl: course.thumbnail_url,
+        price: pricing.price,
+        androidPrice: pricing.androidPrice,
+        iosPrice: pricing.iosPrice,
+        durationHours: course.duration_hours,
+        duration: course.duration,
+        type: course.type,
+        status: course.status,
+        category: course.category,
+        prerequisites: course.prerequisites,
+        prerequisiteCourseId: course.prerequisite_course_id,
+        appleProductId: course.apple_product_id,
+        createdBy: course.created_by,
+        creatorName: course.creator_first_name ? `${course.creator_first_name} ${course.creator_last_name}` : null,
+        lessonCount: parseInt(course.lesson_count),
+        enrollmentCount: parseInt(course.enrollment_count),
+        createdAt: course.created_at,
+        updatedAt: course.updated_at
+      };
+    });
 
     const response = { courses };
     
@@ -148,6 +161,7 @@ const getAllCourses = async (req, res) => {
 const getCourseById = async (req, res) => {
   try {
     const { id } = req.params;
+    const requestedPlatform = resolveRequestedPlatform(req);
 
     const result = await pool.query(
       `SELECT c.*, 
@@ -164,6 +178,7 @@ const getCourseById = async (req, res) => {
     }
 
     const course = result.rows[0];
+    const pricing = toApiCoursePrices(course, requestedPlatform);
 
     // Get lessons
     const lessonsResult = await pool.query(
@@ -177,7 +192,9 @@ const getCourseById = async (req, res) => {
       title: course.title,
       description: course.description,
       thumbnailUrl: course.thumbnail_url,
-      price: parseFloat(course.price),
+      price: pricing.price,
+      androidPrice: pricing.androidPrice,
+      iosPrice: pricing.iosPrice,
       durationHours: course.duration_hours,
       duration: course.duration,
       type: course.type,
@@ -208,16 +225,54 @@ const getCourseById = async (req, res) => {
 // Create course
 const createCourse = async (req, res) => {
   try {
-    const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId, appleProductId } = req.body;
+    const {
+      title,
+      description,
+      thumbnailUrl,
+      price,
+      androidPrice,
+      iosPrice,
+      durationHours,
+      duration,
+      status,
+      category,
+      type,
+      prerequisites,
+      prerequisiteCourseId,
+      appleProductId,
+    } = req.body;
+
+    if ((androidPrice !== undefined || iosPrice !== undefined) && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can configure platform-specific pricing' });
+    }
+
+    const coursePrices = buildCoursePricesForCreate({ price, androidPrice, iosPrice });
 
     const result = await pool.query(
-      `INSERT INTO courses (title, description, thumbnail_url, price, duration_hours, duration, status, category, type, prerequisites, prerequisite_course_id, created_by, apple_product_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      `INSERT INTO courses (title, description, thumbnail_url, price, android_price, ios_price, duration_hours, duration, status, category, type, prerequisites, prerequisite_course_id, created_by, apple_product_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING *`,
-      [title, description, thumbnailUrl, price || 0, durationHours || 0, duration, status || 'active', category, type || 'self', prerequisites, prerequisiteCourseId, req.user.id, appleProductId]
+      [
+        title,
+        description,
+        thumbnailUrl,
+        coursePrices.legacyPrice,
+        coursePrices.androidPrice,
+        coursePrices.iosPrice,
+        durationHours || 0,
+        duration,
+        status || 'active',
+        category,
+        type || 'self',
+        prerequisites,
+        prerequisiteCourseId,
+        req.user.id,
+        appleProductId,
+      ]
     );
 
     const course = result.rows[0];
+    const pricing = toApiCoursePrices(course, resolveRequestedPlatform(req));
 
     res.status(201).json({
       message: 'Course created',
@@ -226,7 +281,9 @@ const createCourse = async (req, res) => {
         title: course.title,
         description: course.description,
         thumbnailUrl: course.thumbnail_url,
-        price: parseFloat(course.price),
+        price: pricing.price,
+        androidPrice: pricing.androidPrice,
+        iosPrice: pricing.iosPrice,
         durationHours: course.duration_hours,
         duration: course.duration,
         type: course.type,
@@ -257,7 +314,22 @@ const createCourse = async (req, res) => {
 const updateCourse = async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId, appleProductId } = req.body;
+    const {
+      title,
+      description,
+      thumbnailUrl,
+      price,
+      androidPrice,
+      iosPrice,
+      durationHours,
+      duration,
+      status,
+      category,
+      type,
+      prerequisites,
+      prerequisiteCourseId,
+      appleProductId,
+    } = req.body;
 
     // Check permission for facilitator
     if (req.user.role === 'facilitator') {
@@ -272,12 +344,30 @@ const updateCourse = async (req, res) => {
       }
     }
 
+    if ((androidPrice !== undefined || iosPrice !== undefined) && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can configure platform-specific pricing' });
+    }
+
+    const existingCourseResult = await pool.query(
+      'SELECT * FROM courses WHERE id = $1',
+      [id]
+    );
+
+    if (existingCourseResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Course not found' });
+    }
+
+    const updatedPrices = buildCoursePricesForUpdate(
+      { price, androidPrice, iosPrice },
+      existingCourseResult.rows[0]
+    );
+
     const result = await pool.query(
       `UPDATE courses 
        SET title = COALESCE($1, title),
            description = COALESCE($2, description),
            thumbnail_url = COALESCE($3, thumbnail_url),
-           price = COALESCE($4, price),
+           price = $4,
            duration_hours = COALESCE($5, duration_hours),
            duration = COALESCE($6, duration),
            status = COALESCE($7, status),
@@ -286,17 +376,32 @@ const updateCourse = async (req, res) => {
            prerequisites = COALESCE($10, prerequisites),
            prerequisite_course_id = $11,
            apple_product_id = COALESCE($13, apple_product_id),
+           android_price = $14,
+           ios_price = $15,
            updated_at = NOW()
        WHERE id = $12
        RETURNING *`,
-      [title, description, thumbnailUrl, price, durationHours, duration, status, category, type, prerequisites, prerequisiteCourseId, id, appleProductId]
+      [
+        title,
+        description,
+        thumbnailUrl,
+        updatedPrices.legacyPrice,
+        durationHours,
+        duration,
+        status,
+        category,
+        type,
+        prerequisites,
+        prerequisiteCourseId,
+        id,
+        appleProductId,
+        updatedPrices.androidPrice,
+        updatedPrices.iosPrice,
+      ]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Course not found' });
-    }
-
     const course = result.rows[0];
+    const pricing = toApiCoursePrices(course, resolveRequestedPlatform(req));
 
     res.json({
       message: 'Course updated',
@@ -305,7 +410,9 @@ const updateCourse = async (req, res) => {
         title: course.title,
         description: course.description,
         thumbnailUrl: course.thumbnail_url,
-        price: parseFloat(course.price),
+        price: pricing.price,
+        androidPrice: pricing.androidPrice,
+        iosPrice: pricing.iosPrice,
         durationHours: course.duration_hours,
         duration: course.duration,
         type: course.type,

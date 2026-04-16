@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS courses (
   description TEXT,
   thumbnail_url TEXT,
   price DECIMAL(10, 2) DEFAULT 0,
+  android_price DECIMAL(10, 2),
+  ios_price DECIMAL(10, 2),
   duration VARCHAR(50),
   duration_hours INTEGER DEFAULT 0,
   type course_type DEFAULT 'self',

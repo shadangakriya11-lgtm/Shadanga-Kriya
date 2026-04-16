@@ -19,6 +19,7 @@ import {
   Download,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Capacitor } from '@capacitor/core';
 
 declare global {
   interface Window {
@@ -74,7 +75,12 @@ export default function PaymentLinkPage() {
   const fetchCourse = async () => {
     try {
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/payment-links/course/${courseId}`
+        `${import.meta.env.VITE_API_URL}/api/payment-links/course/${courseId}`,
+        {
+          headers: {
+            'x-client-platform': Capacitor.getPlatform(),
+          },
+        }
       );
       
       if (!response.ok) throw new Error('Course not found');
@@ -104,6 +110,7 @@ export default function PaymentLinkPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'x-client-platform': Capacitor.getPlatform(),
           },
           body: JSON.stringify({
             code: discountCode.toUpperCase(),
@@ -185,6 +192,7 @@ export default function PaymentLinkPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'x-client-platform': Capacitor.getPlatform(),
           },
           body: JSON.stringify({
             name: formData.name,
@@ -216,6 +224,7 @@ export default function PaymentLinkPage() {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
+                  'x-client-platform': Capacitor.getPlatform(),
                 },
                 body: JSON.stringify({
                   razorpay_order_id: razorpayResponse.razorpay_order_id,

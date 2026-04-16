@@ -4,6 +4,7 @@ const { notifyAdmins } = require('./notification.controller.js');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { getSetting } = require('./settings.controller.js');
+const { resolveRequestedPlatform, resolveCoursePrice } = require('../lib/platformPricing.js');
 
 // Get user's payments
 const getMyPayments = async (req, res) => {
@@ -45,7 +46,7 @@ const createPayment = async (req, res) => {
 
     // Get course price - more relaxed check
     const courseResult = await pool.query(
-      'SELECT id, title, price, status FROM courses WHERE id = $1',
+      'SELECT id, title, price, android_price, ios_price, status FROM courses WHERE id = $1',
       [courseId]
     );
 
@@ -58,6 +59,8 @@ const createPayment = async (req, res) => {
     }
 
     const course = courseResult.rows[0];
+    const requestedPlatform = resolveRequestedPlatform(req);
+    const selectedAmount = resolveCoursePrice(course, requestedPlatform);
     console.log('Found course:', course);
 
     if (course.status === 'draft') {
@@ -82,7 +85,7 @@ const createPayment = async (req, res) => {
       `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [req.user.id, courseId, course.price, 'INR', 'pending', paymentMethod || 'mock', transactionId]
+      [req.user.id, courseId, selectedAmount, 'INR', 'pending', paymentMethod || 'mock', transactionId]
     );
 
     const payment = result.rows[0];
@@ -122,7 +125,7 @@ const createRazorpayOrder = async (req, res) => {
 
     // 2. Get course price - more relaxed check
     const courseResult = await pool.query(
-      'SELECT id, title, price, status FROM courses WHERE id = $1',
+      'SELECT id, title, price, android_price, ios_price, status FROM courses WHERE id = $1',
       [courseId]
     );
 
@@ -141,8 +144,12 @@ const createRazorpayOrder = async (req, res) => {
       return res.status(400).json({ error: 'Cannot purchase a draft course' });
     }
     
-    // Use finalAmount if provided (with discount), otherwise use course price
-    const amount = finalAmount !== undefined ? finalAmount : course.price;
+    // Use finalAmount if provided (with discount), otherwise use platform-aware course price
+    const parsedFinalAmount = Number(finalAmount);
+    const hasFinalAmount = finalAmount !== undefined && Number.isFinite(parsedFinalAmount);
+    const amount = hasFinalAmount
+      ? parsedFinalAmount
+      : resolveCoursePrice(course, resolveRequestedPlatform(req));
     const amountInPaise = Math.round(amount * 100);
 
     // 3. Initialize Razorpay
@@ -498,7 +505,7 @@ const recordIOSPurchase = async (req, res) => {
 
     // 1. Get course details
     const courseResult = await client.query(
-      'SELECT id, title, price, status FROM courses WHERE id = $1',
+      'SELECT id, title, price, android_price, ios_price, status FROM courses WHERE id = $1',
       [courseId]
     );
 
@@ -564,7 +571,7 @@ const recordIOSPurchase = async (req, res) => {
     await client.query(
       `INSERT INTO payments (user_id, course_id, amount, currency, status, payment_method, transaction_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, courseId, course.price, 'INR', 'completed', 'apple_iap', transactionId]
+      [userId, courseId, resolveCoursePrice(course, 'ios'), 'INR', 'completed', 'apple_iap', transactionId]
     );
 
     // 5. Create enrollment

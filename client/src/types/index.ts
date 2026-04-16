@@ -31,6 +31,8 @@ export interface Course {
   duration: string;
   thumbnail?: string;
   price?: number;
+  androidPrice?: number;
+  iosPrice?: number;
   appleProductId?: string;
 }
 
@@ -260,6 +262,8 @@ export interface CreateCourseData {
   description: string;
   type: CourseType;
   price?: number;
+  androidPrice?: number;
+  iosPrice?: number;
   duration?: string;
   thumbnail?: string;
   appleProductId?: string;
@@ -270,6 +274,8 @@ export interface UpdateCourseData {
   description?: string;
   type?: CourseType;
   price?: number;
+  androidPrice?: number;
+  iosPrice?: number;
   duration?: string;
   thumbnail?: string;
   status?: CourseStatus;
