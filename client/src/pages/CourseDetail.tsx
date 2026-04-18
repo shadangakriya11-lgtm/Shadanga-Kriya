@@ -28,9 +28,10 @@ import { AccessCodeInputDialog } from "@/components/learner/AccessCodeInputDialo
 import {
   getDownloadedLessonsForCourse,
   deleteDownloadsForCourse,
-  DownloadedLesson,
+  isLessonDownloaded,
 } from "@/lib/downloadManager";
 import { shouldShowPricing } from "@/lib/platformDetection";
+import { Capacitor } from "@capacitor/core";
 
 type ViewState = "details" | "protocol" | "player";
 
@@ -43,6 +44,7 @@ export default function CourseDetail() {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [isAccessCodeOpen, setIsAccessCodeOpen] = useState(false);
   const [pendingLesson, setPendingLesson] = useState<Lesson | null>(null);
+  const isNativePlatform = Capacitor.isNativePlatform();
 
   const { data: courseData, isLoading: courseLoading } = useCourse(id || "");
   const { data: lessonsData, isLoading: lessonsLoading } = useLessonsByCourse(
@@ -154,7 +156,7 @@ export default function CourseDetail() {
     );
   }
 
-  const handleLessonClick = (lesson: Lesson) => {
+  const handleLessonClick = async (lesson: Lesson) => {
     if (lesson.status === "active") {
       // For on-site courses, check attendance before allowing lesson start
       if (isOnsiteCourse) {
@@ -172,6 +174,31 @@ export default function CourseDetail() {
             title: "Attendance Required",
             description:
               "Please ask your facilitator to mark your attendance before starting the lesson.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Native app flow: lesson must be downloaded before protocol can open.
+      if (isNativePlatform) {
+        try {
+          const downloaded = await isLessonDownloaded(lesson.id);
+          if (!downloaded) {
+            toast({
+              title: "Download Required",
+              description:
+                "Please download this lesson before starting the session.",
+              variant: "destructive",
+            });
+            return;
+          }
+        } catch (error) {
+          console.error("Failed to verify download status:", error);
+          toast({
+            title: "Unable to Verify Download",
+            description:
+              "Please try again after checking the lesson download status.",
             variant: "destructive",
           });
           return;

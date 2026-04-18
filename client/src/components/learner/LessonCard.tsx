@@ -38,6 +38,7 @@ export function LessonCard({
   const status = statusConfig[lesson.status];
   const [isDownloaded, setIsDownloaded] = useState<boolean | undefined>(undefined);
   const isNativePlatform = Capacitor.isNativePlatform();
+  const isCardClickable = status.canPlay && (isNativePlatform ? isDownloaded === true : true);
 
   // On native: show play/key only when downloaded. On browser: always show (no download concept).
   const shouldShowAction = status.canPlay && (isNativePlatform ? isDownloaded === true : true);
@@ -46,13 +47,13 @@ export function LessonCard({
     <div
       className={cn(
         "group flex items-center gap-4 bg-card rounded-xl border border-border/50 p-4 transition-all duration-200",
-        status.canPlay &&
+        isCardClickable &&
         "hover:shadow-soft hover:border-border cursor-pointer",
         lesson.status === "locked" && "opacity-60",
         className
       )}
       style={style}
-      onClick={status.canPlay ? onClick : undefined}
+      onClick={isCardClickable ? onClick : undefined}
     >
       {/* Order Number / Status Icon */}
       <div
