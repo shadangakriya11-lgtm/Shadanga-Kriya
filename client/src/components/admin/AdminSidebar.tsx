@@ -10,7 +10,6 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Shield,
   Menu,
   X,
   Bell,
@@ -59,11 +58,13 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="h-16 flex items-center gap-3 px-6 border-b border-sidebar-border">
-        <div className="h-9 w-9 rounded-lg bg-sidebar-primary/20 flex items-center justify-center">
-          <Shield className="h-5 w-5 text-sidebar-primary" />
-        </div>
+        <img
+          src="/shadanga-kriya-logo.png"
+          alt="Shadanga Kriya"
+          className="h-9 w-9 rounded-lg object-contain"
+        />
         <div>
-          <h1 className="font-serif font-semibold text-sidebar-foreground">TherapyOS</h1>
+          <h1 className="font-serif font-semibold text-sidebar-foreground">Shadanga Kriya</h1>
           <p className="text-xs text-sidebar-foreground/60">Admin Console</p>
         </div>
       </div>

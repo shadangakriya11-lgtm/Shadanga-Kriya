@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   Mail,
   Lock,
-  UserCircle,
   Sparkles,
   Sunrise,
 } from "lucide-react";
@@ -69,7 +68,8 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
   const isNativePlatform = Capacitor.isNativePlatform();
@@ -99,8 +99,7 @@ export default function Auth() {
 
     if (mode === "signup" && password.length < 6) {
       toast({
-        title: "Password too short",
-        description: "Password must be at least 6 characters.",
+        description: "Please enter both first name and last name.",
         variant: "destructive",
       });
       return;
@@ -131,14 +130,11 @@ export default function Auth() {
         });
         navigate(roleConfig[loggedInUser.role]?.redirectTo || "/home");
       } else {
-        const [firstName, ...lastNameParts] = fullName.trim().split(" ");
-        const lastName = lastNameParts.join(" ") || firstName;
-
         const newUser = await register({
           email,
           password,
-          firstName,
-          lastName,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           referralCode: referralCode || undefined,
         });
         toast({
@@ -196,19 +192,35 @@ export default function Auth() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
             {mode === "signup" && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-sm font-medium text-muted-foreground">
-                  Your Name
-                </Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder="First and Last Name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="h-14 px-4 rounded-xl border border-border bg-background text-base focus:border-primary focus:ring-2 focus:ring-primary/10"
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName" className="text-sm font-medium text-muted-foreground">
+                    First Name
+                  </Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    placeholder="First name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="h-14 px-4 rounded-xl border border-border bg-background text-base focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName" className="text-sm font-medium text-muted-foreground">
+                    Last Name
+                  </Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    placeholder="Last name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="h-14 px-4 rounded-xl border border-border bg-background text-base focus:border-primary focus:ring-2 focus:ring-primary/10"
+                    required
+                  />
+                </div>
               </div>
             )}
 
@@ -309,19 +321,6 @@ export default function Auth() {
               )}
             </Button>
 
-            {mode === "signup" && (
-              <p className="text-xs text-center text-muted-foreground px-4 mt-4">
-                By signing up you agree to our{" "}
-                <button
-                  type="button"
-                  onClick={() => navigate("/privacy-security")}
-                  className="text-primary underline"
-                >
-                  Privacy Policy and Terms
-                </button>
-                .
-              </p>
-            )}
           </form>
 
           {/* Switch Mode */}
@@ -503,19 +502,36 @@ export default function Auth() {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {mode === "signup" && (
-                <div className="space-y-2 animate-fade-in">
-                  <Label htmlFor="fullName" className="text-foreground">Name (First and Last Name)</Label>
-                  <div className="relative group">
-                    <UserCircle className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                    <Input
-                      id="fullName"
-                      type="text"
-                      placeholder="Enter name (First and Last Name)"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
-                      required
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstNameWeb" className="text-foreground">First Name</Label>
+                    <div className="relative group">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                      <Input
+                        id="firstNameWeb"
+                        type="text"
+                        placeholder="First name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastNameWeb" className="text-foreground">Last Name</Label>
+                    <div className="relative group">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                      <Input
+                        id="lastNameWeb"
+                        type="text"
+                        placeholder="Last name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        className="h-14 pl-12 rounded-xl border-2 border-border bg-muted/50 focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all text-foreground placeholder:text-muted-foreground"
+                        required
+                      />
+                    </div>
                   </div>
                 </div>
               )}

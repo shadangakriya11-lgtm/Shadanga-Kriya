@@ -6,13 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Filter, MoreHorizontal, Download, CreditCard, CheckCircle, XCircle, Clock, FileText, FileSpreadsheet, Eye, Receipt, RotateCcw } from 'lucide-react';
+import { Search, Filter, MoreHorizontal, Download, CreditCard, CheckCircle, XCircle, Clock, FileText, FileSpreadsheet, Eye, Receipt, RotateCcw, Smartphone, Wallet } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -31,16 +30,31 @@ import {
 } from '@/components/ui/select';
 import { useAllPayments, usePaymentStats, useUsers, useCourses, useCompletePayment, useActivateCourse, useRefundPayment } from '@/hooks/useApi';
 import { useToast } from '@/hooks/use-toast';
+import type { Course, Payment, User } from '@/types';
+
+type PaymentRow = Payment & {
+  userName?: string;
+  userEmail?: string;
+  courseTitle?: string;
+  transactionId?: string;
+  paymentId?: string;
+  createdAt: string | Date;
+  status: Payment['status'] | 'refunded';
+};
+
+type PaymentRecord = PaymentRow;
+type AdminUser = Pick<User, 'id' | 'firstName' | 'lastName' | 'email'>;
+type AdminCourse = Pick<Course, 'id' | 'title'>;
 
 export default function AdminPayments() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isActivateOpen, setIsActivateOpen] = useState(false);
   const [activateData, setActivateData] = useState({ userId: '', courseId: '', notes: '' });
-  const [selectedPayment, setSelectedPayment] = useState<any>(null);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { toast } = useToast();
 
-  const { data: paymentsData, isLoading, refetch } = useAllPayments();
+  const { data: paymentsData, isLoading } = useAllPayments();
   const { data: statsData } = usePaymentStats();
   const { data: usersData } = useUsers({ noPagination: 'true' }); // Fetch all users for dropdown
   const { data: coursesData } = useCourses({ noPagination: 'true' }); // Fetch all courses for dropdown
@@ -48,20 +62,45 @@ export default function AdminPayments() {
   const activateCourse = useActivateCourse();
   const refundPayment = useRefundPayment();
 
-  const payments = (paymentsData?.payments || []).filter((payment: any) =>
+  const payments = ((paymentsData?.payments || []) as PaymentRecord[]).filter((payment: PaymentRecord) =>
     payment.userName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     payment.courseTitle?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     payment.transactionId?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const normalizePaymentMethod = (method?: string) => (method || '').toLowerCase();
+
+  const getPaymentMethodLabel = (method?: string) => {
+    const normalized = normalizePaymentMethod(method);
+    if (normalized === 'razorpay') return 'Razorpay';
+    if (normalized === 'apple_iap') return 'Apple In-App Purchase';
+    if (normalized === 'manual') return 'Manual Activation';
+    if (normalized === 'mock') return 'Mock Payment';
+    return method || 'N/A';
+  };
+
+  const getPrimaryTransactionLabel = (method?: string) => {
+    const normalized = normalizePaymentMethod(method);
+    if (normalized === 'razorpay') return 'Razorpay Order ID';
+    if (normalized === 'apple_iap') return 'Apple Transaction ID';
+    return 'Transaction ID';
+  };
+
+  const getSecondaryTransactionLabel = (method?: string) => {
+    const normalized = normalizePaymentMethod(method);
+    if (normalized === 'razorpay') return 'Razorpay Payment ID';
+    if (normalized === 'apple_iap') return 'App Store Payment ID';
+    return 'Payment ID';
+  };
+
   const stats = statsData || { totalRevenue: 0, completed: 0, pending: 0, revenueThisMonth: 0 };
-  const users = usersData?.users || [];
-  const courses = coursesData?.courses || [];
+  const users = (usersData?.users || []) as AdminUser[];
+  const courses = (coursesData?.courses || []) as AdminCourse[];
 
   // Export to CSV
   const exportToCSV = () => {
     const headers = ['User Name', 'Email', 'Course', 'Amount', 'Status', 'Transaction ID', 'Payment Method', 'Date'];
-    const csvData = payments.map((tx: any) => [
+    const csvData = payments.map((tx: PaymentRecord) => [
       tx.userName || 'Unknown',
       tx.userEmail || '',
       tx.courseTitle || 'Unknown Course',
@@ -103,7 +142,7 @@ export default function AdminPayments() {
       return;
     }
 
-    const totalAmount = payments.reduce((sum: number, tx: any) => sum + parseFloat(tx.amount || 0), 0);
+    const totalAmount = payments.reduce((sum: number, tx: PaymentRecord) => sum + Number(tx.amount || 0), 0);
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -163,7 +202,7 @@ export default function AdminPayments() {
             </tr>
           </thead>
           <tbody>
-            ${payments.map((tx: any) => `
+            ${payments.map((tx: PaymentRecord) => `
               <tr>
                 <td>${tx.userName || 'Unknown'}<br><small>${tx.userEmail || ''}</small></td>
                 <td>${tx.courseTitle || 'Unknown Course'}</td>
@@ -223,13 +262,13 @@ export default function AdminPayments() {
   };
 
   // View payment details
-  const handleViewDetails = (tx: any) => {
+  const handleViewDetails = (tx: PaymentRecord) => {
     setSelectedPayment(tx);
     setIsDetailsOpen(true);
   };
 
   // Download receipt as PDF
-  const handleDownloadReceipt = (tx: any) => {
+  const handleDownloadReceipt = (tx: PaymentRecord) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast({
@@ -276,13 +315,15 @@ export default function AdminPayments() {
         <div class="section">
           <div class="section-title">Transaction Details</div>
           <div class="row">
-            <span class="label">Razorpay Order ID</span>
+            <span class="label">${getPrimaryTransactionLabel(tx.paymentMethod)}</span>
             <span class="value">${tx.transactionId || 'N/A'}</span>
           </div>
+          ${(tx.paymentId || normalizePaymentMethod(tx.paymentMethod) === 'razorpay') ? `
           <div class="row">
-            <span class="label">Razorpay Payment ID</span>
+            <span class="label">${getSecondaryTransactionLabel(tx.paymentMethod)}</span>
             <span class="value">${tx.paymentId || 'N/A'}</span>
           </div>
+          ` : ''}
           <div class="row">
             <span class="label">Date</span>
             <span class="value">${new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>
@@ -293,7 +334,7 @@ export default function AdminPayments() {
           </div>
           <div class="row">
             <span class="label">Payment Method</span>
-            <span class="value">${tx.paymentMethod || 'Razorpay'}</span>
+            <span class="value">${getPaymentMethodLabel(tx.paymentMethod)}</span>
           </div>
         </div>
 
@@ -347,7 +388,7 @@ export default function AdminPayments() {
   };
 
   // Mark payment as refunded
-  const handleMarkAsRefunded = async (tx: any) => {
+  const handleMarkAsRefunded = async (tx: PaymentRecord) => {
     if (!confirm(`Are you sure you want to mark this payment as refunded?\n\nUser: ${tx.userName}\nCourse: ${tx.courseTitle}\nAmount: ₹${tx.amount}`)) {
       return;
     }
@@ -363,7 +404,7 @@ export default function AdminPayments() {
     {
       key: 'user',
       header: 'User',
-      render: (tx: any) => (
+      render: (tx: PaymentRecord) => (
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
             {(tx.userName || tx.userEmail || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
@@ -378,21 +419,21 @@ export default function AdminPayments() {
     {
       key: 'course',
       header: 'Course',
-      render: (tx: any) => (
+      render: (tx: PaymentRecord) => (
         <p className="font-medium text-foreground">{tx.courseTitle || 'Unknown Course'}</p>
       ),
     },
     {
       key: 'amount',
       header: 'Amount',
-      render: (tx: any) => (
+      render: (tx: PaymentRecord) => (
         <span className="font-semibold text-foreground">₹{tx.amount}</span>
       ),
     },
     {
       key: 'status',
       header: 'Status',
-      render: (tx: any) => {
+      render: (tx: PaymentRecord) => {
         const variants: Record<string, 'active' | 'completed' | 'pending' | 'locked'> = {
           completed: 'completed',
           pending: 'pending',
@@ -414,23 +455,50 @@ export default function AdminPayments() {
       },
     },
     {
+      key: 'gateway',
+      header: 'Gateway',
+      render: (tx: PaymentRecord) => {
+        const normalized = normalizePaymentMethod(tx.paymentMethod);
+        if (normalized === 'apple_iap') {
+          return (
+            <Badge variant="outline" className="inline-flex w-fit flex-nowrap whitespace-nowrap gap-1 border-blue-200 text-blue-700 bg-blue-50 min-w-[7.5rem] justify-center">
+              <Smartphone className="h-3 w-3" />
+              Apple IAP
+            </Badge>
+          );
+        }
+
+        if (normalized === 'razorpay') {
+          return (
+            <Badge variant="outline" className="inline-flex w-fit flex-nowrap whitespace-nowrap gap-1 border-emerald-200 text-emerald-700 bg-emerald-50 min-w-[7.5rem] justify-center">
+              <Wallet className="h-3 w-3" />
+              Razorpay
+            </Badge>
+          );
+        }
+
+        return <Badge variant="outline" className="whitespace-nowrap">{getPaymentMethodLabel(tx.paymentMethod)}</Badge>;
+      },
+      className: 'whitespace-nowrap min-w-[9rem]',
+    },
+    {
       key: 'transactionId',
-      header: 'Razorpay Order ID',
-      render: (tx: any) => (
+      header: 'Transaction ID',
+      render: (tx: PaymentRecord) => (
         <code className="text-xs bg-muted px-2 py-1 rounded">{tx.transactionId || 'N/A'}</code>
       ),
     },
     {
       key: 'paymentId',
-      header: 'Razorpay Payment ID',
-      render: (tx: any) => (
+      header: 'Payment ID',
+      render: (tx: PaymentRecord) => (
         <code className="text-xs bg-muted px-2 py-1 rounded">{tx.paymentId || 'N/A'}</code>
       ),
     },
     {
       key: 'date',
       header: 'Date',
-      render: (tx: any) => (
+      render: (tx: PaymentRecord) => (
         <span className="text-muted-foreground">
           {new Date(tx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
         </span>
@@ -439,7 +507,7 @@ export default function AdminPayments() {
     {
       key: 'actions',
       header: '',
-      render: (tx: any) => (
+      render: (tx: PaymentRecord) => (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -556,7 +624,7 @@ export default function AdminPayments() {
                           <SelectValue placeholder="Select user" />
                         </SelectTrigger>
                         <SelectContent>
-                          {users.map((user: any) => (
+                          {users.map((user: AdminUser) => (
                             <SelectItem key={user.id} value={user.id}>
                               {user.firstName} {user.lastName} ({user.email})
                             </SelectItem>
@@ -571,7 +639,7 @@ export default function AdminPayments() {
                           <SelectValue placeholder="Select course" />
                         </SelectTrigger>
                         <SelectContent>
-                          {courses.map((course: any) => (
+                          {courses.map((course: AdminCourse) => (
                             <SelectItem key={course.id} value={course.id}>{course.title}</SelectItem>
                           ))}
                         </SelectContent>
@@ -653,7 +721,7 @@ export default function AdminPayments() {
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Payment Method</span>
-                        <span className="font-medium">{selectedPayment.paymentMethod || 'Razorpay'}</span>
+                        <span className="font-medium">{getPaymentMethodLabel(selectedPayment.paymentMethod)}</span>
                       </div>
                     </div>
                   </div>
@@ -664,7 +732,7 @@ export default function AdminPayments() {
                     <div className="bg-muted/50 rounded-lg p-4 space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Name</span>
-                        <span className="font-medium">{selectedPayment.userName || 'N/A'}</span>
+                          <span className="font-medium">{selectedPayment.userName || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Email</span>
