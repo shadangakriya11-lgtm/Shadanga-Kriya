@@ -20,8 +20,33 @@ export interface PurchaseResult {
   success: boolean;
   transactionId?: string;
   appUserId?: string;
+  cancelled?: boolean;
   error?: string;
 }
+
+const hasCourseAccess = (info: CustomerInfo, productId?: string): boolean => {
+  const activeEntitlements = info?.entitlements?.active || {};
+  if ("course_access" in activeEntitlements) {
+    return true;
+  }
+
+  if (!productId) {
+    return false;
+  }
+
+  const customerInfoAny = info as any;
+  const activeSubscriptions = customerInfoAny?.activeSubscriptions;
+  if (Array.isArray(activeSubscriptions) && activeSubscriptions.includes(productId)) {
+    return true;
+  }
+
+  const purchasedProducts = customerInfoAny?.allPurchasedProductIdentifiers;
+  if (Array.isArray(purchasedProducts) && purchasedProducts.includes(productId)) {
+    return true;
+  }
+
+  return false;
+};
 
 /**
  * Hook to manage RevenueCat purchases — iOS only.
@@ -217,7 +242,7 @@ export function useRevenueCat() {
       setCustomerInfo(customerInfo);
       const { appUserID } = await Purchases.getAppUserID();
 
-      if ("course_access" in customerInfo.entitlements.active || customerInfo.entitlements.active[productId || ""]) {
+      if (hasCourseAccess(customerInfo, productId)) {
         return {
           success: true,
           transactionId: transaction.transactionIdentifier,
@@ -233,6 +258,50 @@ export function useRevenueCat() {
     }
   }, []);
 
+  // ─── Redeem App Store offer code and refresh entitlements ───
+  const redeemOfferCode = useCallback(async (productId?: string): Promise<PurchaseResult> => {
+    if (Capacitor.getPlatform() !== "ios") {
+      return { success: false, error: "Not iOS platform" };
+    }
+
+    try {
+      await Purchases.presentCodeRedemptionSheet();
+
+      // Force a fresh entitlement read after redemption sheet flow.
+      await Purchases.syncPurchases();
+      await Purchases.invalidateCustomerInfoCache();
+
+      const info = await Purchases.getCustomerInfo();
+      setCustomerInfo(info.customerInfo);
+      const { appUserID } = await Purchases.getAppUserID();
+
+      if (hasCourseAccess(info.customerInfo, productId)) {
+        return {
+          success: true,
+          appUserId: appUserID,
+        };
+      }
+
+      return {
+        success: false,
+        error: "No active offer/purchase found for this course after redemption.",
+      };
+    } catch (err: any) {
+      const message = err?.message || "Offer code redemption failed";
+      const cancelled = /cancel/i.test(message);
+
+      if (!cancelled) {
+        console.error("[RevenueCat] Offer code redemption error:", err);
+      }
+
+      return {
+        success: false,
+        cancelled,
+        error: message,
+      };
+    }
+  }, []);
+
   return {
     isConfigured,
     customerInfo,
@@ -241,6 +310,7 @@ export function useRevenueCat() {
     presentPaywall,
     presentPaywallIfNeeded,
     purchaseCourse,
+    redeemOfferCode,
     getOfferings,
     restorePurchases,
     refreshCustomerInfo,

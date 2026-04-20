@@ -75,8 +75,9 @@ export function PaymentModal({
 }: PaymentModalProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const { purchaseCourse } = useRevenueCat();
+  const { purchaseCourse, redeemOfferCode } = useRevenueCat();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isRedeemingOfferCode, setIsRedeemingOfferCode] = useState(false);
   const [paymentStep, setPaymentStep] = useState<
     "details" | "processing" | "success" | "error"
   >("details");
@@ -167,6 +168,55 @@ export function PaymentModal({
 
   const finalAmount = appliedDiscount ? appliedDiscount.finalPrice : (course?.price || 0);
 
+  const recordIOSPurchaseOnBackend = async (params: {
+    courseId: string;
+    transactionId?: string;
+    appUserId?: string;
+    appleProductId?: string;
+  }) => {
+    const token = getCachedToken();
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/payments/ios-purchase`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(Capacitor.isNativePlatform() && {
+          'x-client-platform': Capacitor.getPlatform(),
+        }),
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || 'Failed to record purchase on the server. Please check your network or contact support.');
+    }
+  };
+
+  const completeIOSSuccess = async () => {
+    if (!course) {
+      return;
+    }
+
+    await queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
+    await queryClient.invalidateQueries({ queryKey: ["courses"] });
+    await queryClient.invalidateQueries({ queryKey: ["myPayments"] });
+
+    setPaymentStep("success");
+
+    setTimeout(() => {
+      onSuccess(course.id);
+      toast({
+        title: "Purchase Successful!",
+        description: `You now have access to "${course.title}"`,
+      });
+      setPaymentStep("details");
+      setIsProcessing(false);
+      onClose();
+    }, 2000);
+  };
+
   const handleVerifiedPayment = async (
     razorpayResponse: RazorpayVerificationPayload,
   ) => {
@@ -221,50 +271,21 @@ export function PaymentModal({
       const result = await purchaseCourse(course.appleProductId);
 
       if (result.success) {
-        // Tell the backend to create payment + enrollment records
-        const token = getCachedToken();
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/payments/ios-purchase`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-            ...(Capacitor.isNativePlatform() && {
-              'x-client-platform': Capacitor.getPlatform(),
-            }),
-            'ngrok-skip-browser-warning': 'true',
-          },
-          body: JSON.stringify({ 
-            courseId: course.id,
-            transactionId: result.transactionId,
-            appUserId: result.appUserId
-          }),
+        await recordIOSPurchaseOnBackend({
+          courseId: course.id,
+          transactionId: result.transactionId,
+          appUserId: result.appUserId,
+          appleProductId: course.appleProductId,
         });
-
-        if (!response.ok) {
-          throw new Error("Failed to record purchase on the server. Please check your network or contact support.");
-        }
-
-        // Invalidate queries to refresh enrollment status
-        await queryClient.invalidateQueries({ queryKey: ["myEnrollments"] });
-        await queryClient.invalidateQueries({ queryKey: ["courses"] });
-        await queryClient.invalidateQueries({ queryKey: ["myPayments"] });
-
-        setPaymentStep("success");
-
-        setTimeout(() => {
-          onSuccess(course.id);
-          toast({
-            title: "Purchase Successful!",
-            description: `You now have access to "${course.title}"`,
-          });
-          setPaymentStep("details");
-          setIsProcessing(false);
-          onClose();
-        }, 2000);
+        await completeIOSSuccess();
       } else {
         // User cancelled or purchase failed
-        if (result.error) setErrorMessage(result.error);
-        setPaymentStep(result.error ? "error" : "details");
+        if (result.cancelled) {
+          setPaymentStep("details");
+        } else {
+          if (result.error) setErrorMessage(result.error);
+          setPaymentStep(result.error ? "error" : "details");
+        }
         setIsProcessing(false);
       }
     } catch (error: any) {
@@ -272,6 +293,66 @@ export function PaymentModal({
       setPaymentStep("error");
       setErrorMessage(error.message || "App Store purchase failed");
       setIsProcessing(false);
+    }
+  };
+
+  const handleRedeemOfferCode = async () => {
+    if (!course || !user) return;
+
+    if (!course.appleProductId) {
+      toast({
+        title: "Error",
+        description: "This course is missing Apple Product ID configuration.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsRedeemingOfferCode(true);
+
+    try {
+      const result = await redeemOfferCode(course.appleProductId);
+
+      if (result.success) {
+        await recordIOSPurchaseOnBackend({
+          courseId: course.id,
+          appUserId: result.appUserId,
+          appleProductId: course.appleProductId,
+        });
+
+        toast({
+          title: "Offer Code Applied",
+          description: "Your App Store offer code was redeemed successfully.",
+        });
+
+        await completeIOSSuccess();
+        return;
+      }
+
+      if (result.cancelled) {
+        toast({
+          title: "Redemption Cancelled",
+          description: "No changes were made to your purchase.",
+        });
+        return;
+      }
+
+      toast({
+        title: "Offer Code Not Applied",
+        description:
+          result.error ||
+          "No active offer was detected for this course after redemption.",
+        variant: "destructive",
+      });
+    } catch (error: any) {
+      console.error("Offer code redemption error:", error);
+      toast({
+        title: "Offer Code Error",
+        description: error.message || "Failed to redeem offer code",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRedeemingOfferCode(false);
     }
   };
 
@@ -593,6 +674,24 @@ export function PaymentModal({
               <Shield className="h-4 w-4" />
               <span>{isIOS ? 'Managed by Apple • Secure payment' : 'Secure payment processing'}</span>
             </div>
+
+            {isIOS && (
+              <Button
+                variant="outline"
+                onClick={handleRedeemOfferCode}
+                disabled={isProcessing || isRedeemingOfferCode}
+                className="w-full mt-3"
+              >
+                {isRedeemingOfferCode ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Redeeming Offer Code...
+                  </span>
+                ) : (
+                  "Redeem App Store Offer Code"
+                )}
+              </Button>
+            )}
 
             <DialogFooter className="mt-4">
               <Button

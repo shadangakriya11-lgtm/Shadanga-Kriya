@@ -500,12 +500,17 @@ const recordIOSPurchase = async (req, res) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const { courseId, transactionId: reqTransactionId, appUserId } = req.body;
+    const {
+      courseId,
+      transactionId: reqTransactionId,
+      appUserId,
+      appleProductId: requestAppleProductId,
+    } = req.body;
     const userId = req.user.id;
 
     // 1. Get course details
     const courseResult = await client.query(
-      'SELECT id, title, price, android_price, ios_price, status FROM courses WHERE id = $1',
+      'SELECT id, title, price, android_price, ios_price, status, apple_product_id FROM courses WHERE id = $1',
       [courseId]
     );
 
@@ -520,6 +525,8 @@ const recordIOSPurchase = async (req, res) => {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Cannot purchase a draft course' });
     }
+
+    const appleProductId = requestAppleProductId || course.apple_product_id || null;
 
     // 2. Server-side RevenueCat Verification
     if (process.env.REVENUECAT_SECRET_KEY && appUserId) {
@@ -536,14 +543,25 @@ const recordIOSPurchase = async (req, res) => {
         }
 
         const data = await rcResponse.json();
-        const entitlements = data.subscriber?.entitlements || {};
-        
-        // Check for generic course_access entitlement
-        const hasEntitlement = entitlements['course_access'] !== undefined;
+        const subscriber = data.subscriber || {};
+        const entitlements = subscriber.entitlements || {};
+        const subscriptions = subscriber.subscriptions || {};
+        const nonSubscriptions = subscriber.non_subscriptions || {};
 
-        if (!hasEntitlement) {
+        // Generic entitlement support + strict product checks for course-specific offer codes.
+        const hasCourseEntitlement = entitlements['course_access'] !== undefined;
+        const hasSubscriptionForProduct = appleProductId
+          ? subscriptions[appleProductId] !== undefined
+          : false;
+        const hasNonSubscriptionForProduct = appleProductId
+          ? Array.isArray(nonSubscriptions[appleProductId]) && nonSubscriptions[appleProductId].length > 0
+          : false;
+
+        if (!hasCourseEntitlement && !hasSubscriptionForProduct && !hasNonSubscriptionForProduct) {
           await client.query('ROLLBACK');
-          return res.status(403).json({ error: 'Server Verification Failed: You do not have the required entitlement.' });
+          return res.status(403).json({
+            error: 'Server Verification Failed: No active entitlement or purchased product found for this iOS course.',
+          });
         }
       } catch (err) {
         console.error('RevenueCat server verification error:', err);

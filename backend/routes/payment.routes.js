@@ -38,7 +38,10 @@ router.post('/verify-razorpay', verifyToken, paymentController.verifyRazorpayPay
 
 // iOS In-App Purchase (RevenueCat / Apple IAP)
 router.post('/ios-purchase', verifyToken, [
-  body('courseId').isUUID().withMessage('Valid course ID required')
+  body('courseId').isUUID().withMessage('Valid course ID required'),
+  body('transactionId').optional().isString().trim(),
+  body('appUserId').optional().isString().trim(),
+  body('appleProductId').optional().isString().trim()
 ], validate, paymentController.recordIOSPurchase);
 
 module.exports = router;
